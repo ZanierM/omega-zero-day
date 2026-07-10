@@ -1,0 +1,8 @@
+Buildings & units (bld_*.png, u_*.png):
+  "Sci-Fi Strategy Mech Buildings Isometric Asset Pack" by acdrnx,
+  licensed CC0 1.0 Universal (public domain).
+  https://opengameart.org/content/sci-fi-strategy-mech-buildings-isometric-asset-pack
+
+Environment props (env_*.png):
+  "Sci-Fi RTS" by Kenney (kenney.nl), licensed CC0 1.0 Universal.
+  https://kenney.nl/assets/sci-fi-rts
