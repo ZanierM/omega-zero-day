@@ -37,16 +37,30 @@ function blob(cx: number, cy: number, r: number, fn: (x: number, y: number) => v
     }
 }
 
-// Base corners in tile coords: player SW, enemies NE / NW / SE
-export function basePositions(numEnemies: number): { x: number, y: number }[] {
+// Base corners are randomized each game. generateMap() decides them once and
+// stores the result so map generation and world setup always agree.
+// Index 0 is the player.
+export let startBases: { x: number, y: number }[] = [];
+
+function pickBasePositions(numEnemies: number): { x: number, y: number }[] {
   const m = 8;
-  const spots = [
-    { x: m, y: MAP_H - m - 3 },              // player, bottom-left
-    { x: MAP_W - m - 3, y: m },              // enemy 1, top-right
-    { x: m, y: m },                          // enemy 2, top-left
-    { x: MAP_W - m - 3, y: MAP_H - m - 3 },  // enemy 3, bottom-right
+  const corners = [
+    { x: m, y: MAP_H - m - 3 },              // SW
+    { x: MAP_W - m - 3, y: m },              // NE
+    { x: m, y: m },                          // NW
+    { x: MAP_W - m - 3, y: MAP_H - m - 3 },  // SE
   ];
-  return spots.slice(0, numEnemies + 1);
+  if (numEnemies === 1) {
+    // 1v1: always a diagonal pair so bases start far apart
+    const pair = rand() < 0.5 ? [corners[0], corners[1]] : [corners[2], corners[3]];
+    return rand() < 0.5 ? pair : [pair[1], pair[0]];
+  }
+  // shuffle all corners, take what we need
+  for (let i = corners.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [corners[i], corners[j]] = [corners[j], corners[i]];
+  }
+  return corners.slice(0, numEnemies + 1);
 }
 
 export function generateMap(numEnemies: number) {
@@ -59,7 +73,8 @@ export function generateMap(numEnemies: number) {
 
   for (let i = 0; i < terrain.length; i++) tint[i] = Math.floor(rand() * 4);
 
-  const bases = basePositions(numEnemies);
+  startBases = pickBasePositions(numEnemies);
+  const bases = startBases;
 
   // Rock formations scattered around, away from every base
   const rockCount = Math.floor(MAP_W * MAP_H / 260);

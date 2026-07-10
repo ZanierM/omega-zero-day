@@ -167,6 +167,89 @@ export function initInput() {
   });
   window.addEventListener('keyup', e => keys.delete(e.key));
 
+  // ---------- touch controls (phones / tablets) ----------
+  // one-finger drag pans · tap selects or orders · long-press = attack-move
+  let touch: { x: number, y: number, sx: number, sy: number, moved: boolean } | null = null;
+  let lastTapAt = 0;
+  let longPressTimer: number | null = null;
+
+  const touchPos = (e: TouchEvent) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+  };
+  const updateGhost = () => {
+    if (!placement) return;
+    const w = toWorld(mouse.x, mouse.y);
+    const def = BUILDINGS[placement.defId];
+    placement.tx = Math.min(MAP_W - def.w, Math.max(0, tileOf(w.x) - Math.floor(def.w / 2)));
+    placement.ty = Math.min(MAP_H - def.h, Math.max(0, tileOf(w.y) - Math.floor(def.h / 2)));
+  };
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length !== 1) { touch = null; return; }
+    const p = touchPos(e);
+    touch = { x: p.x, y: p.y, sx: p.x, sy: p.y, moved: false };
+    mouse.x = p.x; mouse.y = p.y; mouse.inside = true;
+    updateGhost();
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = window.setTimeout(() => {
+      if (touch && !touch.moved && !placement && selectedUnits().some(u => u.def.damage > 0)) {
+        const w = toWorld(touch.x, touch.y);
+        for (const u of selectedUnits()) if (u.def.damage > 0) issueOrder(u, { type: 'attackMove', x: w.x, y: w.y });
+        toast('Attack-move');
+        touch = null; // consume so the tap doesn't also fire
+      }
+    }, 500);
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!touch || e.touches.length !== 1) return;
+    const p = touchPos(e);
+    if (Math.hypot(p.x - touch.sx, p.y - touch.sy) > 12) touch.moved = true;
+    if (touch.moved && !placement) {
+      camera.x -= p.x - touch.x;
+      camera.y -= p.y - touch.y;
+      clampCamera();
+    }
+    touch.x = p.x; touch.y = p.y;
+    mouse.x = p.x; mouse.y = p.y;
+    updateGhost();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    if (!touch) return;
+    const t = touch;
+    touch = null;
+    if (t.moved) return; // it was a pan
+    mouse.x = t.x; mouse.y = t.y;
+    // tap: place building / select own thing / order the current selection
+    if (placement) {
+      if (canPlace(PLAYER, placement.defId, placement.tx, placement.ty)) {
+        placeBuilding(placement.defId, PLAYER, placement.tx, placement.ty);
+        placement = null;
+        onBuildingPlaced();
+        sfx('place');
+      } else { toast('Cannot build there'); sfx('error'); }
+      return;
+    }
+    const w = toWorld(t.x, t.y);
+    const hit = entityAt(w.x, w.y);
+    const now = performance.now();
+    if (hit && hit.owner === PLAYER && !(selection.size && hit.kind === 'building' && selectedUnits().length)) {
+      selection.clear();
+      selection.add(hit.id);
+    } else if (selection.size > 0) {
+      rightClick(); // move / attack / harvest / set rally — same as a right-click
+    } else if (now - lastTapAt < 350) {
+      selection.clear();
+    }
+    lastTapAt = now;
+  }, { passive: false });
+
   // minimap click → jump camera
   const mm = document.getElementById('minimap') as HTMLCanvasElement;
   const jump = (e: MouseEvent) => {

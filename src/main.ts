@@ -1,5 +1,5 @@
 import { PLAYER, TILE } from './config';
-import { generateMap, basePositions } from './map';
+import { generateMap, startBases } from './map';
 import * as game from './game';
 import { update, spawnUnit, placeBuilding, buildingCenter, centerOfTile, initGame } from './game';
 import { updateAI, initAI } from './ai';
@@ -24,7 +24,7 @@ async function startGame(numEnemies: number) {
   await loadSprites();
   initRenderer();
 
-  const bases = basePositions(numEnemies);
+  const bases = startBases; // randomized by generateMap
   for (let owner = 0; owner < bases.length; owner++) {
     const b = bases[owner];
     const hq = placeBuilding('nexus', owner, b.x, b.y);

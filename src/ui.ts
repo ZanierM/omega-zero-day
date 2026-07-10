@@ -87,11 +87,11 @@ export function initUI() {
       if (q[0]?.ready) { q.shift(); return; }
     }
   });
-  upgBtn.addEventListener('click', () => {
+  upgBtn.addEventListener('pointerdown', () => {
     const b = selectedOwnBuilding();
     if (b) upgradeBuilding(b);
   });
-  actBtn.addEventListener('click', () => {
+  actBtn.addEventListener('pointerdown', () => {
     const u = selectedOwnPioneer();
     if (u) { deployPioneer(u); return; }
     const b = selectedOwnBuilding();
@@ -212,7 +212,7 @@ export function updateUI() {
   // selection info + building upgrade button
   const ob = selectedOwnBuilding();
   if (ob && ob.def.upgradable && (ob.level < 3 || ob.upgrading)) {
-    upgBtn.style.display = 'block';
+    upgBtn.style.visibility = 'visible';
     if (ob.upgrading) {
       const pct = Math.round((1 - ob.upgrading.remaining / ob.upgrading.total) * 100);
       upgBtn.textContent = `UPGRADING… ${pct}%`;
@@ -222,21 +222,21 @@ export function updateUI() {
       upgBtn.disabled = false;
     }
   } else {
-    upgBtn.style.display = 'none';
+    upgBtn.style.visibility = 'hidden';
   }
 
   // contextual action button: deploy a Pioneer, or repair a damaged building
   const pio = selectedOwnPioneer();
   if (pio) {
-    actBtn.style.display = 'block';
+    actBtn.style.visibility = 'visible';
     actBtn.textContent = '▼ DEPLOY COMMAND POST';
     actBtn.disabled = false;
   } else if (ob && ob.hp < ob.maxHp) {
-    actBtn.style.display = 'block';
+    actBtn.style.visibility = 'visible';
     if (ob.repairing) { actBtn.textContent = 'REPAIRING…'; actBtn.disabled = true; }
     else { actBtn.textContent = `🔧 REPAIR — $${repairCost(ob)}`; actBtn.disabled = false; }
   } else {
-    actBtn.style.display = 'none';
+    actBtn.style.visibility = 'hidden';
   }
 
   if (selection.size > 0) {
