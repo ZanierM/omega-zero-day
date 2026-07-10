@@ -57,10 +57,10 @@ function iconHtml(tab: Tab, defId: string): string {
   if (tab === 'ups') return upgradeSvg(defId);
   if (tab === 'inf' || tab === 'veh') {
     const d = UNITS[defId];
-    return `<img src="/sprites/u_${d.model}${d.mstep}_s.png" alt="">`;
+    return `<img src="sprites/u_${d.model}${d.mstep}_s.png" alt="">`;
   }
   const s = BUILDINGS[defId]?.sprite;
-  if (s) return `<img src="/sprites/${s}_1.png" alt="">`;
+  if (s) return `<img src="sprites/${s}_1.png" alt="">`;
   return `<img src="${defenceIconUrl(defId)}" alt="">`; // turret / wall: baked art
 }
 

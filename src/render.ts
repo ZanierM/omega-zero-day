@@ -82,7 +82,7 @@ export function loadSprites(): Promise<void> {
     const img = new Image();
     img.onload = () => { images.set(f, img); res(); };
     img.onerror = () => res(); // missing file → procedural fallback
-    img.src = `/sprites/${f}.png`;
+    img.src = `sprites/${f}.png`;
   }));
   return Promise.all(jobs).then(() => {});
 }
