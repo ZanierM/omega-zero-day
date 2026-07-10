@@ -193,15 +193,15 @@
     @keyframes chev { 50% { opacity: 0.25; } }
 
     /* ---- compact HUD for phones & small windows ---- */
-    @media (max-width: 860px), (pointer: coarse) and (max-height: 500px) {
-      #minimap { width: 92px; height: 92px; }
-      #infopanel { width: 170px; }
-      #credits { font-size: 14px; }
-      .bbtn { width: 84px; min-width: 84px; }
-      .bbtn img, .bbtn svg { height: 42px; }
+    @media (max-width: 860px), (pointer: coarse) and (max-height: 560px) {
+      #minimap { width: 84px; height: 84px; }
+      #infopanel { width: 150px; }
+      #credits { font-size: 13px; }
+      .bbtn { width: 80px; min-width: 80px; }
+      .bbtn img, .bbtn svg { height: 44px; }
       .htab { padding: 5px 8px 4px; font-size: 9.5px; letter-spacing: 1px; }
       #selinfo { font-size: 9px; }
-      #toast { bottom: 156px; font-size: 11px; }
+      #toast { bottom: 150px; font-size: 11px; }
       #briefbox { padding: 18px 16px; margin: 8px; }
       #briefbox h1 { font-size: 20px; letter-spacing: 3px; }
       #briefbox p { font-size: 11px; }
@@ -210,11 +210,49 @@
       .opt span { font-size: 7px; }
       .radar { display: none; }
     }
+
+    /* short landscape viewport (phones especially): reclaim vertical space so the
+       battlefield gets most of the screen — this is the intended way to play */
+    @media (orientation: landscape) and (max-height: 480px) {
+      #minimapwrap { justify-content: flex-end; }
+      #hudrow { gap: 5px; padding: 4px; }
+      #minimap { width: 60px; height: 60px; }
+      #infopanel { width: 124px; gap: 3px; }
+      #resline { padding: 2px 6px; }
+      #credits { font-size: 12px; }
+      #creditlabel { display: none; }
+      #powerwrap { padding: 2px 6px 3px; }
+      #powerbar { height: 7px; }
+      .bbtn { width: 58px; min-width: 58px; padding-bottom: 2px; }
+      .bbtn img, .bbtn svg { height: 30px; top: 3px; }
+      .bbtn .nm { display: none; }               /* icon + cost only */
+      .bbtn .cost { font-size: 9px; }
+      #buildgrid { gap: 4px; }
+      .htab { padding: 3px 7px 3px; font-size: 8.5px; letter-spacing: 1px; }
+      #tabsbar { padding: 0 4px; }
+      #selinfo { padding: 3px 6px; font-size: 8.5px; line-height: 1.3; }
+      #upgbtn, #actbtn { padding: 3px 0; font-size: 9px; letter-spacing: 1px; }
+      #mutebtn { display: none; }
+    }
+
+    /* ⛶ box-select toggle — floats over the map, touch devices only */
+    #selectmode { display: none; }
+    @media (pointer: coarse) {
+      #selectmode {
+        display: flex; position: absolute; top: 8px; left: 8px; z-index: 6;
+        width: 46px; height: 46px; align-items: center; justify-content: center;
+        font-size: 22px; color: #ffb02e; background: rgba(12,5,3,0.72);
+        border: 1px solid #ff8c3a88; border-radius: 8px; cursor: pointer;
+        -webkit-tap-highlight-color: transparent; user-select: none;
+      }
+      #selectmode.active { color: #0a0402; background: #ffb02e; box-shadow: 0 0 12px rgba(255,176,46,0.6); }
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <canvas id="game"></canvas>
+    <button id="selectmode" title="Box-select mode">⛶</button>
     <div id="bottombar">
       <div id="tabsbar"></div>
       <div id="hudrow">

@@ -13,6 +13,8 @@ export let selectBox: { x: number, y: number, w: number, h: number } | null = nu
 export let placement: { defId: string, tx: number, ty: number } | null = null;
 export let attackMovePending = false;          // press A, then left-click a spot
 const controlGroups = new Map<string, number[]>(); // '1'..'9' → entity ids
+let usingTouch = false;    // true once any touch happens → disables mouse edge-scroll
+let selectMode = false;    // ⛶ toggle: one-finger drag box-selects instead of panning
 
 export function startPlacement(defId: string) {
   placement = { defId, tx: 0, ty: 0 };
@@ -168,9 +170,12 @@ export function initInput() {
   window.addEventListener('keyup', e => keys.delete(e.key));
 
   // ---------- touch controls (phones / tablets) ----------
-  // one-finger drag pans · tap selects or orders · long-press = attack-move
+  // one-finger drag pans · tap selects / orders · long-press = attack-move.
+  // The ⛶ button flips to box-select: a one-finger drag rubber-bands a selection.
+  // Double-tap a unit selects every unit of that type.
   let touch: { x: number, y: number, sx: number, sy: number, moved: boolean } | null = null;
   let lastTapAt = 0;
+  let lastTapId = -1;
   let longPressTimer: number | null = null;
 
   const touchPos = (e: TouchEvent) => {
@@ -187,20 +192,25 @@ export function initInput() {
 
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
-    if (e.touches.length !== 1) { touch = null; return; }
+    usingTouch = true;
+    if (e.touches.length !== 1) { touch = null; selectBox = null; return; }
     const p = touchPos(e);
     touch = { x: p.x, y: p.y, sx: p.x, sy: p.y, moved: false };
-    mouse.x = p.x; mouse.y = p.y; mouse.inside = true;
+    // note: we set mouse.x/y for world-projection, but never mouse.inside —
+    // that flag drives mouse edge-scroll, which must stay off during touch
+    mouse.x = p.x; mouse.y = p.y;
     updateGhost();
     if (longPressTimer) clearTimeout(longPressTimer);
-    longPressTimer = window.setTimeout(() => {
-      if (touch && !touch.moved && !placement && selectedUnits().some(u => u.def.damage > 0)) {
-        const w = toWorld(touch.x, touch.y);
-        for (const u of selectedUnits()) if (u.def.damage > 0) issueOrder(u, { type: 'attackMove', x: w.x, y: w.y });
-        toast('Attack-move');
-        touch = null; // consume so the tap doesn't also fire
-      }
-    }, 500);
+    if (!selectMode) {
+      longPressTimer = window.setTimeout(() => {
+        if (touch && !touch.moved && !placement && selectedUnits().some(u => u.def.damage > 0)) {
+          const w = toWorld(touch.x, touch.y);
+          for (const u of selectedUnits()) if (u.def.damage > 0) issueOrder(u, { type: 'attackMove', x: w.x, y: w.y });
+          toast('Attack-move');
+          touch = null; // consume so the tap doesn't also fire
+        }
+      }, 500);
+    }
   }, { passive: false });
 
   canvas.addEventListener('touchmove', e => {
@@ -209,9 +219,16 @@ export function initInput() {
     const p = touchPos(e);
     if (Math.hypot(p.x - touch.sx, p.y - touch.sy) > 12) touch.moved = true;
     if (touch.moved && !placement) {
-      camera.x -= p.x - touch.x;
-      camera.y -= p.y - touch.y;
-      clampCamera();
+      if (selectMode) {
+        selectBox = {
+          x: Math.min(touch.sx, p.x), y: Math.min(touch.sy, p.y),
+          w: Math.abs(p.x - touch.sx), h: Math.abs(p.y - touch.sy),
+        };
+      } else {
+        camera.x -= p.x - touch.x;
+        camera.y -= p.y - touch.y;
+        clampCamera();
+      }
     }
     touch.x = p.x; touch.y = p.y;
     mouse.x = p.x; mouse.y = p.y;
@@ -221,12 +238,26 @@ export function initInput() {
   canvas.addEventListener('touchend', e => {
     e.preventDefault();
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-    if (!touch) return;
+    if (!touch) { selectBox = null; return; }
     const t = touch;
     touch = null;
+
+    // box-select drag completed
+    if (selectMode && t.moved && selectBox && (selectBox.w > 6 || selectBox.h > 6)) {
+      const x0 = selectBox.x + camera.x, y0 = selectBox.y + camera.y;
+      const x1 = x0 + selectBox.w, y1 = y0 + selectBox.h;
+      selection.clear();
+      for (const u of units) {
+        if (u.owner === PLAYER && u.x >= x0 && u.x <= x1 && u.y >= y0 && u.y <= y1) selection.add(u.id);
+      }
+      selectBox = null;
+      if (selection.size) sfx('click');
+      return;
+    }
+    selectBox = null;
     if (t.moved) return; // it was a pan
+
     mouse.x = t.x; mouse.y = t.y;
-    // tap: place building / select own thing / order the current selection
     if (placement) {
       if (canPlace(PLAYER, placement.defId, placement.tx, placement.ty)) {
         placeBuilding(placement.defId, PLAYER, placement.tx, placement.ty);
@@ -239,16 +270,36 @@ export function initInput() {
     const w = toWorld(t.x, t.y);
     const hit = entityAt(w.x, w.y);
     const now = performance.now();
-    if (hit && hit.owner === PLAYER && !(selection.size && hit.kind === 'building' && selectedUnits().length)) {
-      selection.clear();
-      selection.add(hit.id);
+    const isDbl = now - lastTapAt < 350;
+    if (hit && hit.owner === PLAYER) {
+      if (isDbl && hit.kind === 'unit' && lastTapId === hit.id) {
+        // double-tap a unit → select every unit of that type you own
+        selection.clear();
+        for (const u of units) if (u.owner === PLAYER && u.def.id === hit.def.id) selection.add(u.id);
+      } else if (selection.size && hit.kind === 'building' && selectedUnits().length) {
+        rightClick(); // units selected + tapped own building → order there
+      } else {
+        selection.clear();
+        selection.add(hit.id);
+      }
+      lastTapId = hit.kind === 'unit' ? hit.id : -1;
     } else if (selection.size > 0) {
-      rightClick(); // move / attack / harvest / set rally — same as a right-click
-    } else if (now - lastTapAt < 350) {
-      selection.clear();
+      rightClick(); // move / attack / harvest / set rally
+      lastTapId = -1;
+    } else {
+      if (isDbl) selection.clear();
+      lastTapId = -1;
     }
     lastTapAt = now;
   }, { passive: false });
+
+  // ⛶ box-select toggle (shown only on touch devices via CSS)
+  const selBtn = document.getElementById('selectmode');
+  selBtn?.addEventListener('click', () => {
+    selectMode = !selectMode;
+    selBtn.classList.toggle('active', selectMode);
+    canvas.style.cursor = selectMode ? 'cell' : 'crosshair';
+  });
 
   // minimap click → jump camera
   const mm = document.getElementById('minimap') as HTMLCanvasElement;
@@ -312,7 +363,9 @@ export function updateCamera(dt: number) {
   if (keys.has('ArrowRight') || keys.has('d')) dx += 1;
   if (keys.has('ArrowUp') || keys.has('w')) dy -= 1;
   if (keys.has('ArrowDown') || keys.has('s')) dy += 1;
-  if (mouse.inside && !dragStart) {
+  // edge-scroll is a mouse-only affordance — on touch you drag to pan, and a
+  // finger resting near an edge must never make the camera crawl on its own
+  if (mouse.inside && !dragStart && !usingTouch) {
     if (mouse.x < EDGE) dx -= 1;
     if (mouse.x > canvas.clientWidth - EDGE) dx += 1;
     if (mouse.y < EDGE) dy -= 1;
