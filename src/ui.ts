@@ -5,6 +5,7 @@ import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
   gameOver, toastMsg, toast, byId, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
+  enemyStrikeETA, starvedHarvesters, stats,
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
 import { sfx, duckMusic } from './audio';
@@ -18,6 +19,11 @@ const tabsBar = document.getElementById('tabsbar')!;
 const selInfo = document.getElementById('selinfo')!;
 const countdown = document.getElementById('countdown')!;
 const cdTime = document.getElementById('cdtime')!;
+const enemySw = document.getElementById('enemysw')!;
+const idleBtn = document.getElementById('idlebtn')!;
+const idleCount = document.getElementById('idlecount')!;
+const overlayStats = document.getElementById('overlaystats')!;
+const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const upgBtn = document.getElementById('upgbtn') as HTMLButtonElement;
 const actBtn = document.getElementById('actbtn') as HTMLButtonElement;
 const overlay = document.getElementById('overlay')!;
@@ -202,6 +208,21 @@ export function updateUI() {
     countdown.style.display = 'none';
   }
 
+  // enemy orbital-strike dread banner (RA2-style visible countdown)
+  const eta = enemyStrikeETA();
+  if (eta !== Infinity && !gameOver) {
+    enemySw.classList.add('show');
+    enemySw.classList.toggle('imminent', eta <= 0);
+    enemySw.textContent = eta <= 0 ? '⚠ HOSTILE ORBITAL STRIKE READY' : `⚠ HOSTILE ORBITAL STRIKE — ${fmtTime(eta)}`;
+  } else {
+    enemySw.classList.remove('show', 'imminent');
+  }
+
+  // idle-harvester warning button
+  const idle = starvedHarvesters().length;
+  idleBtn.classList.toggle('show', idle > 0 && !gameOver);
+  if (idle > 0) idleCount.textContent = String(idle);
+
   // research tab dims until a Laboratory exists
   const upsTab = tabBtns.get('ups');
   if (upsTab) upsTab.classList.toggle('locked', !hasBuilding(PLAYER, 'lab'));
@@ -296,5 +317,17 @@ export function updateUI() {
       : novaExpired
       ? 'Helios detonated with the enemy still standing. The fleet burns. There is no dawn.'
       : 'Vanguard command has fallen. The fleet dies in orbit, and humanity with the sun.';
+    if (!overlayStats.childElementCount) {
+      const rows: [string, string][] = [
+        ['TIME', fmtTime(stats.time)],
+        ['FLUX MINED', `◈ ${Math.round(stats.flux).toLocaleString()}`],
+        ['UNITS BUILT', String(stats.built)],
+        ['UNITS LOST', String(stats.lost)],
+        ['ENEMIES KILLED', String(stats.killed)],
+        ['STRUCTURES RAZED', String(stats.razed)],
+        ['ORBITAL STRIKES', String(stats.strikes)],
+      ];
+      overlayStats.innerHTML = rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join('');
+    }
   }
 }

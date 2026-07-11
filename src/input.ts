@@ -3,6 +3,7 @@ import { MAP_W, MAP_H } from './map';
 import {
   units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding,
   entityPos, entityRadius, toast, Unit, fireStrike, superReady,
+  jumpTargetAlert, starvedHarvesters,
 } from './game';
 import { crystal, idx, inBounds } from './map';
 import { sfx } from './audio';
@@ -16,6 +17,7 @@ export let attackMovePending = false;          // press A, then left-click a spo
 const controlGroups = new Map<string, number[]>(); // '1'..'9' → entity ids
 let usingTouch = false;    // true once any touch happens → disables mouse edge-scroll
 let selectMode = false;    // ⛶ toggle: one-finger drag box-selects instead of panning
+let lastMouseClick = 0, lastMouseUnit = -1; // for desktop double-click select-type
 
 export function startPlacement(defId: string) {
   placement = { defId, tx: 0, ty: 0 };
@@ -165,8 +167,17 @@ export function initInput() {
     } else {
       const w = toWorld(mouse.x, mouse.y);
       const hit = entityAt(w.x, w.y);
+      const now = performance.now();
+      const dbl = hit && hit.kind === 'unit' && hit.id === lastMouseUnit && now - lastMouseClick < 350;
       selection.clear();
-      if (hit && hit.owner === PLAYER) selection.add(hit.id);
+      if (dbl && hit && hit.kind === 'unit') {
+        // double-click a unit → select all of that type you own (like SC/RA2)
+        for (const u of units) if (u.owner === PLAYER && u.def.id === hit.def.id) selection.add(u.id);
+      } else if (hit && hit.owner === PLAYER) {
+        selection.add(hit.id);
+      }
+      lastMouseUnit = hit && hit.kind === 'unit' ? hit.id : -1;
+      lastMouseClick = now;
     }
     dragStart = null;
     selectBox = null;
@@ -183,6 +194,11 @@ export function initInput() {
     // S = stop
     if (e.key === 's' || e.key === 'S') {
       for (const u of selectedUnits()) issueOrder(u, { type: 'idle' });
+    }
+    // Space = snap camera to the last "under attack" alert
+    if (e.key === ' ') {
+      const a = jumpTargetAlert();
+      if (a) { centerCameraOn(a.x, a.y); e.preventDefault(); }
     }
     // control groups: Ctrl/Cmd+digit assigns, digit recalls
     if (e.key >= '1' && e.key <= '9') {
@@ -357,6 +373,17 @@ export function initInput() {
     selectMode = !selectMode;
     selBtn.classList.toggle('active', selectMode);
     canvas.style.cursor = selectMode ? 'cell' : 'crosshair';
+  });
+
+  // idle-harvester button: cycle to the next starved harvester and select it
+  let idleCycle = 0;
+  document.getElementById('idlebtn')?.addEventListener('click', () => {
+    const idle = starvedHarvesters();
+    if (!idle.length) return;
+    const u = idle[idleCycle % idle.length];
+    idleCycle++;
+    selection.clear(); selection.add(u.id);
+    centerCameraOn(u.x, u.y);
   });
 
   // minimap click → jump camera

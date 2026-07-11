@@ -34,6 +34,7 @@ export interface Unit {
   autoTargetId: number;          // acquired target when idle (-1 none)
   repathTimer: number;
   facing: number;                // radians, for drawing
+  starved: boolean;              // harvester with no reachable crystal
 }
 
 export interface Building {
@@ -115,6 +116,10 @@ export function initGame(numEnemies: number) {
   for (const s of neutralSpots) {
     neutrals.push({ id: nextId++, tx: s.x, ty: s.y, kind: s.kind, owner: -1, prog: 0, progOwner: -1 });
   }
+  pings.length = 0;
+  lastAlert = { x: 0, y: 0, valid: false };
+  alertCooldown = 0;
+  resetStats();
 }
 
 export interface Beam { x1: number, y1: number, x2: number, y2: number, ttl: number, color: string }
@@ -131,6 +136,34 @@ export const booms: Boom[] = [];
 export const shells: Shell[] = [];
 export const strikes: Strike[] = [];
 export let flash = 0; // 0..1 screen-flash intensity for a big orbital detonation
+
+// map pings for the player: red = under attack, amber = objective event
+export interface Ping { x: number, y: number, t: number, color: string }
+export const pings: Ping[] = [];
+export let lastAlert = { x: 0, y: 0, valid: false }; // camera-jump target (Space)
+let alertCooldown = 0;
+
+function raiseAlert(x: number, y: number) {
+  lastAlert = { x, y, valid: true };
+  pings.push({ x, y, t: 0, color: '#ff4030' });
+  if (alertCooldown <= 0) { alertCooldown = 5; toast('Base under attack!'); sfx('alert'); }
+}
+export function jumpTargetAlert(): { x: number, y: number } | null {
+  return lastAlert.valid ? { x: lastAlert.x, y: lastAlert.y } : null;
+}
+
+// per-match stats for the player (index 0); shown on the game-over screen
+export const stats = { time: 0, built: 0, lost: 0, killed: 0, flux: 0, razed: 0, strikes: 0 };
+function resetStats() { stats.time = 0; stats.built = 0; stats.lost = 0; stats.killed = 0; stats.flux = 0; stats.razed = 0; stats.strikes = 0; }
+
+// soonest enemy orbital strike, in seconds (Infinity = none). Powers the dread banner.
+export function enemyStrikeETA(): number {
+  let best = Infinity;
+  for (const b of buildings) {
+    if (b.owner !== PLAYER && b.def.superweapon) best = Math.min(best, b.charge);
+  }
+  return best;
+}
 
 export let gameOver: 'win' | 'lose' | null = null;
 export let paused = true; // starts paused behind the mission briefing
@@ -196,11 +229,17 @@ export function spawnUnit(defId: string, owner: number, px: number, py: number):
     id: nextId++, kind: 'unit', def, owner, x: px, y: py, hp, maxHp: hp,
     path: null, order: { type: 'idle' }, cooldown: 0, cargo: 0,
     harvestState: def.harvester ? 'toField' : 'none',
-    autoTargetId: -1, repathTimer: 0, facing: 0,
+    autoTargetId: -1, repathTimer: 0, facing: 0, starved: false,
   };
   units.push(u);
   byId.set(u.id, u);
+  if (owner === PLAYER) stats.built++;
   return u;
+}
+
+// player harvesters that can't find crystal to mine — for the idle-worker button
+export function starvedHarvesters(): Unit[] {
+  return units.filter(u => u.owner === PLAYER && u.def.harvester && u.starved);
 }
 
 export function canPlace(owner: number, defId: string, tx: number, ty: number, requireProximity = true): boolean {
@@ -274,6 +313,9 @@ function destroy(e: Entity) {
   const p = entityPos(e);
   booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
   if (e.owner === PLAYER || audible(p.x, p.y)) sfx('explosion');
+  // stats: what the player lost vs what the player destroyed
+  if (e.owner === PLAYER) { if (e.kind === 'unit') stats.lost++; }
+  else { if (e.kind === 'unit') stats.killed++; else stats.razed++; }
   if (e.kind === 'unit') {
     units.splice(units.indexOf(e), 1);
   } else {
@@ -286,6 +328,11 @@ function destroy(e: Entity) {
 
 export function damage(target: Entity, amount: number) {
   target.hp -= amount;
+  // "our base is under attack" — alert when any player structure takes a hit
+  if (target.owner === PLAYER && target.kind === 'building') {
+    const c = buildingCenter(target);
+    raiseAlert(c.x, c.y);
+  }
   if (target.hp <= 0) destroy(target);
 }
 
@@ -515,6 +562,7 @@ export function fireStrike(b: Building, wx: number, wy: number): boolean {
   const sw = b.def.superweapon;
   if (!sw || b.charge > 0) return false;
   b.charge = sw.charge; // begin recharging
+  if (b.owner === PLAYER) stats.strikes++;
   strikes.push({ x: wx, y: wy, t: 0, delay: 2.2, owner: b.owner, damage: sw.damage, radius: sw.radius * TILE });
   // both sides hear the klaxon — an inbound orbital strike is everyone's problem
   sfx('siren');
@@ -553,6 +601,7 @@ function updateHarvester(u: Unit, dt: number) {
       else u.order = { type: 'idle' };
     }
     if (!goal) goal = nearestTile(tileOf(u.x), tileOf(u.y), 60, (x, y) => crystal[idx(x, y)] > 0);
+    u.starved = !goal;
     if (!goal) return; // no crystal left anywhere
 
     if (moveToward(u, centerOfTile(goal.x), centerOfTile(goal.y), dt)) {
@@ -581,10 +630,10 @@ function updateHarvester(u: Unit, dt: number) {
     const dock = { x: c.x, y: (best.ty + best.def.h) * TILE + TILE / 2 };
     if (moveToward(u, dock.x, dock.y, dt) || Math.hypot(c.x - u.x, c.y - u.y) < TILE * 2.2) {
       p.credits += Math.round(u.cargo);
+      if (u.owner === PLAYER) { stats.flux += Math.round(u.cargo); sfx('cash'); }
       u.cargo = 0;
       u.path = null;
       u.harvestState = 'toField';
-      if (u.owner === PLAYER) sfx('cash');
     }
   }
 }
@@ -786,6 +835,9 @@ export function update(dt: number) {
 
   // effects
   if (flash > 0) flash = Math.max(0, flash - dt * 1.4);
+  stats.time += dt;
+  if (alertCooldown > 0) alertCooldown -= dt;
+  for (let i = pings.length - 1; i >= 0; i--) { pings[i].t += dt; if (pings[i].t > 2.2) pings.splice(i, 1); }
   for (let i = beams.length - 1; i >= 0; i--) { beams[i].ttl -= dt; if (beams[i].ttl <= 0) beams.splice(i, 1); }
   for (let i = booms.length - 1; i >= 0; i--) {
     const bm = booms[i];
@@ -834,7 +886,10 @@ export function update(dt: number) {
     } else if (present.size === 0 && n.prog > 0) {
       n.prog = Math.max(0, n.prog - dt); // decay when abandoned; contested = frozen
     }
-    if (n.kind === 'vent' && n.owner >= 0) players[n.owner].credits += VENT_INCOME * dt;
+    if (n.kind === 'vent' && n.owner >= 0) {
+      players[n.owner].credits += VENT_INCOME * dt;
+      if (n.owner === PLAYER) stats.flux += VENT_INCOME * dt;
+    }
   }
 
   // fog of war (player perspective), cheap enough to refresh a few times a second

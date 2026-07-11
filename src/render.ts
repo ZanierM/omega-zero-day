@@ -1073,6 +1073,16 @@ export function render() {
     ctx.stroke();
   }
 
+  // alert pings — expanding rings where the player is being attacked
+  for (const p of game.pings) {
+    const k = p.t / 2.2;
+    const r = 8 + k * 46;
+    ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.strokeStyle = p.color; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   // soft fog of war
   updateFogTexture();
   ctx.imageSmoothingEnabled = true;
@@ -1151,6 +1161,14 @@ export function renderMinimap() {
     if (u.owner !== PLAYER && !visible[idx(tileOf(u.x), tileOf(u.y))]) continue;
     mmCtx.fillStyle = TEAM_COLORS[u.owner];
     mmCtx.fillRect((u.x / TILE) * sx - 1, (u.y / TILE) * sy - 1, 2.5, 2.5);
+  }
+  // alert pings on the minimap — blinking rings
+  for (const p of game.pings) {
+    if (Math.floor(p.t * 6) % 2) continue; // blink
+    mmCtx.strokeStyle = p.color; mmCtx.lineWidth = 1.5;
+    mmCtx.beginPath();
+    mmCtx.arc((p.x / TILE) * sx, (p.y / TILE) * sy, 4 + (p.t / 2.2) * 6, 0, Math.PI * 2);
+    mmCtx.stroke();
   }
   const { w, h } = viewSize();
   mmCtx.strokeStyle = '#fffa'; mmCtx.lineWidth = 1;

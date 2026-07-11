@@ -140,8 +140,10 @@ setInterval(() => {
 
 // Dev helpers, handy in the browser console while balancing
 import * as inputMod from './input';
+import * as mapMod from './map';
 (window as any).novaDebug = game;
 (window as any).novaInput = inputMod;
+(window as any).novaMap = mapMod;
 
 // Fast-forward the simulation by N seconds (e.g. novaStep(30) in the console)
 (window as any).novaStep = (seconds: number) => {
