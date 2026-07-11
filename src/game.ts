@@ -239,7 +239,7 @@ export function upgradeBuilding(b: Building): boolean {
   const cost = Math.round(b.def.cost * BLD_UPGRADE_COST);
   const p = players[b.owner];
   if (p.credits < cost) {
-    if (b.owner === PLAYER) { toast('Insufficient credits'); sfx('error'); }
+    if (b.owner === PLAYER) { toast('Insufficient flux'); sfx('error'); }
     return false;
   }
   p.credits -= cost;
@@ -324,7 +324,7 @@ export function startProduction(owner: number, defId: string, tab: Tab): boolean
   const kind = tab === 'ups' ? 'upgrade' : (tab === 'inf' || tab === 'veh') ? 'unit' : 'building';
   const def = kind === 'building' ? BUILDINGS[defId] : kind === 'unit' ? UNITS[defId] : UPGRADES[defId];
   if (p.credits < def.cost) {
-    if (owner === PLAYER) { toast('Insufficient credits'); sfx('error'); }
+    if (owner === PLAYER) { toast('Insufficient flux'); sfx('error'); }
     return false;
   }
   if (p.queues[tab].length >= 9) return false; // sane queue cap
@@ -457,7 +457,7 @@ export function startRepair(b: Building): boolean {
   const cost = repairCost(b);
   const p = players[b.owner];
   if (p.credits < cost) {
-    if (b.owner === PLAYER) { toast('Insufficient credits'); sfx('error'); }
+    if (b.owner === PLAYER) { toast('Insufficient flux'); sfx('error'); }
     return false;
   }
   p.credits -= cost;

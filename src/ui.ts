@@ -117,7 +117,7 @@ function rebuildGrid() {
     const el = document.createElement('div');
     el.className = 'bbtn';
     if ((def as any).desc) el.title = (def as any).desc;
-    el.innerHTML = `${iconHtml(activeTab, def.id)}<div class="nm">${def.name}</div><div class="cost">$${def.cost}</div><div class="prog"></div><div class="count"></div>`;
+    el.innerHTML = `${iconHtml(activeTab, def.id)}<div class="nm">${def.name}</div><div class="cost">◈${def.cost}</div><div class="prog"></div><div class="count"></div>`;
     el.addEventListener('click', () => onBtnClick(def.id));
     el.addEventListener('contextmenu', e => { e.preventDefault(); cancelOne(def.id); });
     grid.appendChild(el);
@@ -184,7 +184,7 @@ export function updateUI() {
   // smooth credit ticker, RA2-style
   shownCredits += (p.credits - shownCredits) * 0.2;
   if (Math.abs(shownCredits - p.credits) < 1) shownCredits = p.credits;
-  creditsEl.textContent = '$ ' + Math.round(shownCredits).toLocaleString();
+  creditsEl.textContent = '◈ ' + Math.round(shownCredits).toLocaleString();
 
   const pw = powerOf(PLAYER);
   const frac = pw.supply > 0 ? Math.min(1, pw.drain / pw.supply) : (pw.drain > 0 ? 1 : 0);
@@ -232,7 +232,7 @@ export function updateUI() {
       upgBtn.textContent = `UPGRADING… ${pct}%`;
       upgBtn.disabled = true;
     } else {
-      upgBtn.textContent = `⬆ UPGRADE (LV ${ob.level} → ${ob.level + 1}) — $${buildingUpgradeCost(ob)}`;
+      upgBtn.textContent = `⬆ UPGRADE (LV ${ob.level} → ${ob.level + 1}) — ◈${buildingUpgradeCost(ob)}`;
       upgBtn.disabled = false;
     }
   } else {
@@ -252,7 +252,7 @@ export function updateUI() {
   } else if (ob && ob.hp < ob.maxHp) {
     actBtn.style.visibility = 'visible';
     if (ob.repairing) { actBtn.textContent = 'REPAIRING…'; actBtn.disabled = true; }
-    else { actBtn.textContent = `🔧 REPAIR — $${repairCost(ob)}`; actBtn.disabled = false; }
+    else { actBtn.textContent = `🔧 REPAIR — ◈${repairCost(ob)}`; actBtn.disabled = false; }
   } else {
     actBtn.style.visibility = 'hidden';
   }
