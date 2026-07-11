@@ -58,12 +58,28 @@ for (const id of ['aiopts', 'diffopts']) {
 
 // sound: mute button + M hotkey
 const muteBtn = document.getElementById('mutebtn')!;
-function refreshMuteBtn() { muteBtn.textContent = isMuted() ? 'SOUND: OFF' : 'SOUND: ON'; }
+const pauseMute = document.getElementById('pausemute')!;
+function refreshMuteBtn() {
+  const label = isMuted() ? 'SOUND: OFF' : 'SOUND: ON';
+  muteBtn.textContent = label;
+  pauseMute.textContent = label;
+}
 muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
+pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 window.addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') { toggleMute(); refreshMuteBtn(); }
 });
 refreshMuteBtn();
+
+// pause menu: ☰ opens it (pausing the sim), resume / restart
+const pauseMenu = document.getElementById('pausemenu')!;
+function openPause() { if (started && !game.gameOver) { game.setPaused(true); pauseMenu.style.display = 'flex'; } }
+function closePause() { pauseMenu.style.display = 'none'; game.setPaused(false); last = performance.now(); }
+document.getElementById('menubtn')!.addEventListener('click', () => {
+  pauseMenu.style.display === 'flex' ? closePause() : openPause();
+});
+document.getElementById('resumebtn')!.addEventListener('click', closePause);
+document.getElementById('restartbtn')!.addEventListener('click', () => location.reload());
 
 document.getElementById('deploy')!.addEventListener('click', async () => {
   initAudio(); // must start from a user gesture (browser autoplay rules)

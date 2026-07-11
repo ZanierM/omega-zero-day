@@ -783,18 +783,21 @@ export function render() {
   if (!terrainTex) return; // not initialized yet (briefing screen)
   T = performance.now() / 1000;
   const vw = canvas.clientWidth, vh = canvas.clientHeight;
+  const z = camera.zoom;
+  const vwz = vw / z, vhz = vh / z; // visible world size at this zoom
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.fillStyle = '#0c0402';
   ctx.fillRect(0, 0, vw, vh);
   ctx.save();
+  ctx.scale(z, z);
   ctx.translate(-camera.x, -camera.y);
 
-  ctx.drawImage(terrainTex, camera.x, camera.y, vw, vh, camera.x, camera.y, vw, vh);
+  ctx.drawImage(terrainTex, camera.x, camera.y, vwz, vhz, camera.x, camera.y, vwz, vhz);
 
   const tx0 = Math.max(0, Math.floor(camera.x / TILE));
   const ty0 = Math.max(0, Math.floor(camera.y / TILE));
-  const tx1 = Math.min(MAP_W - 1, Math.ceil((camera.x + vw) / TILE));
-  const ty1 = Math.min(MAP_H - 1, Math.ceil((camera.y + vh) / TILE));
+  const tx1 = Math.min(MAP_W - 1, Math.ceil((camera.x + vwz) / TILE));
+  const ty1 = Math.min(MAP_H - 1, Math.ceil((camera.y + vhz) / TILE));
 
   // crystals (dynamic: they deplete)
   for (let y = ty0; y <= ty1; y++)
@@ -1016,5 +1019,5 @@ export function renderMinimap() {
   }
   const { w, h } = viewSize();
   mmCtx.strokeStyle = '#fffa'; mmCtx.lineWidth = 1;
-  mmCtx.strokeRect((camera.x / TILE) * sx, (camera.y / TILE) * sy, (w / TILE) * sx, (h / TILE) * sy);
+  mmCtx.strokeRect((camera.x / TILE) * sx, (camera.y / TILE) * sy, (w / camera.zoom / TILE) * sx, (h / camera.zoom / TILE) * sy);
 }

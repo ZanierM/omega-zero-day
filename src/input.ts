@@ -7,7 +7,8 @@ import {
 import { crystal, idx, inBounds } from './map';
 import { sfx } from './audio';
 
-export const camera = { x: 0, y: 0 };
+export const camera = { x: 0, y: 0, zoom: 1 };
+export const MIN_ZOOM = 0.5, MAX_ZOOM = 2.4;
 export const selection = new Set<number>();
 export let selectBox: { x: number, y: number, w: number, h: number } | null = null;
 export let placement: { defId: string, tx: number, ty: number } | null = null;
@@ -31,7 +32,16 @@ export let onBuildingPlaced: () => void = () => {};
 export function setOnBuildingPlaced(fn: () => void) { onBuildingPlaced = fn; }
 
 function toWorld(sx: number, sy: number) {
-  return { x: sx + camera.x, y: sy + camera.y };
+  return { x: sx / camera.zoom + camera.x, y: sy / camera.zoom + camera.y };
+}
+
+// zoom around a screen point, keeping the world under it fixed
+function zoomAt(factor: number, screenX: number, screenY: number) {
+  const before = toWorld(screenX, screenY);
+  camera.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, camera.zoom * factor));
+  camera.x = before.x - screenX / camera.zoom;
+  camera.y = before.y - screenY / camera.zoom;
+  clampCamera();
 }
 
 function selectedUnits(): Unit[] {
@@ -125,10 +135,10 @@ export function initInput() {
     const wasDrag = selectBox && (selectBox.w > 6 || selectBox.h > 6);
     if (wasDrag) {
       selection.clear();
-      const x0 = selectBox!.x + camera.x, y0 = selectBox!.y + camera.y;
-      const x1 = x0 + selectBox!.w, y1 = y0 + selectBox!.h;
+      const a = toWorld(selectBox!.x, selectBox!.y);
+      const b = toWorld(selectBox!.x + selectBox!.w, selectBox!.y + selectBox!.h);
       for (const u of units) {
-        if (u.owner === PLAYER && u.x >= x0 && u.x <= x1 && u.y >= y0 && u.y <= y1) selection.add(u.id);
+        if (u.owner === PLAYER && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y) selection.add(u.id);
       }
     } else {
       const w = toWorld(mouse.x, mouse.y);
@@ -177,10 +187,17 @@ export function initInput() {
   let lastTapAt = 0;
   let lastTapId = -1;
   let longPressTimer: number | null = null;
+  let pinchDist = 0; // >0 while two fingers are down
 
   const touchPos = (e: TouchEvent) => {
     const r = canvas.getBoundingClientRect();
     return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+  };
+  const pinchInfo = (e: TouchEvent) => {
+    const r = canvas.getBoundingClientRect();
+    const ax = e.touches[0].clientX - r.left, ay = e.touches[0].clientY - r.top;
+    const bx = e.touches[1].clientX - r.left, by = e.touches[1].clientY - r.top;
+    return { dist: Math.hypot(bx - ax, by - ay), mx: (ax + bx) / 2, my: (ay + by) / 2 };
   };
   const updateGhost = () => {
     if (!placement) return;
@@ -193,6 +210,13 @@ export function initInput() {
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     usingTouch = true;
+    if (e.touches.length >= 2) {
+      // two fingers → pinch-zoom; cancel any in-progress single-finger gesture
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      touch = null; selectBox = null;
+      pinchDist = pinchInfo(e).dist;
+      return;
+    }
     if (e.touches.length !== 1) { touch = null; selectBox = null; return; }
     const p = touchPos(e);
     touch = { x: p.x, y: p.y, sx: p.x, sy: p.y, moved: false };
@@ -215,6 +239,11 @@ export function initInput() {
 
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
+    if (e.touches.length >= 2 && pinchDist > 0) {
+      const pi = pinchInfo(e);
+      if (pi.dist > 0) { zoomAt(pi.dist / pinchDist, pi.mx, pi.my); pinchDist = pi.dist; }
+      return;
+    }
     if (!touch || e.touches.length !== 1) return;
     const p = touchPos(e);
     if (Math.hypot(p.x - touch.sx, p.y - touch.sy) > 12) touch.moved = true;
@@ -225,8 +254,8 @@ export function initInput() {
           w: Math.abs(p.x - touch.sx), h: Math.abs(p.y - touch.sy),
         };
       } else {
-        camera.x -= p.x - touch.x;
-        camera.y -= p.y - touch.y;
+        camera.x -= (p.x - touch.x) / camera.zoom;
+        camera.y -= (p.y - touch.y) / camera.zoom;
         clampCamera();
       }
     }
@@ -237,6 +266,7 @@ export function initInput() {
 
   canvas.addEventListener('touchend', e => {
     e.preventDefault();
+    if (e.touches.length < 2) pinchDist = 0;
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     if (!touch) { selectBox = null; return; }
     const t = touch;
@@ -244,8 +274,9 @@ export function initInput() {
 
     // box-select drag completed
     if (selectMode && t.moved && selectBox && (selectBox.w > 6 || selectBox.h > 6)) {
-      const x0 = selectBox.x + camera.x, y0 = selectBox.y + camera.y;
-      const x1 = x0 + selectBox.w, y1 = y0 + selectBox.h;
+      const a = toWorld(selectBox.x, selectBox.y);
+      const b = toWorld(selectBox.x + selectBox.w, selectBox.y + selectBox.h);
+      const x0 = a.x, y0 = a.y, x1 = b.x, y1 = b.y;
       selection.clear();
       for (const u of units) {
         if (u.owner === PLAYER && u.x >= x0 && u.x <= x1 && u.y >= y0 && u.y <= y1) selection.add(u.id);
@@ -303,15 +334,23 @@ export function initInput() {
 
   // minimap click → jump camera
   const mm = document.getElementById('minimap') as HTMLCanvasElement;
-  const jump = (e: MouseEvent) => {
+  const jump = (clientX: number, clientY: number) => {
     const r = mm.getBoundingClientRect();
-    const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-    camera.x = fx * MAP_W * TILE - canvas.clientWidth / 2;
-    camera.y = fy * MAP_H * TILE - canvas.clientHeight / 2;
+    const fx = (clientX - r.left) / r.width, fy = (clientY - r.top) / r.height;
+    camera.x = fx * MAP_W * TILE - canvas.clientWidth / camera.zoom / 2;
+    camera.y = fy * MAP_H * TILE - canvas.clientHeight / camera.zoom / 2;
     clampCamera();
   };
-  mm.addEventListener('mousedown', jump);
-  mm.addEventListener('mousemove', e => { if (e.buttons & 1) jump(e); });
+  mm.addEventListener('mousedown', e => jump(e.clientX, e.clientY));
+  mm.addEventListener('mousemove', e => { if (e.buttons & 1) jump(e.clientX, e.clientY); });
+  mm.addEventListener('touchstart', e => { e.preventDefault(); jump(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  mm.addEventListener('touchmove', e => { e.preventDefault(); jump(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+
+  // desktop: mouse-wheel zoom, anchored at the cursor
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, mouse.x, mouse.y);
+  }, { passive: false });
 }
 
 function rightClick() {
@@ -350,8 +389,9 @@ function rightClick() {
 }
 
 function clampCamera() {
-  camera.x = Math.max(0, Math.min(MAP_W * TILE - canvas.clientWidth, camera.x));
-  camera.y = Math.max(0, Math.min(MAP_H * TILE - canvas.clientHeight, camera.y));
+  const viewW = canvas.clientWidth / camera.zoom, viewH = canvas.clientHeight / camera.zoom;
+  camera.x = Math.max(0, Math.min(Math.max(0, MAP_W * TILE - viewW), camera.x));
+  camera.y = Math.max(0, Math.min(Math.max(0, MAP_H * TILE - viewH), camera.y));
 }
 
 const SCROLL_SPEED = 700; // px per second
@@ -377,7 +417,7 @@ export function updateCamera(dt: number) {
 }
 
 export function centerCameraOn(px: number, py: number) {
-  camera.x = px - canvas.clientWidth / 2;
-  camera.y = py - canvas.clientHeight / 2;
+  camera.x = px - canvas.clientWidth / camera.zoom / 2;
+  camera.y = py - canvas.clientHeight / camera.zoom / 2;
   clampCamera();
 }

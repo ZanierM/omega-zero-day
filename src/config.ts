@@ -74,7 +74,7 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'Fast recon rover. Finds trouble before trouble finds you.' },
   hovertank: { id: 'hovertank', name: 'Strider Mech',   tab: 'veh', cost: 900,  buildTime: 10, hp: 400, speed: 3.0, damage: 40, range: 5,   reload: 1.8, vision: 6, radius: 14, model: 'mech2', mstep: 1, spriteH: 38,
                desc: 'Mainline battle walker. The backbone of any assault.' },
-  artillery: { id: 'artillery', name: 'Thumper',        tab: 'veh', cost: 1400, buildTime: 14, hp: 280, speed: 1.6, damage: 90, range: 9,   reload: 4.0, vision: 7, radius: 14, model: 'mech', mstep: 2, spriteH: 40, prereq: 'spire', weapon: 'shell', splash: 1.8,
+  artillery: { id: 'artillery', name: 'Thumper',        tab: 'veh', cost: 1400, buildTime: 14, hp: 280, speed: 1.6, damage: 90, range: 9,   reload: 4.0, vision: 7, radius: 14, model: 'mech', mstep: 2, spriteH: 40, prereq: 'spire', weapon: 'shell', splash: 1.5,
                desc: 'Long-range seismic artillery walker. Shells an area — devastates groups.' },
   dominator: { id: 'dominator', name: 'Dominator',      tab: 'veh', cost: 1750, buildTime: 16, hp: 800, speed: 2.0, damage: 70, range: 5.5, reload: 2.4, vision: 6, radius: 17, model: 'mech', mstep: 1, spriteH: 52, weapon: 'shell', splash: 0.9,
                desc: 'Twin-cannon siege mech. Slow. Unstoppable. Requires Research Spire.' },
