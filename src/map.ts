@@ -63,7 +63,7 @@ function pickBasePositions(numEnemies: number): { x: number, y: number }[] {
   return corners.slice(0, numEnemies + 1);
 }
 
-export function generateMap(numEnemies: number) {
+export function generateMap(numEnemies: number, crystalMul = 1) {
   const size = numEnemies >= 3 ? 90 : numEnemies === 2 ? 76 : 60;
   MAP_W = size; MAP_H = size;
   terrain = new Uint8Array(MAP_W * MAP_H);
@@ -104,7 +104,7 @@ export function generateMap(numEnemies: number) {
   for (const [fx, fy, r] of fields) {
     blob(fx, fy, r, (x, y) => {
       const i = idx(x, y);
-      if (terrain[i] === 0) crystal[i] = 400 + Math.floor(rand() * 600);
+      if (terrain[i] === 0) crystal[i] = Math.min(65000, Math.floor((400 + rand() * 600) * crystalMul));
     });
   }
 }

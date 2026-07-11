@@ -4,9 +4,9 @@ import {
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
   gameOver, toastMsg, toast, byId, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
-  Unit, deployPioneer, startRepair, repairCost,
+  Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
 } from './game';
-import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced } from './input';
+import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
 import { sfx, duckMusic } from './audio';
 import { defenceIconUrl } from './render';
 
@@ -16,6 +16,8 @@ const powerText = document.getElementById('powertext')!;
 const grid = document.getElementById('buildgrid')!;
 const tabsBar = document.getElementById('tabsbar')!;
 const selInfo = document.getElementById('selinfo')!;
+const countdown = document.getElementById('countdown')!;
+const cdTime = document.getElementById('cdtime')!;
 const upgBtn = document.getElementById('upgbtn') as HTMLButtonElement;
 const actBtn = document.getElementById('actbtn') as HTMLButtonElement;
 const overlay = document.getElementById('overlay')!;
@@ -95,7 +97,9 @@ export function initUI() {
     const u = selectedOwnPioneer();
     if (u) { deployPioneer(u); return; }
     const b = selectedOwnBuilding();
-    if (b) startRepair(b);
+    if (!b) return;
+    if (b.def.superweapon && superReady(b)) { startStrikeTargeting(b.id); sfx('click'); return; }
+    startRepair(b);
   });
   rebuildGrid();
 }
@@ -188,6 +192,16 @@ export function updateUI() {
   powerFill.className = pw.low ? 'low' : '';
   powerText.textContent = pw.low ? `${pw.drain - pw.supply} OVER — production slowed` : `${pw.supply - pw.drain} spare`;
 
+  // supernova countdown
+  if (novaTotal > 0) {
+    countdown.style.display = 'flex';
+    const s = Math.max(0, Math.ceil(novaLeft));
+    cdTime.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    countdown.classList.toggle('warn', novaLeft < novaTotal / 3);
+  } else {
+    countdown.style.display = 'none';
+  }
+
   // research tab dims until a Laboratory exists
   const upsTab = tabBtns.get('ups');
   if (upsTab) upsTab.classList.toggle('locked', !hasBuilding(PLAYER, 'lab'));
@@ -225,12 +239,16 @@ export function updateUI() {
     upgBtn.style.visibility = 'hidden';
   }
 
-  // contextual action button: deploy a Pioneer, or repair a damaged building
+  // contextual action button: deploy Pioneer · orbital strike · repair
   const pio = selectedOwnPioneer();
   if (pio) {
     actBtn.style.visibility = 'visible';
     actBtn.textContent = '▼ DEPLOY COMMAND POST';
     actBtn.disabled = false;
+  } else if (ob && ob.def.superweapon) {
+    actBtn.style.visibility = 'visible';
+    if (superReady(ob)) { actBtn.textContent = '⊕ LAUNCH ORBITAL STRIKE'; actBtn.disabled = false; }
+    else { actBtn.textContent = `CHARGING… ${Math.round((1 - ob.charge / ob.def.superweapon.charge) * 100)}%`; actBtn.disabled = true; }
   } else if (ob && ob.hp < ob.maxHp) {
     actBtn.style.visibility = 'visible';
     if (ob.repairing) { actBtn.textContent = 'REPAIRING…'; actBtn.disabled = true; }
@@ -262,9 +280,12 @@ export function updateUI() {
     if (overlay.style.display !== 'flex') duckMusic();
     overlay.style.display = 'flex';
     overlay.className = gameOver;
-    overlayTitle.textContent = gameOver === 'win' ? 'VICTORY' : 'DEFEAT';
+    const novaExpired = novaTotal > 0 && novaLeft <= 0;
+    overlayTitle.textContent = gameOver === 'win' ? 'VICTORY' : novaExpired ? 'SUPERNOVA' : 'DEFEAT';
     overlaySub.textContent = gameOver === 'win'
       ? 'The launch corridor is clear. The ark-fleet jumps at dawn — humanity survives.'
+      : novaExpired
+      ? 'Helios detonated with the enemy still standing. The fleet burns. There is no dawn.'
       : 'Vanguard command has fallen. The fleet dies in orbit, and humanity with the sun.';
   }
 }

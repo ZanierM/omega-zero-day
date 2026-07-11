@@ -2,7 +2,7 @@ import { TILE, BUILDINGS, UPGRADES } from './config';
 import {
   buildings, units, players, startProduction, placeBuilding, canPlace,
   issueOrder, hasBuilding, buildingCenter, powerOf, numPlayers, deployPioneer, tileOf,
-  startRepair, repairCost,
+  startRepair, repairCost, superReady, fireStrike,
 } from './game';
 import { rand, crystal, idx, nearestTile } from './map';
 
@@ -14,7 +14,7 @@ const BUILD_ORDER = [
   'solar', 'turret', 'spire', 'lab', 'solar', 'railgun', 'turret',
   'extractor', 'solar', 'repairyard', 'turret', 'railgun', 'solar', 'turret',
   // late game: research-gated fortifications (skipped until unlocked)
-  'fusion', 'arctower', 'turret', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion',
+  'fusion', 'arctower', 'turret', 'uplink', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion',
 ];
 const RESEARCH_ORDER = ['wpn1', 'arm1', 'def1', 'wpn2', 'arm2', 'def2', 'wpn3', 'arm3'];
 
@@ -211,6 +211,16 @@ function updateOne(ai: AIState, dt: number) {
       for (const u of army) {
         issueOrder(u, { type: 'attackMove', x: c.x + (rand() * 160 - 80), y: c.y + (rand() * 160 - 80) });
       }
+    }
+  }
+
+  // --- orbital strike: fire a ready uplink at the enemy's fattest cluster ---
+  const uplink = buildings.find(b => b.owner === ai.owner && superReady(b));
+  if (uplink) {
+    const target = pickWaveTarget(ai.owner);
+    if (target) {
+      const c = buildingCenter(target);
+      fireStrike(uplink, c.x + (rand() * 60 - 30), c.y + (rand() * 60 - 30));
     }
   }
 }

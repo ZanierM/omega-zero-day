@@ -18,12 +18,16 @@ window.addEventListener('resize', resize);
 let started = false;
 let difficulty: import('./ai').Difficulty = 'normal';
 
-async function startGame(numEnemies: number) {
-  generateMap(numEnemies);
+interface SkirmishOpts { credits: number; crystalMul: number; nova: number }
+
+async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 5000, crystalMul: 1, nova: 0 }) {
+  generateMap(numEnemies, opts.crystalMul);
   initGame(numEnemies);
+  game.setSupernova(opts.nova);
   await loadSprites();
   initRenderer();
 
+  for (const p of game.players) p.credits = opts.credits;
   const bases = startBases; // randomized by generateMap
   for (let owner = 0; owner < bases.length; owner++) {
     const b = bases[owner];
@@ -47,7 +51,7 @@ async function startGame(numEnemies: number) {
 }
 
 // faction-count + difficulty selectors: segmented buttons (delegated)
-for (const id of ['aiopts', 'diffopts']) {
+for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts']) {
   document.getElementById(id)!.addEventListener('click', e => {
     const btn = (e.target as HTMLElement).closest('.opt');
     if (!btn) return;
@@ -87,9 +91,12 @@ document.getElementById('deploy')!.addEventListener('click', async () => {
   const n = Number(sel?.dataset.n ?? 1);
   const dsel = document.querySelector('#diffopts .opt.sel') as HTMLElement | null;
   difficulty = (dsel?.dataset.d ?? 'normal') as import('./ai').Difficulty;
+  const pick = (id: string, def: number) =>
+    Number((document.querySelector(`#${id} .opt.sel`) as HTMLElement | null)?.dataset.v ?? def);
+  const opts = { credits: pick('creditopts', 5000), crystalMul: pick('crystalopts', 1), nova: pick('novaopts', 0) };
   document.getElementById('briefing')!.style.display = 'none';
   try {
-    await startGame(n);
+    await startGame(n, opts);
   } catch (err) {
     // never fail silently into a black screen
     console.error(err);

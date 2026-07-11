@@ -45,6 +45,7 @@ export interface Building {
   level: number;                 // 1..3, raised by upgrades
   upgrading: { remaining: number, total: number } | null;
   repairing: boolean;
+  charge: number;                // superweapon: seconds until the strike is ready (0 = ready)
   cooldown: number;              // turret reload
   rallyX: number; rallyY: number;
   facing: number;                // turret barrel angle
@@ -87,11 +88,18 @@ export let numPlayers = 2;
 export let explored: Uint8Array;
 export let visible: Uint8Array;
 
+// supernova countdown: total > 0 arms it. When the clock hits zero the sun
+// detonates and you lose unless every enemy is already destroyed.
+export let novaTotal = 0, novaLeft = 0;
+let flareTimer = 0;
+export function setSupernova(seconds: number) { novaTotal = seconds; novaLeft = seconds; }
+
 export function initGame(numEnemies: number) {
   numPlayers = numEnemies + 1;
   players = Array.from({ length: numPlayers }, freshPlayer);
   explored = new Uint8Array(MAP_W * MAP_H);
   visible = new Uint8Array(MAP_W * MAP_H);
+  flareTimer = 0;
 }
 
 export interface Beam { x1: number, y1: number, x2: number, y2: number, ttl: number, color: string }
@@ -100,9 +108,12 @@ export interface Shell {
   x: number, y: number, sx: number, sy: number, tx: number, ty: number,
   t: number, dur: number, dmg: number, splash: number, owner: number, kind: 'shell' | 'rocket',
 }
+// an orbital strike telegraphs a reticle, then a beam slams down and detonates
+export interface Strike { x: number, y: number, t: number, delay: number, owner: number, damage: number, radius: number }
 export const beams: Beam[] = [];
 export const booms: Boom[] = [];
 export const shells: Shell[] = [];
+export const strikes: Strike[] = [];
 
 export let gameOver: 'win' | 'lose' | null = null;
 export let paused = true; // starts paused behind the mission briefing
@@ -202,7 +213,8 @@ export function canPlace(owner: number, defId: string, tx: number, ty: number, r
 export function placeBuilding(defId: string, owner: number, tx: number, ty: number): Building {
   const def = BUILDINGS[defId];
   const b: Building = {
-    id: nextId++, kind: 'building', def, owner, tx, ty, hp: def.hp, maxHp: def.hp, level: 1, upgrading: null, repairing: false, cooldown: 0,
+    id: nextId++, kind: 'building', def, owner, tx, ty, hp: def.hp, maxHp: def.hp, level: 1, upgrading: null, repairing: false,
+    charge: def.superweapon ? def.superweapon.charge : 0, cooldown: 0,
     rallyX: (tx + def.w / 2) * TILE, rallyY: (ty + def.h + 1) * TILE, facing: Math.PI / 2,
   };
   buildings.push(b);
@@ -454,6 +466,22 @@ export function startRepair(b: Building): boolean {
   return true;
 }
 
+// ---------- orbital strike superweapon ----------
+
+export function superReady(b: Building): boolean {
+  return !!b.def.superweapon && b.charge <= 0;
+}
+
+// launch a strike at a world point; telegraphs for 1.6s before impact
+export function fireStrike(b: Building, wx: number, wy: number): boolean {
+  const sw = b.def.superweapon;
+  if (!sw || b.charge > 0) return false;
+  b.charge = sw.charge; // begin recharging
+  strikes.push({ x: wx, y: wy, t: 0, delay: 1.6, owner: b.owner, damage: sw.damage, radius: sw.radius * TILE });
+  if (b.owner === PLAYER) { toast('Orbital strike inbound'); sfx('research'); }
+  return true;
+}
+
 function findEnemyInRange(e: Entity, rangeTiles: number): Entity | null {
   const rangePx = rangeTiles * TILE;
   let best: Entity | null = null, bestD = Infinity;
@@ -661,6 +689,30 @@ export function update(dt: number) {
     }
   }
 
+  // superweapon buildings recharge over time
+  for (const b of buildings) {
+    if (b.def.superweapon && b.charge > 0) b.charge = Math.max(0, b.charge - dt);
+  }
+
+  // orbital strikes: telegraph, then a massive detonation
+  for (let i = strikes.length - 1; i >= 0; i--) {
+    const s = strikes[i];
+    s.t += dt;
+    if (s.t >= s.delay) {
+      strikes.splice(i, 1);
+      booms.push({ x: s.x, y: s.y, r: 6, ttl: 0.5, max: s.radius * 1.1 });
+      sfx('explosion');
+      for (const t of [...units]) {
+        if (t.owner !== s.owner && Math.hypot(t.x - s.x, t.y - s.y) <= s.radius + t.def.radius * 0.5) damage(t, s.damage);
+      }
+      for (const t of [...buildings]) {
+        if (t.owner === s.owner) continue;
+        const c = buildingCenter(t);
+        if (Math.hypot(c.x - s.x, c.y - s.y) <= s.radius + entityRadius(t) * 0.6) damage(t, s.damage);
+      }
+    }
+  }
+
   // projectiles in flight → impact, blast, splash damage
   for (let i = shells.length - 1; i >= 0; i--) {
     const s = shells[i];
@@ -694,7 +746,7 @@ export function update(dt: number) {
   for (let i = beams.length - 1; i >= 0; i--) { beams[i].ttl -= dt; if (beams[i].ttl <= 0) beams.splice(i, 1); }
   for (let i = booms.length - 1; i >= 0; i--) {
     const bm = booms[i];
-    bm.ttl -= dt; bm.r = bm.max * (1 - bm.ttl / 0.5);
+    bm.ttl -= dt; bm.r = Math.max(0.1, bm.max * (1 - bm.ttl / 0.5));
     if (bm.ttl <= 0) booms.splice(i, 1);
   }
 
@@ -734,6 +786,23 @@ export function update(dt: number) {
     for (const b of buildings) if (b.owner === PLAYER) reveal(b.tx + Math.floor(b.def.w / 2), b.ty + Math.floor(b.def.h / 2), b.def.vision);
   }
 
+  // supernova countdown + escalating solar flares in the final third
+  if (novaTotal > 0 && novaLeft > 0) {
+    novaLeft = Math.max(0, novaLeft - dt);
+    const third = novaTotal / 3;
+    if (novaLeft < third) {
+      flareTimer -= dt;
+      if (flareTimer <= 0) {
+        const intensity = 1 - novaLeft / third;             // 0 → 1 as the end nears
+        flareTimer = 5.5 - intensity * 4;                    // ~5.5s down to ~1.5s apart
+        const fx = (2 + Math.random() * (MAP_W - 4)) * TILE;
+        const fy = (2 + Math.random() * (MAP_H - 4)) * TILE;
+        // owner -1 → damages every faction; a fiery environmental strike
+        strikes.push({ x: fx, y: fy, t: 0, delay: 1.2, owner: -1, damage: 120 + intensity * 160, radius: (1.6 + intensity) * TILE });
+      }
+    }
+  }
+
   // win / lose: walls don't keep a faction "alive"
   const alive = (owner: number) => buildings.some(b => b.owner === owner && !b.def.isWall);
   if (!alive(PLAYER)) gameOver = 'lose';
@@ -741,5 +810,6 @@ export function update(dt: number) {
     let anyEnemy = false;
     for (let o = 1; o < numPlayers; o++) if (alive(o)) anyEnemy = true;
     if (!anyEnemy) gameOver = 'win';
+    else if (novaTotal > 0 && novaLeft <= 0) gameOver = 'lose'; // the sun went nova first
   }
 }

@@ -61,6 +61,7 @@ export interface BuildingDef {
   desc?: string;
   sprite?: string;     // file in /sprites (walls & fallbacks draw procedurally)
   upgradable?: boolean;
+  superweapon?: { charge: number; damage: number; radius: number }; // orbital strike
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -122,6 +123,8 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'Long-range radar. Sees trouble coming from very far away.' },
   repairyard:{ id: 'repairyard',name: 'Repair Yard',    tab: 'build', cost: 1600, buildTime: 12, hp: 800,  power: -25,  w: 2, h: 2, vision: 5, prereq: 'fab', healRate: 12,
                desc: 'Field workshop. Slowly repairs all friendly units nearby.' },
+  uplink:    { id: 'uplink',    name: 'Orbital Uplink', tab: 'build', cost: 3500, buildTime: 20, hp: 750,  power: -100, w: 2, h: 2, vision: 6, prereq: 'spire', sprite: 'bld_silo', superweapon: { charge: 105, damage: 650, radius: 3.2 },
+               desc: 'Calls a devastating orbital strike from the ark-fleet on a ~105s cycle. Requires Research Spire.' },
 
   wall:      { id: 'wall',      name: 'Barrier Wall',   tab: 'def',   cost: 100,  buildTime: 1.5, hp: 500, power: 0,    w: 1, h: 1, vision: 1, isWall: true,
                desc: 'Cheap plasteel segment. Slows a push, absorbs fire.' },

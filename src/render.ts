@@ -1,7 +1,7 @@
 import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER } from './config';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
-import { units, buildings, beams, booms, shells, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
-import { camera, selection, selectBox, placement } from './input';
+import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
+import { camera, selection, selectBox, placement, strikeAim } from './input';
 
 // Renderer v4 — Kenney sprite assets on a pre-rendered noise terrain.
 //  * terrain painted once into a big offscreen texture (per-pixel noise, craters, boulders)
@@ -952,6 +952,47 @@ export function render() {
       ctx.fillRect(bo.x + Math.cos(ang) * dd - 1.5, bo.y + Math.sin(ang) * dd - 1.5, 3, 3);
     }
     ctx.globalAlpha = 1;
+  }
+
+  // incoming orbital strikes: pulsing target reticle → searing beam at impact
+  for (const s of strikes) {
+    const left = s.delay - s.t;             // seconds to impact
+    const pulse = 0.5 + 0.5 * Math.abs(Math.sin(T * 6));
+    ctx.strokeStyle = `rgba(255,80,40,${0.6 + pulse * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2); ctx.stroke();
+    const rIn = s.radius * (left / s.delay);  // shrinking ring counts down
+    ctx.strokeStyle = 'rgba(255,180,60,0.9)';
+    ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(2, rIn), 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,120,50,${0.5 + pulse * 0.4})`; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(s.x - s.radius - 6, s.y); ctx.lineTo(s.x + s.radius + 6, s.y);
+    ctx.moveTo(s.x, s.y - s.radius - 6); ctx.lineTo(s.x, s.y + s.radius + 6);
+    ctx.stroke();
+    if (left < 0.35) { // searing beam slams down from the sky just before impact
+      const bw = 10 + (0.35 - left) * 120;
+      const bg = ctx.createLinearGradient(s.x - bw, 0, s.x + bw, 0);
+      bg.addColorStop(0, 'rgba(255,120,40,0)');
+      bg.addColorStop(0.5, 'rgba(255,240,200,0.85)');
+      bg.addColorStop(1, 'rgba(255,120,40,0)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(s.x - bw, camera.y, bw * 2, s.y - camera.y);
+    }
+  }
+
+  // orbital-strike aiming reticle at the cursor
+  const aim = strikeAim();
+  if (aim) {
+    const rr2 = (BUILDINGS['uplink'].superweapon?.radius ?? 3) * TILE;
+    ctx.strokeStyle = 'rgba(255,90,50,0.9)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(aim.x, aim.y, rr2, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath(); ctx.arc(aim.x, aim.y, rr2 * 0.6, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(aim.x - rr2 - 8, aim.y); ctx.lineTo(aim.x + rr2 + 8, aim.y);
+    ctx.moveTo(aim.x, aim.y - rr2 - 8); ctx.lineTo(aim.x, aim.y + rr2 + 8);
+    ctx.stroke();
   }
 
   // soft fog of war

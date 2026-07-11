@@ -80,6 +80,12 @@
     #mutebtn:hover { border-color: #ff8c3a; color: #f5dcc8; }
     #powerwrap { font-size: 9px; letter-spacing: 1.5px; color: #b07a54; padding: 3px 10px 5px; background: #0c0503; border: 1px solid #3a2012; }
     #powertext { color: #ffd0a0; font-size: 10px; }
+    #countdown { display: none; align-items: baseline; justify-content: space-between; padding: 3px 10px; background: #0c0503; border: 1px solid #3a2012; }
+    #cdlabel { font-size: 8px; letter-spacing: 2px; color: #b07a54; }
+    #cdtime { font-family: 'Orbitron', monospace; font-size: 15px; font-weight: 800; color: #ffb02e; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+    #countdown.warn { border-color: #e5484d99; animation: cdflash 1s steps(2) infinite; }
+    #countdown.warn #cdtime { color: #ff5a4a; }
+    @keyframes cdflash { 50% { background: #2a0c08; } }
     #powerbar { height: 10px; background: #080302; border: 1px solid #3a2012; margin-top: 3px; overflow: hidden; }
     #powerfill { height: 100%; width: 50%; background: linear-gradient(90deg, #1fae68, #3ddc84); transition: width .2s;
       box-shadow: 0 0 8px rgba(61,220,132,0.5); }
@@ -175,7 +181,8 @@
     /* opponent selector: segmented threat cards */
     #opponents { margin-bottom: 18px; }
     #opplabel { font-size: 10px; letter-spacing: 3px; color: #b07a54; margin-bottom: 7px; }
-    #aiopts, #diffopts { display: flex; gap: 8px; }
+    #aiopts, #diffopts, .paramrow { display: flex; gap: 8px; }
+    .paramrow .opt { font-size: 11px; letter-spacing: 1px; padding: 8px 4px 7px; }
     .opt { flex: 1; padding: 9px 6px 7px; text-align: center; cursor: pointer; color: #c89068; background: rgba(12,26,44,0.7);
       border: 1px solid rgba(255,140,58,0.25); font-family: inherit; font-size: 17px; font-weight: 700; letter-spacing: 1px;
       clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); transition: all .15s; }
@@ -292,6 +299,7 @@
           <div id="powerwrap">POWER <span id="powertext"></span>
             <div id="powerbar"><div id="powerfill"></div></div>
           </div>
+          <div id="countdown"><span id="cdlabel">SUPERNOVA IN</span> <span id="cdtime">--:--</span></div>
           <div id="selinfo"></div>
           <button id="actbtn"></button>
           <button id="upgbtn"></button>
@@ -345,6 +353,24 @@
           <button class="opt" type="button" data-d="easy">EASY<span>SLOW ECONOMY · SMALL WAVES</span></button>
           <button class="opt sel" type="button" data-d="normal">NORMAL<span>STANDARD DOCTRINE</span></button>
           <button class="opt" type="button" data-d="hard">HARD<span>COUNTERS YOUR ARMY · RELENTLESS</span></button>
+        </div>
+        <div id="opplabel" style="margin-top:10px">STARTING CREDITS</div>
+        <div class="paramrow" id="creditopts">
+          <button class="opt" type="button" data-v="3000">LEAN</button>
+          <button class="opt sel" type="button" data-v="5000">STANDARD</button>
+          <button class="opt" type="button" data-v="10000">RICH</button>
+        </div>
+        <div id="opplabel" style="margin-top:10px">CRYSTAL FIELDS</div>
+        <div class="paramrow" id="crystalopts">
+          <button class="opt" type="button" data-v="0.7">SPARSE</button>
+          <button class="opt sel" type="button" data-v="1">NORMAL</button>
+          <button class="opt" type="button" data-v="1.6">ABUNDANT</button>
+        </div>
+        <div id="opplabel" style="margin-top:10px">SUPERNOVA COUNTDOWN</div>
+        <div class="paramrow" id="novaopts">
+          <button class="opt sel" type="button" data-v="0">OFF</button>
+          <button class="opt" type="button" data-v="900">15 MIN</button>
+          <button class="opt" type="button" data-v="1500">25 MIN</button>
         </div>
       </div>
       <button id="deploy" type="button">COMMENCE OPERATION</button>

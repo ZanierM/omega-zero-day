@@ -2,7 +2,7 @@ import { TILE, PLAYER, BUILDINGS } from './config';
 import { MAP_W, MAP_H } from './map';
 import {
   units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding,
-  entityPos, entityRadius, toast, Unit,
+  entityPos, entityRadius, toast, Unit, fireStrike, superReady,
 } from './game';
 import { crystal, idx, inBounds } from './map';
 import { sfx } from './audio';
@@ -21,6 +21,22 @@ export function startPlacement(defId: string) {
   placement = { defId, tx: 0, ty: 0 };
 }
 export function cancelPlacement() { placement = null; }
+
+// orbital-strike targeting: holds the launching building's id while the player aims
+export let strikeTargeting: number | null = null;
+export function startStrikeTargeting(bId: number) {
+  strikeTargeting = bId;
+  canvas.style.cursor = 'crosshair';
+}
+function fireStrikeAt(wx: number, wy: number) {
+  const b = byId.get(strikeTargeting!);
+  strikeTargeting = null;
+  if (b?.kind === 'building' && superReady(b)) fireStrike(b, wx, wy);
+}
+// world point the player is currently aiming a strike at (for the reticle), or null
+export function strikeAim(): { x: number, y: number } | null {
+  return strikeTargeting !== null ? toWorld(mouse.x, mouse.y) : null;
+}
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const keys = new Set<string>();
@@ -98,6 +114,12 @@ export function initInput() {
 
   canvas.addEventListener('mousedown', e => {
     if (e.button === 0) {
+      // orbital-strike targeting consumes the next click
+      if (strikeTargeting !== null) {
+        const w = toWorld(mouse.x, mouse.y);
+        fireStrikeAt(w.x, w.y);
+        return;
+      }
       if (placement) {
         if (canPlace(PLAYER, placement.defId, placement.tx, placement.ty)) {
           placeBuilding(placement.defId, PLAYER, placement.tx, placement.ty);
@@ -152,7 +174,7 @@ export function initInput() {
 
   window.addEventListener('keydown', e => {
     keys.add(e.key);
-    if (e.key === 'Escape') { placement = null; attackMovePending = false; canvas.style.cursor = 'crosshair'; }
+    if (e.key === 'Escape') { placement = null; attackMovePending = false; strikeTargeting = null; canvas.style.cursor = 'crosshair'; }
     // A = attack-move mode (next left-click orders the attack)
     if ((e.key === 'a' || e.key === 'A') && selectedUnits().some(u => u.def.damage > 0)) {
       attackMovePending = true;
@@ -289,6 +311,11 @@ export function initInput() {
     if (t.moved) return; // it was a pan
 
     mouse.x = t.x; mouse.y = t.y;
+    if (strikeTargeting !== null) {
+      const w = toWorld(t.x, t.y);
+      fireStrikeAt(w.x, w.y);
+      return;
+    }
     if (placement) {
       if (canPlace(PLAYER, placement.defId, placement.tx, placement.ty)) {
         placeBuilding(placement.defId, PLAYER, placement.tx, placement.ty);
