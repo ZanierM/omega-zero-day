@@ -39,7 +39,7 @@ export function duckMusic() {
 // ---------------- sound effects ----------------
 
 type SfxName = 'shot' | 'shotHeavy' | 'explosion' | 'place' | 'ready' | 'click'
-             | 'error' | 'cash' | 'research' | 'upgrade';
+             | 'error' | 'cash' | 'research' | 'upgrade' | 'siren';
 
 const lastPlayed: Record<string, number> = {};
 const MIN_GAP: Partial<Record<SfxName, number>> = {
@@ -143,6 +143,15 @@ export function sfx(name: SfxName) {
       osc('triangle', 660, 660, t + 0.09, 0.08, 0.12, sfxBus);
       osc('triangle', 780, 780, t + 0.18, 0.2, 0.12, sfxBus);
       break;
+    case 'siren': {
+      // rising-then-falling air-raid klaxon — an orbital strike is inbound
+      for (let k = 0; k < 3; k++) {
+        const st = t + k * 0.42;
+        osc('sawtooth', 300, 620, st, 0.22, 0.16, sfxBus);
+        osc('sawtooth', 620, 300, st + 0.22, 0.22, 0.16, sfxBus);
+      }
+      break;
+    }
   }
 }
 

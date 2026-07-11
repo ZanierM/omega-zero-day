@@ -1,5 +1,6 @@
 import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER } from './config';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
+import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
 
@@ -1023,6 +1024,13 @@ export function render() {
   vg.addColorStop(1, 'rgba(26,6,2,0.30)');
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, vw, vh);
+
+  // orbital-strike screen flash: white core fading through fiery orange
+  if (game.flash > 0) {
+    const f = game.flash;
+    ctx.fillStyle = `rgba(255,${170 + f * 60},${120 + f * 80},${f * 0.55})`;
+    ctx.fillRect(0, 0, vw, vh);
+  }
 
   if (selectBox) {
     ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = 1;

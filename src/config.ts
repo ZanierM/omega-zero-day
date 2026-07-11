@@ -62,6 +62,7 @@ export interface BuildingDef {
   sprite?: string;     // file in /sprites (walls & fallbacks draw procedurally)
   upgradable?: boolean;
   superweapon?: { charge: number; damage: number; radius: number }; // orbital strike
+  limit?: number;      // max this faction may own (e.g. 1 for the superweapon)
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -123,8 +124,8 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'Long-range radar. Sees trouble coming from very far away.' },
   repairyard:{ id: 'repairyard',name: 'Repair Yard',    tab: 'build', cost: 1600, buildTime: 12, hp: 800,  power: -25,  w: 2, h: 2, vision: 5, prereq: 'fab', healRate: 12,
                desc: 'Field workshop. Slowly repairs all friendly units nearby.' },
-  uplink:    { id: 'uplink',    name: 'Orbital Uplink', tab: 'build', cost: 3500, buildTime: 20, hp: 750,  power: -100, w: 2, h: 2, vision: 6, prereq: 'spire', sprite: 'bld_silo', superweapon: { charge: 105, damage: 650, radius: 3.2 },
-               desc: 'Calls a devastating orbital strike from the ark-fleet on a ~105s cycle. Requires Research Spire.' },
+  uplink:    { id: 'uplink',    name: 'Orbital Uplink', tab: 'build', cost: 5000, buildTime: 25, hp: 750,  power: -150, w: 2, h: 2, vision: 6, prereq: 'spire', prereqUp: 'orbital', limit: 1, sprite: 'bld_silo', superweapon: { charge: 300, damage: 750, radius: 3.6 },
+               desc: 'The ark-fleet\'s main gun. A cataclysmic strike every 5 minutes. One per faction. Requires Orbital Protocol research.' },
 
   wall:      { id: 'wall',      name: 'Barrier Wall',   tab: 'def',   cost: 100,  buildTime: 1.5, hp: 500, power: 0,    w: 1, h: 1, vision: 1, isWall: true,
                desc: 'Cheap plasteel segment. Slows a push, absorbs fire.' },
@@ -167,6 +168,8 @@ export const UPGRADES: Record<string, UpgradeDef> = {
   arm3: { id: 'arm3', name: 'Armor III',   cost: 1600, buildTime: 25, desc: '+15% more hit points.', prereqUp: 'arm2' },
   def1: { id: 'def1', name: 'Defence Grid I',  cost: 1000, buildTime: 18, desc: '+25% turret damage.' },
   def2: { id: 'def2', name: 'Defence Grid II', cost: 1500, buildTime: 24, desc: '+25% more turret damage.', prereqUp: 'def1' },
+  // prestige unlock: gates the Orbital Uplink superweapon
+  orbital: { id: 'orbital', name: 'Orbital Protocol', cost: 3000, buildTime: 45, desc: 'Establishes a fire-control link to the ark-fleet. Unlocks the Orbital Uplink. Requires Weapons III.', prereqUp: 'wpn3' },
 };
 export const WPN_BONUS = 0.15, ARM_BONUS = 0.15, DEF_BONUS = 0.25;
 
@@ -174,6 +177,34 @@ export const WPN_BONUS = 0.15, ARM_BONUS = 0.15, DEF_BONUS = 0.25;
 export const BLD_UPGRADE_COST = 0.6;   // fraction of base cost per level
 export const BLD_UPGRADE_HP = 0.5;     // +50% max hp per level
 export const BLD_UPGRADE_DMG = 0.3;    // +30% turret damage per level
+
+// ---- damage types: rock-paper-scissors combat ----
+// every target has an armor class; every weapon a damage type. The table below
+// multiplies damage, so unit composition and counters actually matter.
+export type ArmorClass = 'infantry' | 'light' | 'heavy' | 'structure';
+export type DmgType = 'gun' | 'flame' | 'rocket' | 'cannon' | 'sniper';
+
+export const UNIT_ARMOR: Record<string, ArmorClass> = {
+  trooper: 'infantry', rocketeer: 'infantry', vanguard: 'infantry', pyro: 'infantry', sniper: 'infantry',
+  ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light',
+  hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
+};
+export const UNIT_DMGTYPE: Record<string, DmgType> = {
+  trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun',
+  pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
+  hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
+};
+export const TURRET_DMGTYPE: Record<string, DmgType> = {
+  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon',
+};
+// multiplier[weapon dmgType][target armor class]
+export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
+  gun:    { infantry: 1.0, light: 0.9, heavy: 0.5, structure: 0.6 },  // coilguns — vs soft targets
+  flame:  { infantry: 1.8, light: 1.0, heavy: 0.4, structure: 0.8 },  // pyro — shreds infantry, useless vs armor
+  rocket: { infantry: 0.5, light: 1.4, heavy: 1.7, structure: 1.2 },  // anti-armor — wasted on infantry
+  cannon: { infantry: 0.7, light: 1.2, heavy: 1.4, structure: 1.5 },  // shells — vs armor & buildings
+  sniper: { infantry: 2.0, light: 0.7, heavy: 0.5, structure: 0.3 },  // precision — vs infantry only
+};
 
 export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes

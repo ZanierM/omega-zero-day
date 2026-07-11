@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES,
+  BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE,
 } from './config';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
@@ -263,8 +263,17 @@ export function updateUI() {
       const name = first.def.name;
       const lvl = first.kind === 'building' && first.level > 1 ? ` <span style="color:#ffd76e">LV${first.level}</span>` : '';
       const hp = `${Math.ceil(first.hp)} / ${first.maxHp} HP`;
+      // combat profile: weapon type + armor class (rock-paper-scissors hint)
+      let combat = '';
+      if (first.kind === 'unit') {
+        const w = UNIT_DMGTYPE[first.def.id], a = UNIT_ARMOR[first.def.id] ?? 'infantry';
+        const parts = [];
+        if (w) parts.push(`⚔ ${w}`);
+        parts.push(`🛡 ${a}`);
+        combat = `<br><span style="color:#cf9d72;font-size:9.5px">${parts.join(' · ')}</span>`;
+      }
       selInfo.innerHTML = selection.size === 1
-        ? `<b>${name}</b>${lvl} — ${hp}<br><i>${(first.def as any).desc ?? ''}</i>`
+        ? `<b>${name}</b>${lvl} — ${hp}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
         : `<b>${selection.size} units selected</b><br>${name} +${selection.size - 1} more`;
     }
   } else {

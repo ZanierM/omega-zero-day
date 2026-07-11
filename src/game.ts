@@ -3,6 +3,7 @@ import {
   START_CREDITS, HARVEST_RATE, HARVESTER_CAPACITY, LOW_POWER_SPEED, BUILD_RADIUS, PLAYER,
   WPN_BONUS, ARM_BONUS, DEF_BONUS, BLD_UPGRADE_COST, BLD_UPGRADE_HP, BLD_UPGRADE_DMG,
   REPAIR_COST, REPAIR_RATE,
+  DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
 } from './config';
 import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile } from './map';
 import { findPath } from './path';
@@ -107,6 +108,7 @@ export interface Boom { x: number, y: number, r: number, ttl: number, max: numbe
 export interface Shell {
   x: number, y: number, sx: number, sy: number, tx: number, ty: number,
   t: number, dur: number, dmg: number, splash: number, owner: number, kind: 'shell' | 'rocket',
+  dmgType?: DmgType,
 }
 // an orbital strike telegraphs a reticle, then a beam slams down and detonates
 export interface Strike { x: number, y: number, t: number, delay: number, owner: number, damage: number, radius: number }
@@ -114,6 +116,7 @@ export const beams: Beam[] = [];
 export const booms: Boom[] = [];
 export const shells: Shell[] = [];
 export const strikes: Strike[] = [];
+export let flash = 0; // 0..1 screen-flash intensity for a big orbital detonation
 
 export let gameOver: 'win' | 'lose' | null = null;
 export let paused = true; // starts paused behind the mission briefing
@@ -280,6 +283,15 @@ function defFor(item: { defId: string, kind: string }) {
        : UPGRADES[item.defId];
 }
 
+// has this faction hit the per-faction cap on a limited building (e.g. superweapon)?
+function atBuildLimit(owner: number, tab: Tab, defId: string): boolean {
+  const def = BUILDINGS[defId];
+  if (!def?.limit) return false;
+  const owned = buildings.filter(b => b.owner === owner && b.def.id === defId).length;
+  const queued = (players[owner].queues[tab] ?? []).filter(q => q.defId === defId).length;
+  return owned + queued >= def.limit;
+}
+
 export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
   if (tab === 'ups') {
     const up = UPGRADES[defId];
@@ -295,6 +307,7 @@ export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
   if (def.prereqUp && !players[owner].upgrades.has(def.prereqUp)) return false;
   if (tab === 'inf' && !hasBuilding(owner, 'barracks')) return false;
   if (tab === 'veh' && !hasBuilding(owner, 'fab')) return false;
+  if (atBuildLimit(owner, tab, defId)) return false;
   return true;
 }
 
@@ -315,6 +328,7 @@ export function requirementText(owner: number, tab: Tab, defId: string): string 
   if (tab === 'veh' && !hasBuilding(owner, 'fab')) return 'Requires a Fabricator';
   if (def.prereq && !hasBuilding(owner, def.prereq)) return `Requires ${BUILDINGS[def.prereq].name}`;
   if (def.prereqUp && !players[owner].upgrades.has(def.prereqUp)) return `Requires ${UPGRADES[def.prereqUp].name} research`;
+  if (atBuildLimit(owner, tab, defId)) return `Limit ${(def as any).limit} — one already built`;
   return null;
 }
 
@@ -411,8 +425,18 @@ function audible(x: number, y: number): boolean {
   return inBounds(tx, ty) && visible[idx(tx, ty)] === 1;
 }
 
+// target's armor class → weapon-vs-armor multiplier (rock-paper-scissors)
+export function armorClassOf(e: Entity) {
+  return e.kind === 'building' ? 'structure' as const : (UNIT_ARMOR[e.def.id] ?? 'infantry');
+}
+export function damageMult(dmgType: DmgType | undefined, target: Entity): number {
+  if (!dmgType) return 1;                       // strikes / flares hit everything flat
+  return DMG_TABLE[dmgType]?.[armorClassOf(target)] ?? 1;
+}
+
 function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: string) {
   const from = entityPos(u), to = entityPos(target);
+  const dmgType = u.kind === 'unit' ? UNIT_DMGTYPE[u.def.id] : TURRET_DMGTYPE[u.def.id];
   // projectile weapons lob a shell at the target's CURRENT position — fast
   // targets can sidestep, and the blast damages everything near the impact
   if (u.kind === 'unit' && u.def.weapon) {
@@ -421,14 +445,14 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
     shells.push({
       x: from.x, y: from.y, sx: from.x, sy: from.y, tx: to.x, ty: to.y,
       t: 0, dur: Math.max(0.2, d / speed), dmg: damageAmt,
-      splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon,
+      splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType,
     });
     if (audible(from.x, from.y)) sfx(u.def.weapon === 'rocket' ? 'shot' : 'shotHeavy');
     return;
   }
   beams.push({ x1: from.x, y1: from.y, x2: to.x + (Math.random() * 8 - 4), y2: to.y + (Math.random() * 8 - 4), ttl: 0.12, color });
   if (audible(from.x, from.y) || audible(to.x, to.y)) sfx(damageAmt >= 60 ? 'shotHeavy' : 'shot');
-  damage(target, damageAmt);
+  damage(target, damageAmt * damageMult(dmgType, target));
 }
 
 // ---------- pioneer deployment & building repair ----------
@@ -477,8 +501,11 @@ export function fireStrike(b: Building, wx: number, wy: number): boolean {
   const sw = b.def.superweapon;
   if (!sw || b.charge > 0) return false;
   b.charge = sw.charge; // begin recharging
-  strikes.push({ x: wx, y: wy, t: 0, delay: 1.6, owner: b.owner, damage: sw.damage, radius: sw.radius * TILE });
-  if (b.owner === PLAYER) { toast('Orbital strike inbound'); sfx('research'); }
+  strikes.push({ x: wx, y: wy, t: 0, delay: 2.2, owner: b.owner, damage: sw.damage, radius: sw.radius * TILE });
+  // both sides hear the klaxon — an inbound orbital strike is everyone's problem
+  sfx('siren');
+  if (b.owner === PLAYER) toast('Orbital strike launched');
+  else toast('WARNING: hostile orbital strike inbound');
   return true;
 }
 
@@ -702,6 +729,7 @@ export function update(dt: number) {
       strikes.splice(i, 1);
       booms.push({ x: s.x, y: s.y, r: 6, ttl: 0.5, max: s.radius * 1.1 });
       sfx('explosion');
+      if (s.owner >= 0) flash = 1; // orbital strike (not a solar flare) whites out the sky
       for (const t of [...units]) {
         if (t.owner !== s.owner && Math.hypot(t.x - s.x, t.y - s.y) <= s.radius + t.def.radius * 0.5) damage(t, s.damage);
       }
@@ -725,12 +753,12 @@ export function update(dt: number) {
       booms.push({ x: s.tx, y: s.ty, r: 4, ttl: 0.5, max: s.splash * 0.95 });
       if (audible(s.tx, s.ty)) sfx('explosion');
       for (const t of [...units]) {
-        if (t.owner !== s.owner && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg);
+        if (t.owner !== s.owner && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t));
       }
       for (const t of [...buildings]) {
         if (t.owner === s.owner) continue;
         const c = buildingCenter(t);
-        if (Math.hypot(c.x - s.tx, c.y - s.ty) <= s.splash + entityRadius(t) * 0.6) damage(t, s.dmg);
+        if (Math.hypot(c.x - s.tx, c.y - s.ty) <= s.splash + entityRadius(t) * 0.6) damage(t, s.dmg * damageMult(s.dmgType, t));
       }
     }
   }
@@ -743,6 +771,7 @@ export function update(dt: number) {
   }
 
   // effects
+  if (flash > 0) flash = Math.max(0, flash - dt * 1.4);
   for (let i = beams.length - 1; i >= 0; i--) { beams[i].ttl -= dt; if (beams[i].ttl <= 0) beams.splice(i, 1); }
   for (let i = booms.length - 1; i >= 0; i--) {
     const bm = booms[i];

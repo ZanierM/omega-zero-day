@@ -14,9 +14,9 @@ const BUILD_ORDER = [
   'solar', 'turret', 'spire', 'lab', 'solar', 'railgun', 'turret',
   'extractor', 'solar', 'repairyard', 'turret', 'railgun', 'solar', 'turret',
   // late game: research-gated fortifications (skipped until unlocked)
-  'fusion', 'arctower', 'turret', 'uplink', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion',
+  'fusion', 'arctower', 'turret', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion',
 ];
-const RESEARCH_ORDER = ['wpn1', 'arm1', 'def1', 'wpn2', 'arm2', 'def2', 'wpn3', 'arm3'];
+const RESEARCH_ORDER = ['wpn1', 'arm1', 'def1', 'wpn2', 'arm2', 'def2', 'wpn3', 'orbital', 'arm3'];
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -106,6 +106,8 @@ function updateOne(ai: AIState, dt: number) {
   let want: string | null = null;
   if (!hasBuilding(ai.owner, 'solar')) want = 'solar';
   else if (!hasBuilding(ai.owner, 'extractor')) want = 'extractor';
+  // prestige priority: once the Orbital Protocol is researched, build the superweapon
+  else if (p.upgrades.has('orbital') && hasBuilding(ai.owner, 'spire') && !hasBuilding(ai.owner, 'uplink')) want = 'uplink';
   else if (ai.buildIndex < BUILD_ORDER.length) want = BUILD_ORDER[ai.buildIndex];
   else if (powerOf(ai.owner).low) want = 'solar';
   const reserve = want ? BUILDINGS[want].cost + 300 : 0;
