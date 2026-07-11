@@ -107,7 +107,11 @@
       background: #0c0302cc; z-index: 10; color: #fff; }
     #overlay h1 { font-family: 'Orbitron', monospace; font-size: 46px; letter-spacing: 6px; }
     #overlay.win h1 { color: #3ddc84; } #overlay.lose h1 { color: #e5484d; }
-    #overlay button { padding: 10px 26px; font-size: 15px; background: #2a1710; color: #f5dcc8; border: 1px solid #ffb02e; border-radius: 5px; cursor: pointer; }
+    #overlay button { padding: 10px 26px; font-size: 15px; background: #2a1710; color: #f5dcc8; border: 1px solid #ffb02e; border-radius: 5px; cursor: pointer; font-family: 'Share Tech Mono', monospace; letter-spacing: 2px; }
+    #overlaystats { font-family: 'Share Tech Mono', monospace; color: #cfae8a; font-size: 13px; line-height: 1.9;
+      display: grid; grid-template-columns: auto auto; gap: 2px 26px; margin: 4px 0 6px; }
+    #overlaystats .k { color: #8a6a4a; text-align: right; letter-spacing: 1px; }
+    #overlaystats .v { color: #ffd76e; text-align: left; font-variant-numeric: tabular-nums; }
     #toast { position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); background: #1e0f08ee; border: 1px solid #54301a; color: #ffd76e;
       padding: 7px 16px; border-radius: 5px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 5; }
 
@@ -253,6 +257,25 @@
     }
     #menubtn:hover { border-color: #ff8c3a; color: #ffe4c8; }
 
+    /* idle-harvester warning button — bottom-left over the map, only when idle */
+    #idlebtn { display: none; position: absolute; left: 8px; top: 60px; z-index: 6;
+      height: 34px; padding: 0 10px; align-items: center; gap: 4px;
+      font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: 700; color: #131313;
+      background: #ffb02e; border: none; border-radius: 7px; cursor: pointer;
+      box-shadow: 0 0 12px rgba(255,176,46,0.5); -webkit-tap-highlight-color: transparent; }
+    #idlebtn.show { display: flex; animation: idlepulse 1.2s ease-in-out infinite; }
+    @keyframes idlepulse { 50% { box-shadow: 0 0 4px rgba(255,176,46,0.3); } }
+
+    /* enemy orbital-strike dread banner — top-center */
+    #enemysw { display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 7;
+      padding: 6px 18px; font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700; letter-spacing: 2px;
+      color: #ffdad2; background: rgba(40,6,4,0.86); border: 1px solid #ff4030;
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+      text-shadow: 0 0 8px rgba(255,64,48,0.7); white-space: nowrap; }
+    #enemysw.show { display: block; }
+    #enemysw.imminent { animation: swflash 0.7s steps(2) infinite; }
+    @keyframes swflash { 50% { background: rgba(90,10,6,0.92); color: #fff; } }
+
     #pausemenu { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center;
       background: rgba(10,4,2,0.82); backdrop-filter: blur(2px);
       font-family: 'Share Tech Mono', monospace; }
@@ -278,13 +301,15 @@
       #selectmode.active { color: #0a0402; background: #ffb02e; box-shadow: 0 0 12px rgba(255,176,46,0.6); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-SLDQOB6e.js"></script>
+  <script type="module" crossorigin src="./assets/index-Bj4HIrQR.js"></script>
 </head>
 <body>
   <div id="app">
     <canvas id="game"></canvas>
     <button id="selectmode" title="Box-select mode">⛶</button>
     <button id="menubtn" title="Menu">☰</button>
+    <button id="idlebtn" title="Idle harvester (no crystal)">⚠ <span id="idlecount">0</span></button>
+    <div id="enemysw"></div>
     <div id="bottombar">
       <div id="tabsbar"></div>
       <div id="hudrow">
@@ -309,7 +334,7 @@
       </div>
     </div>
   </div>
-  <div id="overlay"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><button onclick="location.reload()">PLAY AGAIN</button></div>
+  <div id="overlay"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><div id="overlaystats"></div><button onclick="location.reload()">PLAY AGAIN</button></div>
   <div id="pausemenu">
     <div id="pausebox">
       <h2>PAUSED</h2>
