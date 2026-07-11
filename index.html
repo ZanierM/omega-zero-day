@@ -52,10 +52,11 @@
     #buildpanel { flex: 1; display: flex; min-width: 0; }
     #buildgrid { flex: 1; display: flex; gap: 7px; overflow-x: auto; overflow-y: hidden; padding: 2px; align-items: stretch; }
     .bbtn { position: relative; width: 98px; min-width: 98px; border: 1px solid #4a2a16; background: linear-gradient(180deg, #1c0d07, #140a06); cursor: pointer; overflow: hidden;
-      display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 4px;
+      display: flex; flex-direction: column; align-items: center; padding: 4px 0; gap: 1px;
       clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
     .bbtn:hover { border-color: #ff8c3a; background: linear-gradient(180deg, #2a140a, #160b06); }
-    .bbtn img, .bbtn svg { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); height: 58px; max-width: 90px; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+    /* icon fills the space above the labels and is centered by object-fit */
+    .bbtn img, .bbtn svg { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 88px; max-height: 62px; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
     .bbtn .nm { font-size: 9.5px; letter-spacing: 0.5px; color: #f5dcc8; text-align: center; line-height: 1.1; padding: 0 2px; z-index: 1; }
     .bbtn .cost { font-size: 10px; color: #ffd76e; z-index: 1; }
     .bbtn.locked { opacity: 0.5; filter: grayscale(0.7); }
@@ -205,7 +206,7 @@
       #infopanel { width: 150px; }
       #credits { font-size: 13px; }
       .bbtn { width: 80px; min-width: 80px; }
-      .bbtn img, .bbtn svg { height: 44px; }
+      .bbtn img, .bbtn svg { max-height: 46px; }
       .htab { padding: 5px 8px 4px; font-size: 9.5px; letter-spacing: 1px; }
       #selinfo { font-size: 9px; }
       #toast { bottom: 150px; font-size: 11px; }
@@ -230,8 +231,8 @@
       #creditlabel { display: none; }
       #powerwrap { padding: 2px 6px 3px; }
       #powerbar { height: 7px; }
-      .bbtn { width: 58px; min-width: 58px; padding-bottom: 2px; }
-      .bbtn img, .bbtn svg { height: 30px; top: 2px; }
+      .bbtn { width: 58px; min-width: 58px; padding: 2px 0; }
+      .bbtn img, .bbtn svg { max-height: 34px; }
       .bbtn .nm { font-size: 7px; line-height: 1; letter-spacing: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .bbtn .cost { font-size: 8px; }
       #buildgrid { gap: 4px; }

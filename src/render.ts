@@ -647,6 +647,31 @@ function g2Glow(x: number, y: number, r: number, color: string) {
   ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
 }
 
+// a single faceted flux-crystal shard: two lit/shadowed faces, a bright ridge,
+// a glowing core and a top highlight — reads as a 3D gem
+function drawShard(bx: number, by: number, h: number, w: number, lean: number, bright: number) {
+  const ax = bx + lean * h, ay = by - h;         // apex
+  const ulx = bx - w, uly = by - h * 0.42;       // upper-left shoulder
+  const urx = bx + w, ury = by - h * 0.42;       // upper-right shoulder
+  const llx = bx - w * 0.66, lrx = bx + w * 0.66;// lower shoulders
+  // left face (shadowed)
+  ctx.fillStyle = '#0c5560';
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ulx, uly); ctx.lineTo(llx, by); ctx.lineTo(bx, by); ctx.closePath(); ctx.fill();
+  // right face (lit) — brighter with the ambient pulse
+  const lit = ctx.createLinearGradient(bx, ay, urx, by);
+  lit.addColorStop(0, '#8ffff7'); lit.addColorStop(0.5, '#3ce4dc'); lit.addColorStop(1, '#127f80');
+  ctx.fillStyle = lit;
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(urx, ury); ctx.lineTo(lrx, by); ctx.lineTo(bx, by); ctx.closePath(); ctx.fill();
+  // central ridge highlight
+  ctx.strokeStyle = `rgba(220,255,253,${0.55 + bright * 0.35})`; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  // glowing inner core
+  g2Glow(bx, by - h * 0.4, w * 1.1, `rgba(120,255,246,${0.25 + bright * 0.3})`);
+  // apex sparkle
+  ctx.fillStyle = `rgba(255,255,255,${0.6 * bright})`;
+  ctx.beginPath(); ctx.arc(ax, ay, 1, 0, Math.PI * 2); ctx.fill();
+}
+
 function buildingOverlay(b: Building) {
   const px = b.tx * TILE, py = b.ty * TILE;
   const w = b.def.w * TILE, h = b.def.h * TILE;
@@ -800,25 +825,31 @@ export function render() {
   const tx1 = Math.min(MAP_W - 1, Math.ceil((camera.x + vwz) / TILE));
   const ty1 = Math.min(MAP_H - 1, Math.ceil((camera.y + vhz) / TILE));
 
-  // crystals (dynamic: they deplete)
+  // crystals: faceted flux-crystal clusters that shrink as they deplete
   for (let y = ty0; y <= ty1; y++)
     for (let x = tx0; x <= tx1; x++) {
       const i = idx(x, y);
       if (crystal[i] === 0 || !explored[i]) continue;
       const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
-      const pulse = 0.8 + 0.2 * Math.sin(T * 2 + x * 1.7 + y * 2.3);
-      g2Glow(cx, cy, TILE * 0.42 * pulse, 'rgba(67,243,236,0.16)');
-      const s = (5 + (crystal[i] / 1000) * 9) * pulse;
-      for (const [ox, oy, k] of [[0, 0, 1], [-8, 5, 0.55], [8, 6, 0.45]] as const) {
-        const ss = s * k;
-        const sg = ctx.createLinearGradient(cx + ox - ss, cy + oy - ss, cx + ox + ss, cy + oy + ss);
-        sg.addColorStop(0, '#eafffe'); sg.addColorStop(0.45, '#43f3ec'); sg.addColorStop(1, '#0b7d78');
-        ctx.fillStyle = sg;
-        ctx.beginPath();
-        ctx.moveTo(cx + ox, cy + oy - ss); ctx.lineTo(cx + ox + ss * 0.6, cy + oy);
-        ctx.lineTo(cx + ox, cy + oy + ss); ctx.lineTo(cx + ox - ss * 0.6, cy + oy);
-        ctx.closePath(); ctx.fill();
+      const amt = Math.min(1, crystal[i] / 1000);
+      const pulse = 0.75 + 0.25 * Math.sin(T * 2 + x * 1.7 + y * 2.3);
+      // ground shadow + ambient glow
+      ctx.fillStyle = 'rgba(0,0,0,0.32)';
+      ctx.beginPath(); ctx.ellipse(cx + 1, cy + 6, 11, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+      g2Glow(cx, cy + 2, TILE * 0.5 * pulse, `rgba(67,243,236,${0.08 + amt * 0.1})`);
+      // deterministic per-tile shard layout (stable shapes, animated brightness)
+      const hash = (n: number) => { const s = Math.sin(x * 127.1 + y * 311.7 + n * 74.7) * 43758.5; return s - Math.floor(s); };
+      const count = 3 + Math.floor(hash(0) * 3);           // 3..5 shards
+      const scale = 0.55 + amt * 0.5;                       // depletion shrinks them
+      const order: { bx: number, by: number, h: number, w: number, lean: number }[] = [];
+      for (let k = 0; k < count; k++) {
+        const bx = cx + (hash(k * 3 + 1) - 0.5) * 20;
+        const by = cy + (hash(k * 3 + 2) - 0.25) * 8 + 3;
+        const h = (11 + hash(k * 3 + 3) * 14) * scale;
+        order.push({ bx, by, h, w: h * 0.3, lean: (hash(k * 3 + 4) - 0.5) * 0.45 });
       }
+      order.sort((a, b) => a.by - b.by);                    // back-to-front
+      for (const s of order) drawShard(s.bx, s.by, s.h, s.w, s.lean, pulse);
     }
 
   // neutral objectives: flux vents & watchtowers with owner ring + capture arc
