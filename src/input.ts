@@ -3,7 +3,7 @@ import { MAP_W, MAP_H } from './map';
 import {
   units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding,
   entityPos, entityRadius, toast, Unit, fireStrike, superReady,
-  jumpTargetAlert, starvedHarvesters,
+  jumpTargetAlert, starvedHarvesters, activateAbility,
 } from './game';
 import { crystal, idx, inBounds } from './map';
 import { sfx } from './audio';
@@ -194,6 +194,10 @@ export function initInput() {
     // S = stop
     if (e.key === 's' || e.key === 'S') {
       for (const u of selectedUnits()) issueOrder(u, { type: 'idle' });
+    }
+    // Q = trigger the selected units' special ability
+    if (e.key === 'q' || e.key === 'Q') {
+      for (const u of selectedUnits()) if (u.def.ability) activateAbility(u);
     }
     // Space = snap camera to the last "under attack" alert
     if (e.key === ' ') {

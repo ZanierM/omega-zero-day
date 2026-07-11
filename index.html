@@ -101,6 +101,11 @@
       background: linear-gradient(180deg, #10301e, #081a10); color: #3ddc84; border: 1px solid #3ddc84; }
     #actbtn:hover { background: #123a24; box-shadow: 0 0 10px rgba(61,220,132,0.3); }
     #actbtn:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
+    #abilbtn { visibility: hidden; flex-shrink: 0; padding: 4px 0; font-family: inherit; font-size: 11px; letter-spacing: 1.5px; font-weight: 700; cursor: pointer;
+      background: linear-gradient(180deg, #2a1440, #140a24); color: #c88bff; border: 1px solid #a86ff0; }
+    #abilbtn:hover { background: #331a4e; box-shadow: 0 0 10px rgba(168,111,240,0.35); }
+    #abilbtn.on { background: linear-gradient(180deg, #4a2a80, #2a1650); color: #f2e3ff; border-color: #d9b8ff; box-shadow: 0 0 10px rgba(200,139,255,0.4) inset; }
+    #abilbtn:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
 
     /* ---- overlays ---- */
     #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px;
@@ -327,6 +332,7 @@
           </div>
           <div id="countdown"><span id="cdlabel">SUPERNOVA IN</span> <span id="cdtime">--:--</span></div>
           <div id="selinfo"></div>
+          <button id="abilbtn"></button>
           <button id="actbtn"></button>
           <button id="upgbtn"></button>
         </div>

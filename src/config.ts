@@ -38,7 +38,40 @@ export interface UnitDef {
   weapon?: 'shell' | 'rocket';
   splash?: number;     // splash radius in tiles (projectiles only)
   deploysTo?: string;  // building this unit can deploy into (Pioneer → Command Post)
+  ability?: AbilityDef;
 }
+
+// active/toggle unit abilities, fully data-driven
+export interface AbilityDef {
+  id: string;
+  name: string;
+  kind: 'toggle' | 'active';
+  cooldown: number;    // seconds between uses (active only)
+  duration: number;    // seconds a timed effect lasts (0 = instant / until toggled off)
+  desc: string;
+  // effect modifiers (multipliers unless noted)
+  rangeMul?: number;
+  dmgMul?: number;
+  resist?: number;     // fraction of incoming damage taken (0.5 = half)
+  speedMul?: number;
+  reloadMul?: number;  // <1 = faster
+  immobile?: boolean;  // can't move while the toggle/effect is on
+  aoeDmg?: number;     // instant area damage on activation
+  aoeRadius?: number;  // tiles
+}
+
+export const ABILITIES: Record<string, AbilityDef> = {
+  siege:      { id: 'siege',      name: 'Siege Mode',    kind: 'toggle', cooldown: 0,  duration: 0, immobile: true, rangeMul: 1.8, dmgMul: 1.7,
+               desc: 'Deploy: immobile, but +80% range and +70% damage. Toggle to pack up.' },
+  brace:      { id: 'brace',      name: 'Brace',         kind: 'toggle', cooldown: 0,  duration: 0, immobile: true, resist: 0.45,
+               desc: 'Dig in: take 55% less damage but hold position. Toggle off to move.' },
+  overdrive:  { id: 'overdrive',  name: 'Overdrive',     kind: 'active', cooldown: 12, duration: 4, speedMul: 1.9,
+               desc: '+90% speed for 4s. Strike the harvesters and run.' },
+  overcharge: { id: 'overcharge', name: 'Overcharge',    kind: 'active', cooldown: 14, duration: 5, reloadMul: 0.45,
+               desc: 'Double fire rate for 5s.' },
+  stomp:      { id: 'stomp',      name: 'Seismic Stomp', kind: 'active', cooldown: 14, duration: 0, aoeDmg: 220, aoeRadius: 2.4,
+               desc: 'Slam the ground for heavy damage to everything nearby.' },
+};
 
 export interface BuildingDef {
   id: string;
@@ -70,13 +103,13 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'Cheap, expendable, everywhere. Helion’s coilgun infantry.' },
   rocketeer: { id: 'rocketeer', name: 'Rocket Trooper', tab: 'inf', cost: 350,  buildTime: 6,  hp: 90,  speed: 2.0, damage: 35, range: 5,   reload: 2.2, vision: 5, radius: 8,  model: 'soldier', mstep: 3, spriteH: 26, weapon: 'rocket', splash: 0.8,
                desc: 'Shoulder-launched anti-armor. Melts tanks, hates knives.' },
-  vanguard:  { id: 'vanguard',  name: 'Vanguard',       tab: 'inf', cost: 500,  buildTime: 8,  hp: 260, speed: 1.8, damage: 18, range: 3.5, reload: 0.8, vision: 5, radius: 9,  model: 'soldier', mstep: 2, spriteH: 30,
+  vanguard:  { id: 'vanguard',  name: 'Vanguard',       tab: 'inf', cost: 500,  buildTime: 8,  hp: 260, speed: 1.8, damage: 18, range: 3.5, reload: 0.8, vision: 5, radius: 9,  model: 'soldier', mstep: 2, spriteH: 30, ability: ABILITIES.brace,
                desc: 'Exo-armored shock trooper. Walks in first, walks out last.' },
   ranger:    { id: 'ranger',    name: 'Scout Ranger',   tab: 'veh', cost: 500,  buildTime: 6,  hp: 150, speed: 5.0, damage: 12, range: 4,   reload: 0.8, vision: 8, radius: 11, model: 'car', mstep: 1, spriteH: 32,
                desc: 'Fast recon rover. Finds trouble before trouble finds you.' },
   hovertank: { id: 'hovertank', name: 'Strider Mech',   tab: 'veh', cost: 900,  buildTime: 10, hp: 400, speed: 3.0, damage: 40, range: 5,   reload: 1.8, vision: 6, radius: 14, model: 'mech2', mstep: 1, spriteH: 38,
                desc: 'Mainline battle walker. The backbone of any assault.' },
-  artillery: { id: 'artillery', name: 'Thumper',        tab: 'veh', cost: 1400, buildTime: 14, hp: 280, speed: 1.6, damage: 90, range: 9,   reload: 4.0, vision: 7, radius: 14, model: 'mech', mstep: 2, spriteH: 40, prereq: 'spire', weapon: 'shell', splash: 1.5,
+  artillery: { id: 'artillery', name: 'Thumper',        tab: 'veh', cost: 1400, buildTime: 14, hp: 280, speed: 1.6, damage: 90, range: 9,   reload: 4.0, vision: 7, radius: 14, model: 'mech', mstep: 2, spriteH: 40, prereq: 'spire', weapon: 'shell', splash: 1.5, ability: ABILITIES.siege,
                desc: 'Long-range seismic artillery walker. Shells an area — devastates groups.' },
   dominator: { id: 'dominator', name: 'Dominator',      tab: 'veh', cost: 1750, buildTime: 16, hp: 800, speed: 2.0, damage: 70, range: 5.5, reload: 2.4, vision: 6, radius: 17, model: 'mech', mstep: 1, spriteH: 52, weapon: 'shell', splash: 0.9,
                desc: 'Twin-cannon siege mech. Slow. Unstoppable. Requires Research Spire.' },
@@ -87,9 +120,9 @@ export const UNITS: Record<string, UnitDef> = {
 
   pyro:      { id: 'pyro',      name: 'Pyro',           tab: 'inf', cost: 450,  buildTime: 6,  hp: 140,  speed: 2.3, damage: 9,   range: 2.2, reload: 0.25, vision: 4, radius: 8, model: 'soldier', mstep: 2, spriteH: 26,
                desc: 'Point-blank plasma thrower. Shreds infantry up close.' },
-  raider:    { id: 'raider',    name: 'Raider',         tab: 'veh', cost: 650,  buildTime: 7,  hp: 180,  speed: 5.5, damage: 15,  range: 3.5, reload: 0.6, vision: 6, radius: 11, model: 'car', mstep: 3, spriteH: 32,
+  raider:    { id: 'raider',    name: 'Raider',         tab: 'veh', cost: 650,  buildTime: 7,  hp: 180,  speed: 5.5, damage: 15,  range: 3.5, reload: 0.6, vision: 6, radius: 11, model: 'car', mstep: 3, spriteH: 32, ability: ABILITIES.overdrive,
                desc: 'Stripped-down harassment buggy. Hit the harvesters, run.' },
-  warden:    { id: 'warden',    name: 'Warden Drone',   tab: 'veh', cost: 1100, buildTime: 10, hp: 220,  speed: 4.2, damage: 22,  range: 4.5, reload: 0.5, vision: 7, radius: 12, model: 'drone', mstep: 2, spriteH: 36, prereq: 'fab',
+  warden:    { id: 'warden',    name: 'Warden Drone',   tab: 'veh', cost: 1100, buildTime: 10, hp: 220,  speed: 4.2, damage: 22,  range: 4.5, reload: 0.5, vision: 7, radius: 12, model: 'drone', mstep: 2, spriteH: 36, prereq: 'fab', ability: ABILITIES.overcharge,
                desc: 'Armed hover-drone. Fast response, thin armor.' },
 
   // ---- research-gated elite tier ----
@@ -97,7 +130,7 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'One shot, one kill, from outside their vision. Requires Weapons I.' },
   juggernaut:{ id: 'juggernaut',name: 'Juggernaut',     tab: 'inf', cost: 1200, buildTime: 12, hp: 600,  speed: 1.5, damage: 30,  range: 4,  reload: 0.7, vision: 5, radius: 11, model: 'mech2', mstep: 2, spriteH: 30, prereq: 'lab', prereqUp: 'arm2',
                desc: 'A soldier in a walking bunker. Requires Armor II.' },
-  colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2,
+  colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2, ability: ABILITIES.stomp,
                desc: 'Superheavy siege platform. The ground remembers where it walked. Requires Weapons II.' },
 };
 

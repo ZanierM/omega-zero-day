@@ -3,6 +3,7 @@ import {
   buildings, units, players, startProduction, placeBuilding, canPlace,
   issueOrder, hasBuilding, buildingCenter, powerOf, numPlayers, deployPioneer, tileOf,
   startRepair, repairCost, superReady, fireStrike, neutrals,
+  activateAbility, abilityOn,
 } from './game';
 import { rand, crystal, idx, nearestTile } from './map';
 
@@ -34,6 +35,35 @@ interface AIState {
   attackTimer: number;
   trainCooldown: number;
   repairCooldown: number;
+  abilCooldown: number;
+}
+
+// nearest enemy unit/building distance (px) to a point, for ability decisions
+function nearestEnemyDist(owner: number, x: number, y: number): number {
+  let best = Infinity;
+  for (const u of units) if (u.owner !== owner && !u.def.harvester) best = Math.min(best, Math.hypot(u.x - x, u.y - y));
+  for (const b of buildings) if (b.owner !== owner && !b.def.isWall) {
+    const c = buildingCenter(b); best = Math.min(best, Math.hypot(c.x - x, c.y - y));
+  }
+  return best;
+}
+
+// let the AI use unit special abilities sensibly
+function manageAbilities(owner: number) {
+  for (const u of units) {
+    if (u.owner !== owner || !u.def.ability) continue;
+    const a = u.def.ability;
+    const near = nearestEnemyDist(owner, u.x, u.y);
+    if (a.kind === 'toggle') {
+      // siege/brace up when an enemy is in weapon range; pack up when they're far
+      const wantOn = near <= (u.def.range + 2) * TILE;
+      const wantOff = near > (u.def.range + 5) * TILE;
+      if (wantOn && !abilityOn(u)) activateAbility(u);
+      else if (wantOff && abilityOn(u)) activateAbility(u);
+    } else if (u.abilityCd <= 0 && near <= 5 * TILE) {
+      activateAbility(u); // stomp / overcharge / overdrive when the enemy is close
+    }
+  }
 }
 
 let ais: AIState[] = [];
@@ -50,6 +80,7 @@ export function initAI(numEnemies: number, difficulty: Difficulty = 'normal') {
       attackTimer: diff.firstWave + i * 12,   // stagger the first waves
       trainCooldown: 0,
       repairCooldown: 5,
+      abilCooldown: 0,
     });
     if (diff.headStart) players[i + 1].upgrades.add('wpn1'); // hard AIs land pre-armed
   }
@@ -92,6 +123,10 @@ function updateOne(ai: AIState, dt: number) {
 
   // modest income trickle so the AI keeps developing even with a lean economy
   p.credits += diff.trickle * dt;
+
+  // unit special abilities (throttled — no need to check every frame)
+  ai.abilCooldown -= dt;
+  if (ai.abilCooldown <= 0) { ai.abilCooldown = 0.5; manageAbilities(ai.owner); }
 
   // field repairs: patch up badly damaged structures when affordable
   ai.repairCooldown -= dt;

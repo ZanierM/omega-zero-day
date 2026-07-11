@@ -35,6 +35,9 @@ export interface Unit {
   repathTimer: number;
   facing: number;                // radians, for drawing
   starved: boolean;              // harvester with no reachable crystal
+  toggled: boolean;              // ability toggle state (siege / brace)
+  abilityCd: number;             // seconds until an active ability is ready again
+  abilityTimer: number;          // seconds left on a timed active effect
 }
 
 export interface Building {
@@ -230,11 +233,77 @@ export function spawnUnit(defId: string, owner: number, px: number, py: number):
     path: null, order: { type: 'idle' }, cooldown: 0, cargo: 0,
     harvestState: def.harvester ? 'toField' : 'none',
     autoTargetId: -1, repathTimer: 0, facing: 0, starved: false,
+    toggled: false, abilityCd: 0, abilityTimer: 0,
   };
   units.push(u);
   byId.set(u.id, u);
   if (owner === PLAYER) stats.built++;
   return u;
+}
+
+// ---------- unit abilities ----------
+
+// is the unit's ability effect currently active (toggle on, or timed effect running)?
+export function abilityOn(u: Unit): boolean {
+  const a = u.def.ability;
+  if (!a) return false;
+  return a.kind === 'toggle' ? u.toggled : u.abilityTimer > 0;
+}
+// effective stats fold in any active ability modifiers
+export function unitSpeed(u: Unit): number {
+  const a = u.def.ability;
+  if (a && abilityOn(u)) {
+    if (a.immobile) return 0;
+    if (a.speedMul) return u.def.speed * a.speedMul;
+  }
+  return u.def.speed;
+}
+export function unitRange(u: Unit): number {
+  const a = u.def.ability;
+  return a && abilityOn(u) && a.rangeMul ? u.def.range * a.rangeMul : u.def.range;
+}
+export function unitReloadTime(u: Unit): number {
+  const a = u.def.ability;
+  return a && abilityOn(u) && a.reloadMul ? u.def.reload * a.reloadMul : u.def.reload;
+}
+function unitDmgMul(u: Unit): number {
+  const a = u.def.ability;
+  return a && abilityOn(u) && a.dmgMul ? a.dmgMul : 1;
+}
+function damageTakenMul(u: Unit): number {
+  const a = u.def.ability;
+  return a && abilityOn(u) && a.resist !== undefined ? a.resist : 1;
+}
+
+// player/AI triggers an ability on a unit. Returns true if it did something.
+export function activateAbility(u: Unit): boolean {
+  const a = u.def.ability;
+  if (!a) return false;
+  if (a.kind === 'toggle') {
+    u.toggled = !u.toggled;
+    if (u.toggled && a.immobile) { u.path = null; if (u.order.type === 'move') u.order = { type: 'idle' }; }
+    if (u.owner === PLAYER) sfx('click');
+    return true;
+  }
+  // active
+  if (u.abilityCd > 0) return false;
+  u.abilityCd = a.cooldown;
+  if (a.duration > 0) u.abilityTimer = a.duration;
+  if (a.aoeDmg && a.aoeRadius) {
+    const r = a.aoeRadius * TILE;
+    booms.push({ x: u.x, y: u.y, r: 4, ttl: 0.5, max: r });
+    if (audible(u.x, u.y)) sfx('explosion');
+    for (const t of [...units]) {
+      if (t.owner !== u.owner && Math.hypot(t.x - u.x, t.y - u.y) <= r + t.def.radius * 0.5) damage(t, a.aoeDmg);
+    }
+    for (const t of [...buildings]) {
+      if (t.owner === u.owner) continue;
+      const c = buildingCenter(t);
+      if (Math.hypot(c.x - u.x, c.y - u.y) <= r + entityRadius(t) * 0.6) damage(t, a.aoeDmg);
+    }
+  }
+  if (u.owner === PLAYER) sfx('upgrade');
+  return true;
 }
 
 // player harvesters that can't find crystal to mine — for the idle-worker button
@@ -327,6 +396,7 @@ function destroy(e: Entity) {
 }
 
 export function damage(target: Entity, amount: number) {
+  if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;
   // "our base is under attack" — alert when any player structure takes a hit
   if (target.owner === PLAYER && target.kind === 'building') {
@@ -451,6 +521,7 @@ export function issueOrder(u: Unit, order: Order) {
 
 function moveToward(u: Unit, px: number, py: number, dt: number): boolean {
   // returns true when arrived (within half a tile)
+  if (unitSpeed(u) <= 0.001) return false; // immobilised (siege/brace) — can't move
   const arrivedDist = TILE * 0.45;
   if (Math.hypot(px - u.x, py - u.y) <= arrivedDist && !u.path?.length) return true;
 
@@ -467,7 +538,7 @@ function moveToward(u: Unit, px: number, py: number, dt: number): boolean {
   const wx = centerOfTile(wp.x), wy = centerOfTile(wp.y);
   const dx = wx - u.x, dy = wy - u.y;
   const d = Math.hypot(dx, dy);
-  const step = u.def.speed * TILE * dt;
+  const step = unitSpeed(u) * TILE * dt;
   u.facing = Math.atan2(dy, dx);
   if (d <= step) {
     u.x = wx; u.y = wy;
@@ -699,6 +770,8 @@ export function update(dt: number) {
   for (const u of [...units]) {
     if (u.hp <= 0) continue;
     u.cooldown = Math.max(0, u.cooldown - dt);
+    if (u.abilityCd > 0) u.abilityCd = Math.max(0, u.abilityCd - dt);
+    if (u.abilityTimer > 0) u.abilityTimer = Math.max(0, u.abilityTimer - dt);
 
     if (u.def.harvester) {
       if (u.order.type === 'move' && u.order.x !== undefined) {
@@ -728,13 +801,13 @@ export function update(dt: number) {
 
     if (target) {
       const d = distBetween(u, target);
-      if (d <= u.def.range * TILE) {
+      if (d <= unitRange(u) * TILE) {
         u.path = null;
         const tp = entityPos(target);
         u.facing = Math.atan2(tp.y - u.y, tp.x - u.x);
         if (u.cooldown === 0) {
-          u.cooldown = u.def.reload;
-          fireAt(u, target, u.def.damage * weaponMult(u.owner), u.owner === 0 ? '#7fd4ff' : '#ff8080');
+          u.cooldown = unitReloadTime(u);
+          fireAt(u, target, u.def.damage * weaponMult(u.owner) * unitDmgMul(u), u.owner === 0 ? '#7fd4ff' : '#ff8080');
         }
       } else {
         const tp = entityPos(target);
@@ -756,8 +829,11 @@ export function update(dt: number) {
       if (d > 0 && d < min) {
         const push = (min - d) * 0.5 * dt * 8;
         const nx = dx / d, ny = dy / d;
-        a.x -= nx * push; a.y -= ny * push;
-        b.x += nx * push; b.y += ny * push;
+        // deployed/immobilised units hold their ground and don't get shoved
+        const aFix = a.def.ability?.immobile && a.toggled;
+        const bFix = b.def.ability?.immobile && b.toggled;
+        if (!aFix) { a.x -= nx * push; a.y -= ny * push; }
+        if (!bFix) { b.x += nx * push; b.y += ny * push; }
       }
     }
   }

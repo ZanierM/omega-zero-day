@@ -5,7 +5,7 @@ import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
   gameOver, toastMsg, toast, byId, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
-  enemyStrikeETA, starvedHarvesters, stats,
+  enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
 import { sfx, duckMusic } from './audio';
@@ -26,6 +26,7 @@ const overlayStats = document.getElementById('overlaystats')!;
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const upgBtn = document.getElementById('upgbtn') as HTMLButtonElement;
 const actBtn = document.getElementById('actbtn') as HTMLButtonElement;
+const abilBtn = document.getElementById('abilbtn') as HTMLButtonElement;
 const overlay = document.getElementById('overlay')!;
 const overlayTitle = document.getElementById('overlaytitle')!;
 const overlaySub = document.getElementById('overlaysub')!;
@@ -107,6 +108,7 @@ export function initUI() {
     if (b.def.superweapon && superReady(b)) { startStrikeTargeting(b.id); sfx('click'); return; }
     startRepair(b);
   });
+  abilBtn.addEventListener('pointerdown', () => { for (const u of abilityUnits()) activateAbility(u); });
   rebuildGrid();
 }
 
@@ -185,6 +187,16 @@ function selectedOwnPioneer(): Unit | null {
   return null;
 }
 
+// selected player units that share an ability (the button acts on all of them)
+function abilityUnits(): Unit[] {
+  const out: Unit[] = [];
+  for (const id of selection) {
+    const e = byId.get(id);
+    if (e?.kind === 'unit' && e.owner === PLAYER && e.def.ability) out.push(e);
+  }
+  return out;
+}
+
 export function updateUI() {
   const p = players[PLAYER];
   // smooth credit ticker, RA2-style
@@ -242,6 +254,27 @@ export function updateUI() {
     const mine = head?.defId === b.defId;
     b.el.classList.toggle('ready', !!(mine && head!.ready));
     b.prog.style.width = mine && !head!.ready ? `${(1 - head!.remaining / head!.total) * 100}%` : '0%';
+  }
+
+  // unit ability button (Q) — reflects toggle / cooldown / ready
+  const au = abilityUnits();
+  if (au.length) {
+    const u = au[0], ab = u.def.ability!;
+    abilBtn.style.visibility = 'visible';
+    if (ab.kind === 'toggle') {
+      const on = abilityOn(u);
+      abilBtn.classList.toggle('on', on);
+      abilBtn.textContent = `${on ? '◆' : '◇'} ${ab.name.toUpperCase()} [Q]`;
+      abilBtn.disabled = false;
+    } else {
+      abilBtn.classList.remove('on');
+      if (u.abilityTimer > 0) { abilBtn.textContent = `${ab.name.toUpperCase()} ACTIVE`; abilBtn.disabled = true; }
+      else if (u.abilityCd > 0) { abilBtn.textContent = `${ab.name.toUpperCase()} ${Math.ceil(u.abilityCd)}s`; abilBtn.disabled = true; }
+      else { abilBtn.textContent = `⚡ ${ab.name.toUpperCase()} [Q]`; abilBtn.disabled = false; }
+    }
+  } else {
+    abilBtn.style.visibility = 'hidden';
+    abilBtn.classList.remove('on');
   }
 
   // selection info + building upgrade button

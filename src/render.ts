@@ -942,6 +942,31 @@ export function render() {
     if (u.def.harvester && u.cargo > 10) {
       g2Glow(u.x, u.y, 5 + (u.cargo / 500) * 5, `rgba(67,243,236,${0.25 + (u.cargo / 500) * 0.45})`);
     }
+    // active-ability visual states
+    const ab = u.def.ability;
+    if (ab && game.abilityOn(u)) {
+      if (ab.id === 'siege') {
+        // deployed: amber range ring + anchor spikes
+        ctx.strokeStyle = 'rgba(255,176,46,0.28)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(u.x, u.y, game.unitRange(u) * TILE, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#ffb02e'; ctx.lineWidth = 2;
+        for (const a of [0.6, 2.2, 3.8, 5.4]) {
+          ctx.beginPath();
+          ctx.moveTo(u.x + Math.cos(a) * u.def.radius, u.y + Math.sin(a) * u.def.radius * 0.6 + 4);
+          ctx.lineTo(u.x + Math.cos(a) * (u.def.radius + 6), u.y + Math.sin(a) * (u.def.radius + 6) * 0.6 + 8);
+          ctx.stroke();
+        }
+      } else if (ab.id === 'brace') {
+        // shield bubble
+        const pulse = 0.5 + 0.3 * Math.sin(T * 5 + u.id);
+        ctx.strokeStyle = `rgba(120,200,255,${0.4 + pulse * 0.4})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(u.x, u.y - u.def.radius * 0.3, u.def.radius + 5, 0, Math.PI * 2); ctx.stroke();
+      } else if (ab.id === 'overdrive') {
+        g2Glow(u.x, u.y, u.def.radius, 'rgba(255,120,40,0.35)');
+      } else if (ab.id === 'overcharge') {
+        g2Glow(u.x, u.y, u.def.radius, 'rgba(200,139,255,0.4)');
+      }
+    }
     const sel = selection.has(u.id);
     if (sel || u.hp < u.maxHp) {
       const w = u.def.radius * 2.2;
