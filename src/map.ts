@@ -42,6 +42,9 @@ function blob(cx: number, cy: number, r: number, fn: (x: number, y: number) => v
 // Index 0 is the player.
 export let startBases: { x: number, y: number }[] = [];
 
+// neutral objective locations chosen during map generation
+export let neutralSpots: { x: number, y: number, kind: 'vent' | 'tower' }[] = [];
+
 function pickBasePositions(numEnemies: number): { x: number, y: number }[] {
   const m = 8;
   const corners = [
@@ -93,6 +96,9 @@ export function generateMap(numEnemies: number, crystalMul = 1) {
     const cy = b.y + (b.y < MAP_H / 2 ? 8 : -6);
     fields.push([cx, cy, 5]);
   }
+  // center fields are RICHER than home fields — expanding into the contested
+  // middle is a risk that pays
+  const homeFieldCount = fields.length;
   const centers = 2 + numEnemies;
   for (let i = 0; i < centers; i++) {
     fields.push([
@@ -101,11 +107,37 @@ export function generateMap(numEnemies: number, crystalMul = 1) {
       5 + Math.floor(rand() * 3),
     ]);
   }
-  for (const [fx, fy, r] of fields) {
+  fields.forEach(([fx, fy, r], fi) => {
+    const rich = fi >= homeFieldCount ? 1.7 : 1;
     blob(fx, fy, r, (x, y) => {
       const i = idx(x, y);
-      if (terrain[i] === 0) crystal[i] = Math.min(65000, Math.floor((400 + rand() * 600) * crystalMul));
+      if (terrain[i] === 0) crystal[i] = Math.min(65000, Math.floor((400 + rand() * 600) * crystalMul * rich));
     });
+  });
+
+  // ---- neutral objectives: flux vents (income) & watchtowers (vision) ----
+  neutralSpots = [];
+  const clearSpot = (x: number, y: number) =>
+    inBounds(x, y) && terrain[idx(x, y)] === 0 && crystal[idx(x, y)] === 0 &&
+    !bases.some(b => Math.hypot(x - b.x, y - b.y) < 16) &&
+    !neutralSpots.some(n => Math.hypot(x - n.x, y - n.y) < 8);
+  const placeNeutral = (kind: 'vent' | 'tower', cx: number, cy: number) => {
+    const t = nearestTile(cx, cy, 10, clearSpot);
+    if (t) neutralSpots.push({ x: t.x, y: t.y, kind });
+  };
+  // vents on a ring around the map centre, one per faction plus one
+  const vents = numEnemies + 2;
+  const ringR = MAP_W * 0.2;
+  const a0 = rand() * Math.PI * 2;
+  for (let i = 0; i < vents; i++) {
+    const a = a0 + (i / vents) * Math.PI * 2;
+    placeNeutral('vent', Math.floor(MAP_W / 2 + Math.cos(a) * ringR), Math.floor(MAP_H / 2 + Math.sin(a) * ringR));
+  }
+  // watchtowers between the ring and the corners
+  const towers = numEnemies >= 2 ? 3 : 2;
+  for (let i = 0; i < towers; i++) {
+    const a = a0 + Math.PI / vents + (i / towers) * Math.PI * 2;
+    placeNeutral('tower', Math.floor(MAP_W / 2 + Math.cos(a) * MAP_W * 0.33), Math.floor(MAP_H / 2 + Math.sin(a) * MAP_H * 0.33));
   }
 }
 

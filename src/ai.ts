@@ -2,7 +2,7 @@ import { TILE, BUILDINGS, UPGRADES } from './config';
 import {
   buildings, units, players, startProduction, placeBuilding, canPlace,
   issueOrder, hasBuilding, buildingCenter, powerOf, numPlayers, deployPioneer, tileOf,
-  startRepair, repairCost, superReady, fireStrike,
+  startRepair, repairCost, superReady, fireStrike, neutrals,
 } from './game';
 import { rand, crystal, idx, nearestTile } from './map';
 
@@ -207,9 +207,17 @@ function updateOne(ai: AIState, dt: number) {
   const waveSize = 6 + Math.floor(ai.buildIndex / 2);
   if (ai.attackTimer <= 0 && army.length >= waveSize) {
     ai.attackTimer = (55 + rand() * 25) * diff.waveGapMul;
-    const targetB = pickWaveTarget(ai.owner);
-    if (targetB) {
-      const c = buildingCenter(targetB);
+    // ~40% of waves contest a flux vent it doesn't own — mid-map skirmishes
+    const wanted = neutrals.filter(n => n.kind === 'vent' && n.owner !== ai.owner);
+    let c: { x: number, y: number } | null = null;
+    if (wanted.length && rand() < 0.4) {
+      const n = wanted[Math.floor(rand() * wanted.length)];
+      c = { x: (n.tx + 0.5) * TILE, y: (n.ty + 0.5) * TILE };
+    } else {
+      const targetB = pickWaveTarget(ai.owner);
+      if (targetB) c = buildingCenter(targetB);
+    }
+    if (c) {
       for (const u of army) {
         issueOrder(u, { type: 'attackMove', x: c.x + (rand() * 160 - 80), y: c.y + (rand() * 160 - 80) });
       }

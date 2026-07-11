@@ -150,6 +150,12 @@ export const NON_BUILDABLE = new Set(['nexus', 'outpost']);
 export const REPAIR_COST = 0.3;
 export const REPAIR_RATE = 0.08;
 
+// neutral objectives: hold ground near them with combat units to capture
+export const VENT_INCOME = 8;     // flux per second while you hold a vent
+export const CAPTURE_RADIUS = 3.5; // tiles
+export const CAPTURE_TIME = 6;     // seconds of uncontested presence to flip it
+export const TOWER_VISION = 13;    // watchtower reveal radius (tiles)
+
 // ---- research upgrades (need a Laboratory) ----
 export interface UpgradeDef {
   id: string;

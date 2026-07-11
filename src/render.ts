@@ -1,4 +1,4 @@
-import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER } from './config';
+import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME } from './config';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
@@ -821,6 +821,52 @@ export function render() {
       }
     }
 
+  // neutral objectives: flux vents & watchtowers with owner ring + capture arc
+  for (const n of game.neutrals) {
+    if (!explored[idx(n.tx, n.ty)]) continue;
+    const cx = n.tx * TILE + TILE / 2, cy = n.ty * TILE + TILE / 2;
+    const ownerCol = n.owner >= 0 ? TEAM_COLORS[n.owner] : '#8a8578';
+    // control ring on the ground
+    ctx.strokeStyle = ownerCol; ctx.globalAlpha = 0.75; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 20, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    if (n.kind === 'vent') {
+      // rocky fumarole with a breathing flux plume
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(cx + 2, cy + 5, 13, 7, 0, 0, Math.PI * 2); ctx.fill();
+      const rg = ctx.createRadialGradient(cx - 3, cy - 3, 2, cx, cy, 13);
+      rg.addColorStop(0, '#7a6a58'); rg.addColorStop(0.7, '#4a3f32'); rg.addColorStop(1, '#241d14');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#120d08';
+      ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fill();
+      const pulse = 0.6 + 0.4 * Math.sin(T * 2.4 + n.id);
+      g2Glow(cx, cy - 4 - pulse * 5, 5 + pulse * 4, `rgba(67,243,236,${0.35 + pulse * 0.35})`);
+    } else {
+      // watchtower: stone pillar with a rotating scanner light
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(cx + 2, cy + 8, 10, 5, 0, 0, Math.PI * 2); ctx.fill();
+      const tg2 = ctx.createLinearGradient(cx - 6, cy - 22, cx + 6, cy + 8);
+      tg2.addColorStop(0, '#9a938a'); tg2.addColorStop(0.5, '#6a635a'); tg2.addColorStop(1, '#3a352e');
+      ctx.fillStyle = tg2;
+      ctx.fillRect(cx - 5, cy - 22, 10, 30);
+      ctx.fillStyle = '#2a2620';
+      ctx.fillRect(cx - 7, cy - 26, 14, 6);
+      const ang = T * 1.5 + n.id;
+      ctx.strokeStyle = `rgba(255,215,110,${n.owner >= 0 ? 0.8 : 0.25})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy - 23);
+      ctx.lineTo(cx + Math.cos(ang) * 16, cy - 23 + Math.sin(ang) * 7); ctx.stroke();
+      g2Glow(cx, cy - 23, 3, n.owner >= 0 ? 'rgba(255,215,110,0.9)' : 'rgba(120,110,90,0.5)');
+    }
+    // capture progress arc
+    if (n.prog > 0 && n.progOwner >= 0) {
+      ctx.strokeStyle = TEAM_COLORS[n.progOwner]; ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 24, -Math.PI / 2, -Math.PI / 2 + (n.prog / CAPTURE_TIME) * Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
   // buildings, sorted so southern (nearer) structures draw over northern ones
   const drawList = [...buildings].sort((a, b) => (a.ty + a.def.h) - (b.ty + b.def.h));
   for (const b of drawList) {
@@ -1056,6 +1102,15 @@ export function renderMinimap() {
       if (!explored[i]) { mmCtx.fillStyle = '#0c0402'; mmCtx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5); }
       else if (crystal[i] > 0) { mmCtx.fillStyle = '#1fa39d'; mmCtx.fillRect(x * sx, y * sy, sx, sy); }
     }
+  // neutral objectives as diamonds (grey until captured)
+  for (const n of game.neutrals) {
+    if (!explored[idx(n.tx, n.ty)]) continue;
+    const mx = n.tx * sx, my = n.ty * sy;
+    mmCtx.fillStyle = n.owner >= 0 ? TEAM_COLORS[n.owner] : '#b0a890';
+    mmCtx.beginPath();
+    mmCtx.moveTo(mx, my - 3); mmCtx.lineTo(mx + 3, my); mmCtx.lineTo(mx, my + 3); mmCtx.lineTo(mx - 3, my);
+    mmCtx.closePath(); mmCtx.fill();
+  }
   for (const b of buildings) {
     if (b.owner !== PLAYER && !explored[idx(b.tx, b.ty)]) continue;
     mmCtx.fillStyle = TEAM_COLORS[b.owner];

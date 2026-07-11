@@ -4,8 +4,9 @@ import {
   WPN_BONUS, ARM_BONUS, DEF_BONUS, BLD_UPGRADE_COST, BLD_UPGRADE_HP, BLD_UPGRADE_DMG,
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
+  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION,
 } from './config';
-import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile } from './map';
+import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile, neutralSpots } from './map';
 import { findPath } from './path';
 import { sfx } from './audio';
 
@@ -95,12 +96,25 @@ export let novaTotal = 0, novaLeft = 0;
 let flareTimer = 0;
 export function setSupernova(seconds: number) { novaTotal = seconds; novaLeft = seconds; }
 
+// neutral map objectives (indestructible; captured by holding ground)
+export interface Neutral {
+  id: number; tx: number; ty: number; kind: 'vent' | 'tower';
+  owner: number;        // -1 = unclaimed
+  prog: number;         // capture progress in seconds
+  progOwner: number;    // faction currently capturing
+}
+export const neutrals: Neutral[] = [];
+
 export function initGame(numEnemies: number) {
   numPlayers = numEnemies + 1;
   players = Array.from({ length: numPlayers }, freshPlayer);
   explored = new Uint8Array(MAP_W * MAP_H);
   visible = new Uint8Array(MAP_W * MAP_H);
   flareTimer = 0;
+  neutrals.length = 0;
+  for (const s of neutralSpots) {
+    neutrals.push({ id: nextId++, tx: s.x, ty: s.y, kind: s.kind, owner: -1, prog: 0, progOwner: -1 });
+  }
 }
 
 export interface Beam { x1: number, y1: number, x2: number, y2: number, ttl: number, color: string }
@@ -796,6 +810,33 @@ export function update(dt: number) {
     }
   }
 
+  // neutral objectives: capture by uncontested presence, income while held
+  for (const n of neutrals) {
+    const cx = centerOfTile(n.tx), cy = centerOfTile(n.ty);
+    const present = new Set<number>();
+    for (const u of units) {
+      if (u.def.harvester) continue; // fighters hold ground, not miners
+      if (Math.hypot(u.x - cx, u.y - cy) <= CAPTURE_RADIUS * TILE) present.add(u.owner);
+    }
+    if (present.size === 1) {
+      const o = [...present][0];
+      if (n.owner !== o) {
+        if (n.progOwner !== o) { n.progOwner = o; n.prog = 0; }
+        n.prog += dt;
+        if (n.prog >= CAPTURE_TIME) {
+          const was = n.owner;
+          n.owner = o; n.prog = 0; n.progOwner = -1;
+          const label = n.kind === 'vent' ? 'Flux vent' : 'Watchtower';
+          if (o === PLAYER) { toast(`${label} captured`); sfx('ready'); }
+          else if (was === PLAYER) { toast(`${label} lost`); sfx('error'); }
+        }
+      }
+    } else if (present.size === 0 && n.prog > 0) {
+      n.prog = Math.max(0, n.prog - dt); // decay when abandoned; contested = frozen
+    }
+    if (n.kind === 'vent' && n.owner >= 0) players[n.owner].credits += VENT_INCOME * dt;
+  }
+
   // fog of war (player perspective), cheap enough to refresh a few times a second
   fogTimer -= dt;
   if (fogTimer <= 0) {
@@ -813,6 +854,11 @@ export function update(dt: number) {
     };
     for (const u of units) if (u.owner === PLAYER) reveal(tileOf(u.x), tileOf(u.y), u.def.vision);
     for (const b of buildings) if (b.owner === PLAYER) reveal(b.tx + Math.floor(b.def.w / 2), b.ty + Math.floor(b.def.h / 2), b.def.vision);
+    // captured watchtowers are long-range eyes; owned vents show their surroundings
+    for (const n of neutrals) {
+      if (n.owner !== PLAYER) continue;
+      reveal(n.tx, n.ty, n.kind === 'tower' ? TOWER_VISION : 4);
+    }
   }
 
   // supernova countdown + escalating solar flares in the final third
