@@ -224,9 +224,9 @@
       #powerwrap { padding: 2px 6px 3px; }
       #powerbar { height: 7px; }
       .bbtn { width: 58px; min-width: 58px; padding-bottom: 2px; }
-      .bbtn img, .bbtn svg { height: 30px; top: 3px; }
-      .bbtn .nm { display: none; }               /* icon + cost only */
-      .bbtn .cost { font-size: 9px; }
+      .bbtn img, .bbtn svg { height: 30px; top: 2px; }
+      .bbtn .nm { font-size: 7px; line-height: 1; letter-spacing: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .bbtn .cost { font-size: 8px; }
       #buildgrid { gap: 4px; }
       .htab { padding: 3px 7px 3px; font-size: 8.5px; letter-spacing: 1px; }
       #tabsbar { padding: 0 4px; }
@@ -234,6 +234,28 @@
       #upgbtn, #actbtn { padding: 3px 0; font-size: 9px; letter-spacing: 1px; }
       #mutebtn { display: none; }
     }
+
+    /* ☰ menu button — floats top-right over the map, always available */
+    #menubtn {
+      position: absolute; top: 8px; right: 8px; z-index: 6;
+      width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: #ffb02e; background: rgba(12,5,3,0.72);
+      border: 1px solid #ff8c3a88; border-radius: 8px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    #menubtn:hover { border-color: #ff8c3a; color: #ffe4c8; }
+
+    #pausemenu { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center;
+      background: rgba(10,4,2,0.82); backdrop-filter: blur(2px);
+      font-family: 'Share Tech Mono', monospace; }
+    #pausebox { display: flex; flex-direction: column; gap: 12px; padding: 30px 40px; min-width: 260px;
+      background: linear-gradient(165deg, rgba(24,11,6,0.96), rgba(12,5,3,0.96)); border: 1px solid #ff8c3a66;
+      clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+      box-shadow: 0 0 40px rgba(255,120,40,0.15); }
+    #pausebox h2 { font-family: 'Orbitron', monospace; text-align: center; color: #ffb02e; letter-spacing: 6px; font-size: 22px; margin-bottom: 6px; }
+    #pausebox button { padding: 12px 0; font-family: inherit; font-size: 13px; letter-spacing: 2px; font-weight: 700; cursor: pointer;
+      color: #ffe4c8; background: linear-gradient(180deg, #2a140a, #1a0c06); border: 1px solid #ff8c3a88; }
+    #pausebox button:hover { background: #33180c; box-shadow: 0 0 12px rgba(255,140,58,0.3); }
 
     /* ⛶ box-select toggle — floats over the map, touch devices only */
     #selectmode { display: none; }
@@ -248,12 +270,13 @@
       #selectmode.active { color: #0a0402; background: #ffb02e; box-shadow: 0 0 12px rgba(255,176,46,0.6); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-gc7nv31w.js"></script>
+  <script type="module" crossorigin src="./assets/index-Bh0OQaD-.js"></script>
 </head>
 <body>
   <div id="app">
     <canvas id="game"></canvas>
     <button id="selectmode" title="Box-select mode">⛶</button>
+    <button id="menubtn" title="Menu">☰</button>
     <div id="bottombar">
       <div id="tabsbar"></div>
       <div id="hudrow">
@@ -278,6 +301,14 @@
     </div>
   </div>
   <div id="overlay"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><button onclick="location.reload()">PLAY AGAIN</button></div>
+  <div id="pausemenu">
+    <div id="pausebox">
+      <h2>PAUSED</h2>
+      <button id="resumebtn">▶ RESUME</button>
+      <button id="restartbtn">⟲ RESTART MISSION</button>
+      <button id="pausemute">SOUND: ON</button>
+    </div>
+  </div>
   <div id="toast"></div>
   <div id="briefing">
     <div class="stars"></div><div class="stars2"></div>
