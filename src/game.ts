@@ -233,7 +233,9 @@ export function spawnUnit(defId: string, owner: number, px: number, py: number):
   const hp = Math.round(def.hp * armorMult(owner));
   const u: Unit = {
     id: nextId++, kind: 'unit', def, owner, x: px, y: py, hp, maxHp: hp,
-    path: null, order: { type: 'idle' }, cooldown: 0, cargo: 0,
+    // small random initial cooldown so armies don't fire in perfect lockstep
+    // (prevents synchronized mutual-kill frames from letting one side sweep)
+    path: null, order: { type: 'idle' }, cooldown: Math.random() * 0.4, cargo: 0,
     harvestState: def.harvester ? 'toField' : 'none',
     autoTargetId: -1, repathTimer: 0, facing: 0, starved: false,
     toggled: false, abilityCd: 0, abilityTimer: 0, xp: 0, rank: 0,
@@ -733,6 +735,7 @@ function updateHarvester(u: Unit, dt: number) {
 
 let fogTimer = 0;
 let healTimer = 0;
+let frameParity = false; // flips each frame to fairly rotate unit update order
 
 export function update(dt: number) {
   if (gameOver || paused) return;
@@ -786,8 +789,11 @@ export function update(dt: number) {
     }
   }
 
-  // units
-  for (const u of [...units]) {
+  // units — alternate iteration direction each frame so neither side gets a
+  // permanent "fires first" advantage from array order (fair mirror matchups)
+  frameParity = !frameParity;
+  const unitList = frameParity ? [...units] : [...units].reverse();
+  for (const u of unitList) {
     if (u.hp <= 0) continue;
     u.cooldown = Math.max(0, u.cooldown - dt);
     if (u.abilityCd > 0) u.abilityCd = Math.max(0, u.abilityCd - dt);
