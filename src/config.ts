@@ -189,6 +189,14 @@ export const CAPTURE_RADIUS = 3.5; // tiles
 export const CAPTURE_TIME = 6;     // seconds of uncontested presence to flip it
 export const TOWER_VISION = 13;    // watchtower reveal radius (tiles)
 
+// ---- veterancy: units rank up by killing, earning XP = the victim's value ----
+// rank 0 Rookie, 1 Veteran, 2 Elite. Index arrays by rank.
+export const VET_XP = [0, 600, 2000];       // total XP needed to reach each rank
+export const VET_DMG = [1, 1.25, 1.55];     // damage multiplier
+export const VET_HEAL = [0, 4, 10];         // self-repair hp/sec (veteran+)
+export const VET_RELOAD = [1, 1, 0.82];     // reload multiplier (elite reloads faster)
+export const VET_NAME = ['', 'Veteran', 'Elite'];
+
 // ---- research upgrades (need a Laboratory) ----
 export interface UpgradeDef {
   id: string;

@@ -967,6 +967,18 @@ export function render() {
         g2Glow(u.x, u.y, u.def.radius, 'rgba(200,139,255,0.4)');
       }
     }
+    // veterancy chevrons (Veteran = 1, Elite = 2) + gold glint for Elite
+    if (u.rank > 0) {
+      if (u.rank === 2) g2Glow(u.x, u.y, u.def.radius * 0.8, 'rgba(255,215,110,0.22)');
+      const cy2 = u.y - u.def.radius - 15;
+      ctx.strokeStyle = '#ffd76e'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+      for (let c = 0; c < u.rank; c++) {
+        const cyy = cy2 - c * 3.5;
+        ctx.beginPath();
+        ctx.moveTo(u.x - 4, cyy); ctx.lineTo(u.x, cyy - 3); ctx.lineTo(u.x + 4, cyy);
+        ctx.stroke();
+      }
+    }
     const sel = selection.has(u.id);
     if (sel || u.hp < u.maxHp) {
       const w = u.def.radius * 2.2;

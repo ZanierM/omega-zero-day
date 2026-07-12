@@ -5,6 +5,7 @@ import {
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
   VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION,
+  VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
 import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile, neutralSpots } from './map';
 import { findPath } from './path';
@@ -38,6 +39,8 @@ export interface Unit {
   toggled: boolean;              // ability toggle state (siege / brace)
   abilityCd: number;             // seconds until an active ability is ready again
   abilityTimer: number;          // seconds left on a timed active effect
+  xp: number;                    // veterancy experience
+  rank: number;                  // 0 Rookie · 1 Veteran · 2 Elite
 }
 
 export interface Building {
@@ -130,7 +133,7 @@ export interface Boom { x: number, y: number, r: number, ttl: number, max: numbe
 export interface Shell {
   x: number, y: number, sx: number, sy: number, tx: number, ty: number,
   t: number, dur: number, dmg: number, splash: number, owner: number, kind: 'shell' | 'rocket',
-  dmgType?: DmgType,
+  dmgType?: DmgType, by?: number,   // by = firing unit id, for veterancy credit
 }
 // an orbital strike telegraphs a reticle, then a beam slams down and detonates
 export interface Strike { x: number, y: number, t: number, delay: number, owner: number, damage: number, radius: number }
@@ -233,13 +236,25 @@ export function spawnUnit(defId: string, owner: number, px: number, py: number):
     path: null, order: { type: 'idle' }, cooldown: 0, cargo: 0,
     harvestState: def.harvester ? 'toField' : 'none',
     autoTargetId: -1, repathTimer: 0, facing: 0, starved: false,
-    toggled: false, abilityCd: 0, abilityTimer: 0,
+    toggled: false, abilityCd: 0, abilityTimer: 0, xp: 0, rank: 0,
   };
   units.push(u);
   byId.set(u.id, u);
   if (owner === PLAYER) stats.built++;
   return u;
 }
+
+// veterancy: award a unit XP for a kill and promote it across rank thresholds
+function creditKill(attacker: Unit, victim: Entity) {
+  const val = victim.kind === 'unit' ? victim.def.cost : Math.round(victim.def.cost * 0.4);
+  attacker.xp += val;
+  while (attacker.rank < 2 && attacker.xp >= VET_XP[attacker.rank + 1]) {
+    attacker.rank++;
+    if (attacker.owner === PLAYER) sfx('upgrade');
+  }
+}
+export function vetDmgMul(u: Unit): number { return VET_DMG[u.rank]; }
+function vetReloadMul(u: Unit): number { return VET_RELOAD[u.rank]; }
 
 // ---------- unit abilities ----------
 
@@ -264,7 +279,8 @@ export function unitRange(u: Unit): number {
 }
 export function unitReloadTime(u: Unit): number {
   const a = u.def.ability;
-  return a && abilityOn(u) && a.reloadMul ? u.def.reload * a.reloadMul : u.def.reload;
+  const base = a && abilityOn(u) && a.reloadMul ? u.def.reload * a.reloadMul : u.def.reload;
+  return base * vetReloadMul(u);
 }
 function unitDmgMul(u: Unit): number {
   const a = u.def.ability;
@@ -395,7 +411,7 @@ function destroy(e: Entity) {
   }
 }
 
-export function damage(target: Entity, amount: number) {
+export function damage(target: Entity, amount: number, attacker?: Unit) {
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;
   // "our base is under attack" — alert when any player structure takes a hit
@@ -403,7 +419,11 @@ export function damage(target: Entity, amount: number) {
     const c = buildingCenter(target);
     raiseAlert(c.x, c.y);
   }
-  if (target.hp <= 0) destroy(target);
+  if (target.hp <= 0) {
+    // veterancy: the killer earns XP (attacker must still be alive & hostile)
+    if (attacker && byId.has(attacker.id) && attacker.owner !== target.owner) creditKill(attacker, target);
+    destroy(target);
+  }
 }
 
 // ---------- Production ----------
@@ -577,14 +597,14 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
     shells.push({
       x: from.x, y: from.y, sx: from.x, sy: from.y, tx: to.x, ty: to.y,
       t: 0, dur: Math.max(0.2, d / speed), dmg: damageAmt,
-      splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType,
+      splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType, by: u.id,
     });
     if (audible(from.x, from.y)) sfx(u.def.weapon === 'rocket' ? 'shot' : 'shotHeavy');
     return;
   }
   beams.push({ x1: from.x, y1: from.y, x2: to.x + (Math.random() * 8 - 4), y2: to.y + (Math.random() * 8 - 4), ttl: 0.12, color });
   if (audible(from.x, from.y) || audible(to.x, to.y)) sfx(damageAmt >= 60 ? 'shotHeavy' : 'shot');
-  damage(target, damageAmt * damageMult(dmgType, target));
+  damage(target, damageAmt * damageMult(dmgType, target), u.kind === 'unit' ? u : undefined);
 }
 
 // ---------- pioneer deployment & building repair ----------
@@ -807,7 +827,7 @@ export function update(dt: number) {
         u.facing = Math.atan2(tp.y - u.y, tp.x - u.x);
         if (u.cooldown === 0) {
           u.cooldown = unitReloadTime(u);
-          fireAt(u, target, u.def.damage * weaponMult(u.owner) * unitDmgMul(u), u.owner === 0 ? '#7fd4ff' : '#ff8080');
+          fireAt(u, target, u.def.damage * weaponMult(u.owner) * unitDmgMul(u) * vetDmgMul(u), u.owner === 0 ? '#7fd4ff' : '#ff8080');
         }
       } else {
         const tp = entityPos(target);
@@ -891,15 +911,22 @@ export function update(dt: number) {
       shells.splice(i, 1);
       booms.push({ x: s.tx, y: s.ty, r: 4, ttl: 0.5, max: s.splash * 0.95 });
       if (audible(s.tx, s.ty)) sfx('explosion');
+      const firer = s.by !== undefined ? byId.get(s.by) : undefined;
+      const attacker = firer?.kind === 'unit' ? firer : undefined;
       for (const t of [...units]) {
-        if (t.owner !== s.owner && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t));
+        if (t.owner !== s.owner && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
       }
       for (const t of [...buildings]) {
         if (t.owner === s.owner) continue;
         const c = buildingCenter(t);
-        if (Math.hypot(c.x - s.tx, c.y - s.ty) <= s.splash + entityRadius(t) * 0.6) damage(t, s.dmg * damageMult(s.dmgType, t));
+        if (Math.hypot(c.x - s.tx, c.y - s.ty) <= s.splash + entityRadius(t) * 0.6) damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
       }
     }
+  }
+
+  // veterancy self-repair: Veteran+ units slowly regenerate
+  for (const u of units) {
+    if (u.rank > 0 && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + VET_HEAL[u.rank] * dt);
   }
 
   // building repairs heal over time (paid when started)

@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE,
+  BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, VET_NAME,
 } from './config';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
@@ -315,7 +315,8 @@ export function updateUI() {
     const first = byId.get([...selection][0]);
     if (first) {
       const name = first.def.name;
-      const lvl = first.kind === 'building' && first.level > 1 ? ` <span style="color:#ffd76e">LV${first.level}</span>` : '';
+      let lvl = first.kind === 'building' && first.level > 1 ? ` <span style="color:#ffd76e">LV${first.level}</span>` : '';
+      if (first.kind === 'unit' && first.rank > 0) lvl += ` <span style="color:#ffd76e">${'★'.repeat(first.rank)} ${VET_NAME[first.rank]}</span>`;
       const hp = `${Math.ceil(first.hp)} / ${first.maxHp} HP`;
       // combat profile: weapon type + armor class (rock-paper-scissors hint)
       let combat = '';
