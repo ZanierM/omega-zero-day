@@ -818,7 +818,15 @@ export function render() {
   ctx.scale(z, z);
   ctx.translate(-camera.x, -camera.y);
 
-  ctx.drawImage(terrainTex, camera.x, camera.y, vwz, vhz, camera.x, camera.y, vwz, vhz);
+  // blit only the part of the terrain texture that actually exists — clamping to
+  // the map bounds prevents the browser from edge-smearing the last row/column
+  // when you zoom/scroll past the edge of the map
+  const mW = MAP_W * TILE, mH = MAP_H * TILE;
+  const bx0 = Math.max(0, camera.x), by0 = Math.max(0, camera.y);
+  const bx1 = Math.min(mW, camera.x + vwz), by1 = Math.min(mH, camera.y + vhz);
+  if (bx1 > bx0 && by1 > by0) {
+    ctx.drawImage(terrainTex, bx0, by0, bx1 - bx0, by1 - by0, bx0, by0, bx1 - bx0, by1 - by0);
+  }
 
   const tx0 = Math.max(0, Math.floor(camera.x / TILE));
   const ty0 = Math.max(0, Math.floor(camera.y / TILE));

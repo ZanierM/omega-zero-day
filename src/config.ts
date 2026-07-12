@@ -101,7 +101,7 @@ export interface BuildingDef {
 export const UNITS: Record<string, UnitDef> = {
   trooper:   { id: 'trooper',   name: 'Trooper',        tab: 'inf', cost: 200,  buildTime: 4,  hp: 100, speed: 2.2, damage: 10, range: 4,   reload: 1.0, vision: 5, radius: 8,  model: 'soldier', mstep: 1, spriteH: 26,
                desc: 'Cheap, expendable, everywhere. Helion’s coilgun infantry.' },
-  rocketeer: { id: 'rocketeer', name: 'Rocket Trooper', tab: 'inf', cost: 350,  buildTime: 6,  hp: 90,  speed: 2.0, damage: 35, range: 5,   reload: 2.2, vision: 5, radius: 8,  model: 'soldier', mstep: 3, spriteH: 26, weapon: 'rocket', splash: 0.8,
+  rocketeer: { id: 'rocketeer', name: 'Rocket Trooper', tab: 'inf', cost: 350,  buildTime: 6,  hp: 90,  speed: 2.0, damage: 35, range: 5,   reload: 2.2, vision: 5, radius: 8,  model: 'soldier', mstep: 3, spriteH: 26, weapon: 'rocket', splash: 0.5,
                desc: 'Shoulder-launched anti-armor. Melts tanks, hates knives.' },
   vanguard:  { id: 'vanguard',  name: 'Vanguard',       tab: 'inf', cost: 500,  buildTime: 8,  hp: 260, speed: 1.8, damage: 18, range: 3.5, reload: 0.8, vision: 5, radius: 9,  model: 'soldier', mstep: 2, spriteH: 30, ability: ABILITIES.brace,
                desc: 'Exo-armored shock trooper. Walks in first, walks out last.' },
@@ -118,7 +118,7 @@ export const UNITS: Record<string, UnitDef> = {
   harvester: { id: 'harvester', name: 'Harvester',      tab: 'veh', cost: 1400, buildTime: 12, hp: 600, speed: 2.5, damage: 0,  range: 0,   reload: 0,   vision: 5, radius: 15, model: 'drone', mstep: 1, spriteH: 40, harvester: true,
                desc: 'Hover-drone that mines flux crystal and hauls it to an Extractor. Protect it.' },
 
-  pyro:      { id: 'pyro',      name: 'Pyro',           tab: 'inf', cost: 450,  buildTime: 6,  hp: 140,  speed: 2.3, damage: 9,   range: 2.2, reload: 0.25, vision: 4, radius: 8, model: 'soldier', mstep: 2, spriteH: 26,
+  pyro:      { id: 'pyro',      name: 'Pyro',           tab: 'inf', cost: 450,  buildTime: 6,  hp: 185,  speed: 2.9, damage: 9,   range: 2.2, reload: 0.25, vision: 4, radius: 8, model: 'soldier', mstep: 2, spriteH: 26,
                desc: 'Point-blank plasma thrower. Shreds infantry up close.' },
   raider:    { id: 'raider',    name: 'Raider',         tab: 'veh', cost: 650,  buildTime: 7,  hp: 180,  speed: 5.5, damage: 15,  range: 3.5, reload: 0.6, vision: 6, radius: 11, model: 'car', mstep: 3, spriteH: 32, ability: ABILITIES.overdrive,
                desc: 'Stripped-down harassment buggy. Hit the harvesters, run.' },
@@ -248,7 +248,7 @@ export const TURRET_DMGTYPE: Record<string, DmgType> = {
 export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
   gun:    { infantry: 1.0, light: 0.9, heavy: 0.5, structure: 0.6 },  // coilguns — vs soft targets
   flame:  { infantry: 1.8, light: 1.0, heavy: 0.4, structure: 0.8 },  // pyro — shreds infantry, useless vs armor
-  rocket: { infantry: 0.5, light: 1.4, heavy: 1.7, structure: 1.2 },  // anti-armor — wasted on infantry
+  rocket: { infantry: 0.35, light: 1.4, heavy: 1.7, structure: 1.2 },  // anti-armor — wasted on infantry
   cannon: { infantry: 0.7, light: 1.2, heavy: 1.4, structure: 1.5 },  // shells — vs armor & buildings
   sniper: { infantry: 2.0, light: 0.7, heavy: 0.5, structure: 0.3 },  // precision — vs infantry only
 };

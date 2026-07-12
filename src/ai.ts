@@ -186,22 +186,24 @@ function updateOne(ai: AIState, dt: number) {
   // --- research ---
   if (hasBuilding(ai.owner, 'lab') && ai.researchIndex < RESEARCH_ORDER.length && !p.queues.ups.length) {
     const up = RESEARCH_ORDER[ai.researchIndex];
-    if (p.credits > UPGRADES[up].cost + 1500 && startProduction(ai.owner, up, 'ups')) {
+    if (p.credits > UPGRADES[up].cost + 400 && startProduction(ai.owner, up, 'ups')) {
       ai.researchIndex++;
     }
   }
 
   // --- unit training ---
-  // keep a minimal defence force, but otherwise save up for the next building
+  // Fund an army in PARALLEL with base-building: we save toward the next
+  // structure, but cap how much we hold back so ongoing income keeps producing
+  // troops instead of hoarding for one expensive building.
   ai.trainCooldown -= dt;
   if (ai.trainCooldown <= 0) {
-    ai.trainCooldown = 1.5;
+    ai.trainCooldown = 1.4;
     const army = armyUnits(ai.owner);
     const harvesters = units.filter(u => u.owner === ai.owner && u.def.harvester).length;
-    const spare = p.credits - reserve;
-    if (harvesters < 2 && hasBuilding(ai.owner, 'fab') && spare >= 1400 && !p.queues.veh.length) {
+    const spare = p.credits - Math.min(reserve, 1600);
+    if (harvesters < 3 && hasBuilding(ai.owner, 'fab') && spare >= 1400 && !p.queues.veh.length) {
       startProduction(ai.owner, 'harvester', 'veh');   // economy first
-    } else if (army.length < diff.armyCap && (spare > 500 || army.length < 6)) {
+    } else if (army.length < diff.armyCap && spare > 250) {
       // composition counter: read the player's army and lean into what beats it
       let vsVehicles = false, vsInfantry = false;
       if (diff.counters) {
@@ -223,7 +225,7 @@ function updateOne(ai: AIState, dt: number) {
         else if (p.upgrades.has('wpn1') && roll > 0.85 && spare > 1000) pick = 'sniper';
         startProduction(ai.owner, pick, 'inf');
       }
-      if (hasBuilding(ai.owner, 'fab') && !p.queues.veh.length && spare > 1200) {
+      if (hasBuilding(ai.owner, 'fab') && !p.queues.veh.length && spare > 850) {
         const roll = rand();
         const advanced = hasBuilding(ai.owner, 'spire');
         let pick = advanced && roll < 0.2 ? 'dominator'
@@ -239,7 +241,7 @@ function updateOne(ai: AIState, dt: number) {
   // --- attack waves: free-for-all — raid whichever enemy faction is closest ---
   ai.attackTimer -= dt;
   const army = armyUnits(ai.owner);
-  const waveSize = 6 + Math.floor(ai.buildIndex / 2);
+  const waveSize = Math.min(14, 5 + Math.floor(ai.buildIndex / 3));
   if (ai.attackTimer <= 0 && army.length >= waveSize) {
     ai.attackTimer = (55 + rand() * 25) * diff.waveGapMul;
     // ~40% of waves contest a flux vent it doesn't own — mid-map skirmishes
