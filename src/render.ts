@@ -331,6 +331,56 @@ function bakeGrime(g: CanvasRenderingContext2D, w: number, h: number, n: number)
 
 // bake one compass direction of an isometric unit, team-tinted.
 // frame 0 = idle pose, frames 1/2 = walk cycle (falls back to idle art)
+// procedurally-drawn aircraft (faces east, rotated freely at draw time —
+// smooth rotation reads naturally for flight, unlike ground walkers)
+export function bakeAirSprite(defId: string, owner: number): HTMLCanvasElement {
+  const def = UNITS[defId];
+  const team = TEAM_COLORS[owner];
+  const S = def.radius * 3;
+  const [c, g] = makeCanvas(S, S);
+  g.translate(S / 2, S / 2);
+  const heavy = defId === 'bomber';
+  const L = def.radius * 1.35;             // nose length
+  const W = heavy ? def.radius * 1.2 : def.radius * 0.95; // wingspan half-width
+  // hull: swept delta wing
+  const hg = g.createLinearGradient(-L * 0.6, -W, L, W);
+  hg.addColorStop(0, heavy ? '#4a4456' : '#5a6472');
+  hg.addColorStop(0.55, heavy ? '#332e40' : '#39414f');
+  hg.addColorStop(1, '#191d26');
+  g.fillStyle = hg;
+  g.beginPath();
+  g.moveTo(L, 0);                          // nose
+  g.lineTo(-L * 0.35, -W);                 // left wingtip
+  g.lineTo(-L * 0.7, -W * 0.35);
+  g.lineTo(-L * 0.55, 0);                  // tail notch
+  g.lineTo(-L * 0.7, W * 0.35);
+  g.lineTo(-L * 0.35, W);                  // right wingtip
+  g.closePath(); g.fill();
+  g.strokeStyle = team; g.lineWidth = 1.6; g.stroke();
+  if (heavy) {
+    // twin bomb pods under the wings
+    g.fillStyle = '#14161d';
+    for (const sy of [-W * 0.55, W * 0.55]) {
+      g.beginPath(); g.ellipse(-L * 0.1, sy, L * 0.4, W * 0.18, 0, 0, Math.PI * 2); g.fill();
+    }
+  }
+  // canopy
+  const cg = g.createLinearGradient(L * 0.15, -3, L * 0.6, 3);
+  cg.addColorStop(0, '#cdeeff'); cg.addColorStop(1, '#2585b5');
+  g.fillStyle = cg;
+  g.beginPath(); g.ellipse(L * 0.35, 0, L * 0.28, W * 0.22, 0, 0, Math.PI * 2); g.fill();
+  // engine glow at the tail
+  g.fillStyle = 'rgba(120,200,255,0.85)';
+  for (const sy of heavy ? [-W * 0.3, W * 0.3] : [0]) {
+    g.beginPath(); g.ellipse(-L * 0.62, sy, 3.2, 2, 0, 0, Math.PI * 2); g.fill();
+  }
+  // team stripe
+  g.fillStyle = team; g.globalAlpha = 0.85;
+  g.fillRect(-L * 0.3, -1.6, L * 0.5, 3.2);
+  g.globalAlpha = 1;
+  return c;
+}
+
 function bakeUnitSprite(defId: string, owner: number, variant: number): HTMLCanvasElement {
   const dir = Math.floor(variant / 3), frame = variant % 3;
   const def = UNITS[defId];
@@ -533,6 +583,60 @@ function bakeProceduralBuilding(defId: string, owner: number): BldSprite {
     g.fillRect(w / 2 - 10, h / 2 - 3, 20, 6);
     g.strokeStyle = TEAM_COLORS[owner]; g.globalAlpha = 0.7; g.lineWidth = 2;
     g.strokeRect(6.5, 8.5, w - 13, h - 17); g.globalAlpha = 1;
+  } else if (defId === 'skyport') {
+    // aerodrome landing pad: octagonal deck, H-marking, corner beacons
+    bakeGroundPatch(g, w, h);
+    const cx = w / 2, cy = h / 2, r = w * 0.46;
+    g.fillStyle = 'rgba(0,0,0,0.4)';
+    g.beginPath(); g.ellipse(cx + 2, cy + 4, r, r * 0.8, 0, 0, Math.PI * 2); g.fill();
+    const pg = g.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    pg.addColorStop(0, '#565e6e'); pg.addColorStop(0.5, '#3a4150'); pg.addColorStop(1, '#232833');
+    g.fillStyle = pg;
+    g.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4 + Math.PI / 8;
+      const px2 = cx + Math.cos(a) * r, py2 = cy + Math.sin(a) * r;
+      i ? g.lineTo(px2, py2) : g.moveTo(px2, py2);
+    }
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1.5; g.stroke();
+    // landing circle + H marking
+    g.strokeStyle = '#ffd76e'; g.globalAlpha = 0.8; g.lineWidth = 2;
+    g.beginPath(); g.arc(cx, cy, r * 0.62, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(cx - 8, cy - 9); g.lineTo(cx - 8, cy + 9);
+    g.moveTo(cx + 8, cy - 9); g.lineTo(cx + 8, cy + 9);
+    g.moveTo(cx - 8, cy); g.lineTo(cx + 8, cy);
+    g.stroke(); g.globalAlpha = 1;
+    g.strokeStyle = TEAM_COLORS[owner]; g.globalAlpha = 0.85; g.lineWidth = 2;
+    g.strokeRect(3.5, 3.5, w - 7, h - 7); g.globalAlpha = 1;
+  } else if (defId === 'skyguard') {
+    // flak battery: pedestal + upward quad missile pod
+    bakeGroundPatch(g, w, h);
+    const cx = w / 2, cy = h / 2;
+    g.fillStyle = 'rgba(0,0,0,0.45)';
+    g.beginPath(); g.ellipse(cx + 2, cy + 4, w * 0.4, h * 0.28, 0, 0, Math.PI * 2); g.fill();
+    const bg2 = g.createRadialGradient(cx - 4, cy - 5, 2, cx, cy, w * 0.44);
+    bg2.addColorStop(0, '#8fa0be'); bg2.addColorStop(0.55, '#51607e'); bg2.addColorStop(1, '#232b3e');
+    g.fillStyle = bg2;
+    g.beginPath(); g.arc(cx, cy, w * 0.38, 0, Math.PI * 2); g.fill();
+    // boxy launcher housing angled skyward, with four slim missile tubes
+    g.save();
+    g.translate(cx, cy - 2);
+    g.rotate(-0.5);
+    const lg2 = g.createLinearGradient(-9, -7, 9, 7);
+    lg2.addColorStop(0, '#6a7590'); lg2.addColorStop(1, '#2c3346');
+    g.fillStyle = lg2;
+    g.fillRect(-9, -8, 18, 15);
+    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1; g.strokeRect(-9, -8, 18, 15);
+    g.fillStyle = '#12141c';
+    for (const ox of [-6, -2, 2, 6]) g.fillRect(ox - 1.3, -7, 2.6, 5); // tube openings
+    g.fillStyle = '#ff8c3a';
+    for (const ox of [-6, -2, 2, 6]) g.fillRect(ox - 0.8, -6.4, 1.6, 1.6); // warheads
+    g.restore();
+    g.strokeStyle = TEAM_COLORS[owner]; g.globalAlpha = 0.85; g.lineWidth = 2;
+    g.beginPath(); g.arc(cx, cy, w * 0.34, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1;
   } else if (defId === 'arctower') {
     // tesla pylon: dark pedestal, insulator rings, crackling orb on top
     bakeGroundPatch(g, w, h);
@@ -932,6 +1036,7 @@ export function render() {
 
   // units: 8-direction isometric sprites with 2-frame walk cycles
   for (const u of units) {
+    if (u.def.air) continue; // aircraft draw in the top layer, after effects
     if (u.owner !== PLAYER && !visible[idx(tileOf(u.x), tileOf(u.y))]) continue;
     const moving = !!u.path && u.path.length > 0;
     const frame = moving ? 1 + (Math.floor(T * 6 + u.id) % 2) : 0;
@@ -1116,6 +1221,34 @@ export function render() {
     ctx.moveTo(aim.x - rr2 - 8, aim.y); ctx.lineTo(aim.x + rr2 + 8, aim.y);
     ctx.moveTo(aim.x, aim.y - rr2 - 8); ctx.lineTo(aim.x, aim.y + rr2 + 8);
     ctx.stroke();
+  }
+
+  // aircraft — top layer, above buildings and effects, with altitude + shadow
+  const AIR_ALT = 26;
+  for (const u of units) {
+    if (!u.def.air) continue;
+    if (u.owner !== PLAYER && !visible[idx(tileOf(u.x), tileOf(u.y))]) continue;
+    const key = `a:${u.def.id}:${u.owner}`;
+    let s = sprites.get(key);
+    if (!s) { s = bakeAirSprite(u.def.id, u.owner); sprites.set(key, s); }
+    const bob = Math.sin(T * 2.2 + u.id) * 2;
+    // ground shadow, offset from the airframe so the altitude reads
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath(); ctx.ellipse(u.x + 8, u.y + 10, u.def.radius * 0.9, u.def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(u.x, u.y - AIR_ALT + bob);
+    ctx.rotate(u.facing);
+    ctx.drawImage(s, -s.width / 2, -s.height / 2);
+    ctx.restore();
+    const sel = selection.has(u.id);
+    if (sel || u.hp < u.maxHp) {
+      const w2 = u.def.radius * 2.2;
+      drawHealthBar(u.x - w2 / 2, u.y - AIR_ALT - u.def.radius - 8 + bob, w2, u.hp / u.maxHp);
+    }
+    if (sel) {
+      const r2 = u.def.radius + 5;
+      cornersSel(u.x - r2, u.y - AIR_ALT - r2 + bob, r2 * 2, r2 * 2);
+    }
   }
 
   // alert pings — expanding rings where the player is being attacked

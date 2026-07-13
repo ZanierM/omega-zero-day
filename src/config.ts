@@ -39,6 +39,8 @@ export interface UnitDef {
   splash?: number;     // splash radius in tiles (projectiles only)
   deploysTo?: string;  // building this unit can deploy into (Pioneer → Command Post)
   ability?: AbilityDef;
+  air?: boolean;       // aircraft: fly over terrain, only anti-air weapons can hit them
+  antiAir?: boolean;   // this unit's weapon can hit aircraft
 }
 
 // active/toggle unit abilities, fully data-driven
@@ -87,7 +89,7 @@ export interface BuildingDef {
   prereq?: string;
   prereqUp?: string;   // research upgrade id required
   produces?: 'inf' | 'veh';
-  turret?: { damage: number; range: number; reload: number };
+  turret?: { damage: number; range: number; reload: number; antiAir?: boolean; airOnly?: boolean };
   grantsHarvester?: boolean;
   isWall?: boolean;
   healRate?: number;   // hp per second restored to friendly units within 5 tiles
@@ -99,9 +101,9 @@ export interface BuildingDef {
 }
 
 export const UNITS: Record<string, UnitDef> = {
-  trooper:   { id: 'trooper',   name: 'Trooper',        tab: 'inf', cost: 200,  buildTime: 4,  hp: 100, speed: 2.2, damage: 10, range: 4,   reload: 1.0, vision: 5, radius: 8,  model: 'soldier', mstep: 1, spriteH: 26,
+  trooper:   { id: 'trooper',   name: 'Trooper',        tab: 'inf', cost: 200,  buildTime: 4,  hp: 100, speed: 2.2, damage: 10, range: 4,   reload: 1.0, vision: 5, radius: 8,  model: 'soldier', mstep: 1, spriteH: 26, antiAir: true,
                desc: 'Cheap, expendable, everywhere. Helion’s coilgun infantry.' },
-  rocketeer: { id: 'rocketeer', name: 'Rocket Trooper', tab: 'inf', cost: 350,  buildTime: 6,  hp: 90,  speed: 2.0, damage: 35, range: 5,   reload: 2.2, vision: 5, radius: 8,  model: 'soldier', mstep: 3, spriteH: 26, weapon: 'rocket', splash: 0.5,
+  rocketeer: { id: 'rocketeer', name: 'Rocket Trooper', tab: 'inf', cost: 350,  buildTime: 6,  hp: 90,  speed: 2.0, damage: 35, range: 5,   reload: 2.2, vision: 5, radius: 8,  model: 'soldier', mstep: 3, spriteH: 26, weapon: 'rocket', splash: 0.5, antiAir: true,
                desc: 'Shoulder-launched anti-armor. Melts tanks, hates knives.' },
   vanguard:  { id: 'vanguard',  name: 'Vanguard',       tab: 'inf', cost: 500,  buildTime: 8,  hp: 260, speed: 1.8, damage: 18, range: 3.5, reload: 0.8, vision: 5, radius: 9,  model: 'soldier', mstep: 2, spriteH: 30, ability: ABILITIES.brace,
                desc: 'Exo-armored shock trooper. Walks in first, walks out last.' },
@@ -118,15 +120,20 @@ export const UNITS: Record<string, UnitDef> = {
   harvester: { id: 'harvester', name: 'Harvester',      tab: 'veh', cost: 1400, buildTime: 12, hp: 600, speed: 2.5, damage: 0,  range: 0,   reload: 0,   vision: 5, radius: 15, model: 'drone', mstep: 1, spriteH: 40, harvester: true,
                desc: 'Hover-drone that mines flux crystal and hauls it to an Extractor. Protect it.' },
 
+  gunship:   { id: 'gunship',   name: 'Skyhawk',        tab: 'veh', cost: 1200, buildTime: 12, hp: 260, speed: 4.5, damage: 24,  range: 4.5, reload: 0.6, vision: 8, radius: 13, model: 'drone', mstep: 1, spriteH: 30, prereq: 'skyport', air: true, antiAir: true,
+               desc: 'Fast strike VTOL. Ignores terrain, dogfights other aircraft. Cannons cannot touch it.' },
+  bomber:    { id: 'bomber',    name: 'Ravager',        tab: 'veh', cost: 2200, buildTime: 18, hp: 520, speed: 2.6, damage: 160, range: 2.2, reload: 3.5, vision: 6, radius: 16, model: 'drone', mstep: 3, spriteH: 34, prereq: 'skyport', air: true, weapon: 'shell', splash: 1.6,
+               desc: 'Heavy bomber. Slow, but its payload levels structures. Escort it.' },
+
   pyro:      { id: 'pyro',      name: 'Pyro',           tab: 'inf', cost: 450,  buildTime: 6,  hp: 185,  speed: 2.9, damage: 9,   range: 2.2, reload: 0.25, vision: 4, radius: 8, model: 'soldier', mstep: 2, spriteH: 26,
                desc: 'Point-blank plasma thrower. Shreds infantry up close.' },
   raider:    { id: 'raider',    name: 'Raider',         tab: 'veh', cost: 650,  buildTime: 7,  hp: 180,  speed: 5.5, damage: 15,  range: 3.5, reload: 0.6, vision: 6, radius: 11, model: 'car', mstep: 3, spriteH: 32, ability: ABILITIES.overdrive,
                desc: 'Stripped-down harassment buggy. Hit the harvesters, run.' },
-  warden:    { id: 'warden',    name: 'Warden Drone',   tab: 'veh', cost: 1100, buildTime: 10, hp: 220,  speed: 4.2, damage: 22,  range: 4.5, reload: 0.5, vision: 7, radius: 12, model: 'drone', mstep: 2, spriteH: 36, prereq: 'fab', ability: ABILITIES.overcharge,
+  warden:    { id: 'warden',    name: 'Warden Drone',   tab: 'veh', cost: 1100, buildTime: 10, hp: 220,  speed: 4.2, damage: 22,  range: 4.5, reload: 0.5, vision: 7, radius: 12, model: 'drone', mstep: 2, spriteH: 36, prereq: 'fab', ability: ABILITIES.overcharge, antiAir: true,
                desc: 'Armed hover-drone. Fast response, thin armor.' },
 
   // ---- research-gated elite tier ----
-  sniper:    { id: 'sniper',    name: 'Ghost Sniper',   tab: 'inf', cost: 800,  buildTime: 9,  hp: 80,   speed: 2.4, damage: 60,  range: 7,  reload: 3.0, vision: 8, radius: 8,  model: 'soldier', mstep: 3, spriteH: 28, prereq: 'lab', prereqUp: 'wpn1',
+  sniper:    { id: 'sniper',    name: 'Ghost Sniper',   tab: 'inf', cost: 800,  buildTime: 9,  hp: 80,   speed: 2.4, damage: 60,  range: 7,  reload: 3.0, vision: 8, radius: 8,  model: 'soldier', mstep: 3, spriteH: 28, prereq: 'lab', prereqUp: 'wpn1', antiAir: true,
                desc: 'One shot, one kill, from outside their vision. Requires Weapons I.' },
   juggernaut:{ id: 'juggernaut',name: 'Juggernaut',     tab: 'inf', cost: 1200, buildTime: 12, hp: 600,  speed: 1.5, damage: 30,  range: 4,  reload: 0.7, vision: 5, radius: 11, model: 'mech2', mstep: 2, spriteH: 30, prereq: 'lab', prereqUp: 'arm2',
                desc: 'A soldier in a walking bunker. Requires Armor II.' },
@@ -160,9 +167,12 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   uplink:    { id: 'uplink',    name: 'Orbital Uplink', tab: 'build', cost: 5000, buildTime: 25, hp: 750,  power: -150, w: 2, h: 2, vision: 6, prereq: 'spire', prereqUp: 'orbital', limit: 1, sprite: 'bld_silo', superweapon: { charge: 300, damage: 750, radius: 3.6 },
                desc: 'The ark-fleet\'s main gun. A cataclysmic strike every 5 minutes. One per faction. Requires Orbital Protocol research.' },
 
+  skyport:   { id: 'skyport',   name: 'Skyport',        tab: 'build', cost: 1500, buildTime: 12, hp: 800,  power: -30,  w: 2, h: 2, vision: 6, prereq: 'fab',
+               desc: 'Aerodrome pad. Unlocks the Skyhawk gunship and Ravager bomber.' },
+
   wall:      { id: 'wall',      name: 'Barrier Wall',   tab: 'def',   cost: 100,  buildTime: 1.5, hp: 500, power: 0,    w: 1, h: 1, vision: 1, isWall: true,
                desc: 'Cheap plasteel segment. Slows a push, absorbs fire.' },
-  turret:    { id: 'turret',    name: 'Pulse Turret',   tab: 'def',   cost: 1000, buildTime: 8,  hp: 600,  power: -25,  w: 1, h: 1, vision: 7, prereq: 'barracks', turret: { damage: 30, range: 6.5, reload: 1.0 }, upgradable: true,
+  turret:    { id: 'turret',    name: 'Pulse Turret',   tab: 'def',   cost: 1000, buildTime: 8,  hp: 600,  power: -25,  w: 1, h: 1, vision: 7, prereq: 'barracks', turret: { damage: 30, range: 6.5, reload: 1.0, antiAir: true }, upgradable: true,
                desc: 'Automated base defence. Goes offline without power.' },
   railgun:   { id: 'railgun',   name: 'Rail Cannon',    tab: 'def',   cost: 1800, buildTime: 12, hp: 850,  power: -40,  w: 2, h: 2, vision: 9, prereq: 'spire', turret: { damage: 95, range: 8.5, reload: 2.4 }, sprite: 'bld_silo', upgradable: true,
                desc: 'Hypervelocity siege deterrent. Expensive, worth it.' },
@@ -170,6 +180,8 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   // ---- research-gated elite tier ----
   heavywall: { id: 'heavywall', name: 'Bulwark Wall',   tab: 'def',   cost: 300,  buildTime: 2.5, hp: 1500, power: 0,   w: 1, h: 1, vision: 1, isWall: true, prereqUp: 'arm1',
                desc: 'Triple-plated composite barrier. Requires Armor I.' },
+  skyguard:  { id: 'skyguard',  name: 'Skyguard AA',    tab: 'def',   cost: 900,  buildTime: 8,  hp: 550,  power: -20,  w: 1, h: 1, vision: 9, prereq: 'barracks', turret: { damage: 35, range: 8, reload: 0.7, antiAir: true, airOnly: true },
+               desc: 'Dedicated flak battery. Shreds aircraft, useless against ground.' },
   arctower:  { id: 'arctower',  name: 'Arc Tower',      tab: 'def',   cost: 2400, buildTime: 13, hp: 700,  power: -35,  w: 1, h: 1, vision: 8, prereq: 'lab', prereqUp: 'def1', turret: { damage: 55, range: 7, reload: 0.8 }, upgradable: true,
                desc: 'Rapid-discharge lightning emitter. Requires Defence Grid I.' },
   bastion:   { id: 'bastion',   name: 'Bastion Battery', tab: 'def',  cost: 3500, buildTime: 18, hp: 1400, power: -60,  w: 2, h: 2, vision: 10, prereq: 'railgun', prereqUp: 'def2', turret: { damage: 150, range: 9, reload: 3.0 }, sprite: 'bld_silo', upgradable: true,
@@ -233,11 +245,11 @@ export type DmgType = 'gun' | 'flame' | 'rocket' | 'cannon' | 'sniper';
 
 export const UNIT_ARMOR: Record<string, ArmorClass> = {
   trooper: 'infantry', rocketeer: 'infantry', vanguard: 'infantry', pyro: 'infantry', sniper: 'infantry',
-  ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light',
+  ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light', gunship: 'light', bomber: 'heavy',
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
 };
 export const UNIT_DMGTYPE: Record<string, DmgType> = {
-  trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun',
+  trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun', gunship: 'gun', bomber: 'cannon',
   pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
   hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
 };

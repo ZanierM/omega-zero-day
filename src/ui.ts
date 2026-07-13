@@ -9,7 +9,7 @@ import {
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
 import { sfx, duckMusic } from './audio';
-import { defenceIconUrl } from './render';
+import { defenceIconUrl, bakeAirSprite } from './render';
 
 const creditsEl = document.getElementById('credits')!;
 const powerFill = document.getElementById('powerfill')!;
@@ -66,6 +66,7 @@ function iconHtml(tab: Tab, defId: string): string {
   if (tab === 'ups') return upgradeSvg(defId);
   if (tab === 'inf' || tab === 'veh') {
     const d = UNITS[defId];
+    if (d.air) return `<img src="${bakeAirSprite(defId, PLAYER).toDataURL()}" alt="">`;
     return `<img src="sprites/u_${d.model}${d.mstep}_s.png" alt="">`;
   }
   const s = BUILDINGS[defId]?.sprite;

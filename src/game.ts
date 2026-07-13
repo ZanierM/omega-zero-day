@@ -312,6 +312,7 @@ export function activateAbility(u: Unit): boolean {
     booms.push({ x: u.x, y: u.y, r: 4, ttl: 0.5, max: r });
     if (audible(u.x, u.y)) sfx('explosion');
     for (const t of [...units]) {
+      if (t.def.air) continue; // a ground slam can't touch aircraft
       if (t.owner !== u.owner && Math.hypot(t.x - u.x, t.y - u.y) <= r + t.def.radius * 0.5) damage(t, a.aoeDmg);
     }
     for (const t of [...buildings]) {
@@ -520,7 +521,9 @@ export function queuedCount(owner: number, tab: Tab, defId: string): number {
 
 function finishUnit(owner: number, defId: string) {
   const def = UNITS[defId];
-  const src = buildings.find(b => b.owner === owner && b.def.produces === def.tab);
+  // aircraft launch from the Skyport; everything else from its factory type
+  const src = (def.air ? buildings.find(b => b.owner === owner && b.def.id === 'skyport') : undefined)
+           ?? buildings.find(b => b.owner === owner && b.def.produces === def.tab);
   if (!src) return; // factory died — unit is lost (credits were spent, like RA2)
   const spot = nearestTile(src.tx + Math.floor(src.def.w / 2), src.ty + src.def.h, 10,
     (x, y) => inBounds(x, y) && terrain[idx(x, y)] === 0 && occupied[idx(x, y)] === -1);
@@ -546,6 +549,18 @@ function moveToward(u: Unit, px: number, py: number, dt: number): boolean {
   if (unitSpeed(u) <= 0.001) return false; // immobilised (siege/brace) — can't move
   const arrivedDist = TILE * 0.45;
   if (Math.hypot(px - u.x, py - u.y) <= arrivedDist && !u.path?.length) return true;
+
+  // aircraft ignore terrain entirely: fly in a straight line, no pathfinding
+  if (u.def.air) {
+    const dx = px - u.x, dy = py - u.y;
+    const d = Math.hypot(dx, dy);
+    const step = unitSpeed(u) * TILE * dt;
+    u.facing = Math.atan2(dy, dx);
+    if (d <= step) { u.x = px; u.y = py; return true; }
+    u.x += (dx / d) * step;
+    u.y += (dy / d) * step;
+    return false;
+  }
 
   if (!u.path || u.path.length === 0) {
     u.repathTimer -= dt;
@@ -664,6 +679,20 @@ export function fireStrike(b: Building, wx: number, wy: number): boolean {
   return true;
 }
 
+// air/ground targeting rules: aircraft can only be hit by anti-air weapons,
+// and dedicated flak (airOnly) can't shoot at the ground
+export function canHit(attacker: Entity, target: Entity): boolean {
+  const targetIsAir = target.kind === 'unit' && !!target.def.air;
+  if (attacker.kind === 'unit') {
+    if (targetIsAir) return !!attacker.def.antiAir;
+    return true; // every armed unit can shoot ground
+  }
+  const tur = attacker.def.turret;
+  if (!tur) return false;
+  if (targetIsAir) return !!tur.antiAir;
+  return !tur.airOnly;
+}
+
 function findEnemyInRange(e: Entity, rangeTiles: number): Entity | null {
   const rangePx = rangeTiles * TILE;
   let best: Entity | null = null, bestD = Infinity;
@@ -671,6 +700,7 @@ function findEnemyInRange(e: Entity, rangeTiles: number): Entity | null {
     if (t.owner === e.owner) return;
     // don't auto-acquire walls; they're only attacked on explicit orders or when blocking
     if (t.kind === 'building' && t.def.isWall && e.kind === 'unit' && e.order.type !== 'attack') return;
+    if (!canHit(e, t)) return;
     const d = distBetween(e, t);
     if (d <= rangePx && d < bestD) { best = t; bestD = d; }
   };
@@ -812,6 +842,7 @@ export function update(dt: number) {
     let target: Entity | null = null;
     if (u.order.type === 'attack' && u.order.targetId !== undefined) {
       target = byId.get(u.order.targetId) ?? null;
+      if (target && !canHit(u, target)) target = null; // e.g. a tank ordered onto a gunship
       if (!target) u.order = { type: 'idle' };
     }
     if (!target && (u.order.type === 'idle' || u.order.type === 'attackMove')) {
@@ -849,6 +880,7 @@ export function update(dt: number) {
     const a = units[i];
     for (let j = i + 1; j < units.length; j++) {
       const b = units[j];
+      if (!!a.def.air !== !!b.def.air) continue; // different altitudes don't collide
       const dx = b.x - a.x, dy = b.y - a.y;
       const d = Math.hypot(dx, dy);
       const min = (a.def.radius + b.def.radius) * 0.9;
@@ -920,6 +952,7 @@ export function update(dt: number) {
       const firer = s.by !== undefined ? byId.get(s.by) : undefined;
       const attacker = firer?.kind === 'unit' ? firer : undefined;
       for (const t of [...units]) {
+        if (t.def.air) continue; // ground blasts don't reach aircraft
         if (t.owner !== s.owner && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
       }
       for (const t of [...buildings]) {
@@ -976,7 +1009,7 @@ export function update(dt: number) {
     const cx = centerOfTile(n.tx), cy = centerOfTile(n.ty);
     const present = new Set<number>();
     for (const u of units) {
-      if (u.def.harvester) continue; // fighters hold ground, not miners
+      if (u.def.harvester || u.def.air) continue; // only ground fighters can hold a point
       if (Math.hypot(u.x - cx, u.y - cy) <= CAPTURE_RADIUS * TILE) present.add(u.owner);
     }
     if (present.size === 1) {

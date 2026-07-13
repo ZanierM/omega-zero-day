@@ -13,7 +13,7 @@ import { rand, crystal, idx, nearestTile } from './map';
 const BUILD_ORDER = [
   'solar', 'extractor', 'barracks', 'solar', 'fab', 'turret', 'extractor',
   'solar', 'turret', 'spire', 'lab', 'solar', 'railgun', 'turret',
-  'extractor', 'solar', 'repairyard', 'turret', 'railgun', 'solar', 'turret',
+  'extractor', 'solar', 'repairyard', 'skyport', 'turret', 'skyguard', 'railgun', 'solar', 'turret', 'skyguard',
   // late game: research-gated fortifications (skipped until unlocked)
   'fusion', 'arctower', 'turret', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion',
 ];
@@ -205,7 +205,7 @@ function updateOne(ai: AIState, dt: number) {
       startProduction(ai.owner, 'harvester', 'veh');   // economy first
     } else if (army.length < diff.armyCap && spare > 250) {
       // composition counter: read the player's army and lean into what beats it
-      let vsVehicles = false, vsInfantry = false;
+      let vsVehicles = false, vsInfantry = false, vsAir = false;
       if (diff.counters) {
         let inf = 0, veh = 0;
         for (const u of units) {
@@ -214,10 +214,12 @@ function updateOne(ai: AIState, dt: number) {
         }
         vsVehicles = veh > inf + 2;
         vsInfantry = inf > veh + 4;
+        vsAir = units.filter(x => x.owner === 0 && x.def.air).length >= 2;
       }
       if (hasBuilding(ai.owner, 'barracks') && !p.queues.inf.length) {
         const roll = rand();
-        let pick = vsVehicles ? (roll < 0.65 ? 'rocketeer' : 'trooper')          // rockets shred armor
+        let pick = vsAir ? (roll < 0.7 ? 'rocketeer' : 'trooper')                // AA screen vs aircraft
+                 : vsVehicles ? (roll < 0.65 ? 'rocketeer' : 'trooper')          // rockets shred armor
                  : vsInfantry ? (roll < 0.5 ? 'pyro' : 'vanguard')               // flame + armor vs mobs
                  : roll < 0.4 ? 'trooper' : roll < 0.55 ? 'pyro' : roll < 0.8 ? 'rocketeer' : 'vanguard';
         // elite infantry once the research is in
@@ -232,6 +234,10 @@ function updateOne(ai: AIState, dt: number) {
                  : advanced && roll < 0.35 ? 'artillery'
                  : roll < 0.45 ? 'ranger' : roll < 0.6 ? 'raider' : roll < 0.72 ? 'warden' : 'hovertank';
         if (vsInfantry && advanced && roll < 0.4) pick = 'artillery'; // splash vs infantry mobs
+        if (hasBuilding(ai.owner, 'skyport')) {
+          if (roll > 0.8) pick = 'gunship';
+          else if (roll > 0.72 && spare > 2600) pick = 'bomber';
+        }
         if (advanced && p.upgrades.has('wpn2') && roll < 0.12 && spare > 4000) pick = 'colossus';
         startProduction(ai.owner, pick, 'veh');
       }
