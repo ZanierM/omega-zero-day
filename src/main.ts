@@ -97,7 +97,8 @@ muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 graphicsBtn.addEventListener('click', toggleGraphics);
 window.addEventListener('keydown', e => {
-  if ((e.target as HTMLElement).closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+  const target = e.target instanceof Element ? e.target : null;
+  if (target?.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
   if (e.key === 'm' || e.key === 'M') { toggleMute(); refreshMuteBtn(); }
   if (e.key === 'v' || e.key === 'V') toggleGraphics();
 });
@@ -109,6 +110,9 @@ const pauseMenu = document.getElementById('pausemenu')!;
 const menuBtn = document.getElementById('menubtn')!;
 function openPause() { if (started && !game.gameOver) { game.setPaused(true); app.inert = true; pauseMenu.style.display = 'flex'; document.getElementById('resumebtn')!.focus(); } }
 function closePause() { pauseMenu.style.display = 'none'; app.inert = false; game.setPaused(false); last = performance.now(); menuBtn.focus(); }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && pauseMenu.style.display !== 'flex') openPause();
+});
 menuBtn.addEventListener('click', () => {
   pauseMenu.style.display === 'flex' ? closePause() : openPause();
 });
