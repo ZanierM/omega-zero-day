@@ -7,13 +7,16 @@ import { initInput, updateCamera, centerCameraOn } from './input';
 import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle, setRefinedStyle } from './render';
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted } from './audio';
+import { drawBriefingScene } from './briefing-scene';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
 
 initInput();
 initUI();
+const briefScene = document.getElementById('briefscene') as HTMLCanvasElement;
+drawBriefingScene(briefScene);
 resize();
-window.addEventListener('resize', resize);
+window.addEventListener('resize', () => { resize(); if (!started) drawBriefingScene(briefScene); });
 // folding/unfolding or rotating reflows the command deck, which resizes the
 // map canvas without always firing a window resize
 new ResizeObserver(resize).observe(document.getElementById('game')!);
@@ -73,6 +76,7 @@ function refreshMuteBtn() {
 muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 window.addEventListener('keydown', e => {
+  if ((e.target as HTMLElement).closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
   if (e.key === 'm' || e.key === 'M') { toggleMute(); refreshMuteBtn(); }
   // prototype: flip between the chunky and refined building render styles
   if (e.key === 'v' || e.key === 'V') setRefinedStyle(!refinedStyle);

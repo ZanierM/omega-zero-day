@@ -31,6 +31,8 @@ const overlay = document.getElementById('overlay')!;
 const overlayTitle = document.getElementById('overlaytitle')!;
 const overlaySub = document.getElementById('overlaysub')!;
 const toastEl = document.getElementById('toast')!;
+const buildTip = document.getElementById('buildtip')!;
+let shownSelection = '';
 
 let activeTab: Tab = 'build';
 let shownCredits = 0;
@@ -130,15 +132,43 @@ function defsFor(tab: Tab) {
   return Object.values(BUILDINGS).filter(d => d.tab === tab && !NON_BUILDABLE.has(d.id));
 }
 
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+function tipDescription(desc: string) {
+  return escapeHtml(desc).replace(/\b(flux crystal|hover tank|power|damage|armor|range|repair|harvest|deploy|orbital|turret|infantry|vehicles|shield|cannon)\b/gi, '<mark>$&</mark>');
+}
+function showTip(el: HTMLElement, name: string, desc: string, cost: number) {
+  if (!desc) return;
+  buildTip.innerHTML = `<strong>${escapeHtml(name)}</strong><div>${tipDescription(desc)}</div><div class="tipcost">◈ ${cost.toLocaleString()} flux</div>`;
+  const r = el.getBoundingClientRect();
+  const above = r.top > 150;
+  buildTip.style.left = `${Math.max(10, Math.min(innerWidth - 270, r.left))}px`;
+  buildTip.style.top = above ? 'auto' : `${r.bottom + 10}px`;
+  buildTip.style.bottom = above ? `${innerHeight - r.top + 10}px` : 'auto';
+  buildTip.style.display = 'block';
+}
+function hideTip() { buildTip.style.display = 'none'; }
+
 function rebuildGrid() {
+  hideTip();
   grid.innerHTML = '';
   btns.length = 0;
   for (const def of defsFor(activeTab)) {
-    const el = document.createElement('div');
+    const el = document.createElement('button');
+    el.type = 'button';
     el.className = 'bbtn';
-    if ((def as any).desc) el.title = (def as any).desc;
-    el.innerHTML = `${iconHtml(activeTab, def.id)}<div class="nm">${def.name}</div><div class="cost">◈${def.cost}</div><div class="prog"></div><div class="count"></div>`;
-    el.addEventListener('click', () => onBtnClick(def.id));
+    const desc = (def as any).desc ?? '';
+    el.setAttribute('aria-label', `${def.name}, ${def.cost} flux. ${desc}`);
+    el.innerHTML = `${iconHtml(activeTab, def.id)}<span class="nm">${def.name}</span><span class="cost"><span class="resource-gem" aria-hidden="true">◈</span>${def.cost}</span><span class="prog"></span><span class="count"></span>`;
+    let held = false;
+    let timer = 0;
+    el.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') showTip(el, def.name, desc, def.cost); });
+    el.addEventListener('pointerleave', () => { clearTimeout(timer); hideTip(); });
+    el.addEventListener('focus', () => showTip(el, def.name, desc, def.cost));
+    el.addEventListener('blur', hideTip);
+    el.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') timer = window.setTimeout(() => { held = true; showTip(el, def.name, desc, def.cost); }, 450); });
+    el.addEventListener('pointerup', () => clearTimeout(timer));
+    el.addEventListener('pointercancel', () => { clearTimeout(timer); hideTip(); });
+    el.addEventListener('click', () => { if (held) { held = false; return; } hideTip(); onBtnClick(def.id); });
     el.addEventListener('contextmenu', e => { e.preventDefault(); cancelOne(def.id); });
     grid.appendChild(el);
     btns.push({
@@ -339,12 +369,14 @@ export function updateUI() {
         parts.push(`🛡 ${a}`);
         combat = `<br><span style="color:#c9b48a;font-size:0.9em">${parts.join(' · ')}</span>`;
       }
-      selInfo.innerHTML = selection.size === 1
+      const html = selection.size === 1
         ? `<b>${name}</b>${lvl} — ${hp}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
         : `<b>${selection.size} units selected</b><br>${name} +${selection.size - 1} more`;
+      if (html !== shownSelection) { selInfo.innerHTML = html; shownSelection = html; }
     }
   } else {
-    selInfo.innerHTML = '<b>Awaiting orders</b><br>Select a unit or building.';
+    const html = '<b>Awaiting orders</b><br>Select a unit or building.';
+    if (html !== shownSelection) { selInfo.innerHTML = html; shownSelection = html; }
   }
 
   // toast
