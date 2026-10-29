@@ -1,8 +1,8 @@
-# Omega Zero Day — campaign plan (draft 2, for review)
+# Omega Zero Day — campaign plan (draft 3, signed off for Act I)
 
 Status: **story and plan only, nothing implemented.**
 Direction agreed so far: **dark and grim** tone · **two non-human peoples** (native alien life *and* a lost proto-human colony) · the central twist is that **Helion, the player's own side, caused the collapse** · a **silent commander** the story speaks to.
-Open questions are at the end.
+Names are locked; the ending, Hollow and release decisions are in section 6.
 
 ---
 
@@ -76,7 +76,9 @@ To fire, the beacon has to burn the vents dry, which means burning out what is l
 - **Fire the beacon.** The fleet escapes. The Vey dies, Cinder dies, and with it the Hollow and the Verdant Pact. Varga finally confesses on an open channel as the fleet jumps. Forty thousand sleepers wake up on the far side carrying the guilt.
 - **Give the vents to Reyes.** The beacon never fires. The Vey, unbled, steadies Helios for a while: years, maybe decades, Reyes can't say. The fleet stays. Humanity lives on Cinder beside the Vey and the Hollow, under a sun that will still die, and the board's crimes are judged in the open.
 
-The Act II choice changes the details: whether the Hollow stand with Lantern in the finale, whether Okoye is still at the commander's side, and what Seren's last line is.
+- **Hidden third ending: carry the seed.** This is only possible if Lantern protected the Hollow at the Meridian. Seren reveals that the Vey can live in a single heart-crystal, and that it can be cut from the Lantern shaft and carried aboard the fleet. Doing it means holding the shaft *and* the corridor at once, and the Vey's absence lets Helios go nova at once instead of in hours. The fleet escapes with a living world-seed and the Hollow's survivors. Cinder, the Verdant Pact and everyone who couldn't reach the corridor in time die. It's the "best" ending, and it still costs a planet.
+
+The Act II choice changes the details too: whether the Hollow stand with Lantern in the finale, whether Okoye is still at the commander's side, and what Seren's last line is.
 
 ---
 
@@ -92,14 +94,14 @@ The Act II choice changes the details: whether the Hollow stand with Lantern in 
 | 6 | **Resonance** | Kessler and Hollow | Research and orbital strike under a timer | Destroy Kessler's Orbital Uplink before it charges | Lind hands over the Resonance Report. Okoye asks the question |
 | 7 | **Meridian** | Ashen, Hollow | Escort and defence, **choice** | Defend the wreck *or* let the Ashen take it | First choice. Seren speaks clearly for the first time |
 | 8 | **Kessler's Wall** | Kessler | Siege: bastions, walls, colossus | Destroy Kessler's Nexus | Kessler's terms. Lind goes down the Lantern shaft (a side objective: hold the shaft entrance) |
-| 9 | **Zero Day** | Everyone left | Everything | Hold the corridor for 5 min with the supernova running, then **choose** | Final choice; the ending plays out |
+| 9 | **Zero Day** | Everyone left | Everything | Hold the corridor for 5 min with the supernova running, then **choose** | Final choice. With the Meridian flag, a third option appears: also hold the Lantern shaft to cut the seed |
 
 There are 9 missions of 12–25 minutes each, about 3 hours in all.
 
 ### New mechanics the story needs
 - **The Hollow as a neutral-hostile faction.** They come out of tunnel mouths near deep crystal, with 3 new units (crystal-grown infantry, a burrower that surfaces under harvesters, and a "choir" support unit that heals Hollow near crystal). Their stance (hostile, neutral or allied) is set per mission and by the Act II choice.
 - **Vey resonance.** Over-harvesting a field raises a local resonance meter. High resonance sets off tremors (damage to structures), crystal storms (vision loss) and vents going dark. This is the campaign's proof that the crystal is alive, and it could later become an optional skirmish rule.
-- **Choices.** Two map-based decisions (missions 7 and 9) set campaign flags that change later missions and the ending.
+- **Choices.** Two map-based decisions (missions 7 and 9) set campaign flags that change later missions and the ending. The third ending in mission 9 only appears if the mission 7 flag is set.
 
 ---
 
@@ -135,16 +137,15 @@ Nothing starts until this draft is signed off. The plan keeps the current file o
 - The Meridian wreck, the Lantern shaft, the launch-beacon tower, and resonance effects (crystal pulses, tremor dust, dark vents).
 
 ### Order of work
-1. Phase 0, then re-test skirmish.
-2. Missions 1–3 with the comms box and the tracker, then playtest.
-3. Missions 4–6, the Hollow and resonance.
-4. Missions 7–9, the choices and the endings.
+**First release = Act I plus a cliffhanger:** missions 1–3, ending on Kessler's broadcast, *"Ask your company what Project Lantern was."*
+1. Phase 0 engine work, but only the parts Act I needs: objectives, the event bus, scripted waves and spawns, hand-authored maps, tech locks, and a basic **tunnel ambush** for the Hollow's first appearance in mission 2 (no full Hollow faction yet). Then re-test skirmish.
+2. Missions 1–3, the comms box, the objective tracker, briefing cards and a "to be continued" card. Playtest it with you.
+3. Acts II and III after that: the full Hollow faction, Vey resonance, missions 4–9, the choices and all three endings.
+4. **The Hollow in skirmish** come later, as an optional neutral faction in the skirmish settings once they're balanced in the campaign.
 5. A balance pass using the telemetry.
 
----
-
-## 6. Still open
-1. **Names:** Cinder (planet), Lantern (player and project), the Vey, the Hollow, Meridian. Keep, or change any?
-2. **How dark the ending is:** two bleak endings as written, or a hidden third ending (e.g. if the Hollow were protected, Seren shows a way to move the Vey's heart onto the fleet)?
-3. **Hollow in skirmish:** keep them campaign-only, or add them later as an optional neutral faction?
-4. **Length:** 9 missions, or a shorter first release (Act I plus a cliffhanger)?
+## 6. Decisions
+- **Names:** locked. Cinder, Lantern, the Vey, the Hollow, Meridian.
+- **Ending:** two bleak endings, plus a hidden third (carry the seed) unlocked by protecting the Hollow in mission 7.
+- **The Hollow:** campaign first, an optional skirmish faction later.
+- **First release:** Act I (missions 1–3) ending on a cliffhanger.
