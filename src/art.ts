@@ -1418,6 +1418,7 @@ interface SoldierSpec {
   armour: string; armourTop: string;          // body plates
   build: number;                              // 1 = trooper; bulk multiplies width
   helmet: string;
+  legs?: [string, string, string, string];    // leg top/side, boot top/side (default: dark fatigues)
   extra?: (lift: number) => Limb[];           // kit: weapon, pack, shield...
   glow?: (g: Ctx, a: number, lift: number) => void;   // emissive bits drawn last
 }
@@ -1431,8 +1432,9 @@ function drawSoldier(g: Ctx, a: number, team: string, phase: number, sp: Soldier
   // legs: each foot swings along x, the swinging one lifted a little
   for (const [side, sx] of [[-1, step], [1, -step]] as [number, number][]) {
     const lift = Math.max(0, Math.cos(t) * side) * 1.1;
-    limbs.push({ x0: sx - 1.3, y0: side * hip - legW, x1: sx + 1.3, y1: side * hip + legW, z0: lift, z1: 6.8 + lift * 0.3, top: '#4a4d56', side: '#3a3d46' });
-    limbs.push({ x0: sx - 1.4, y0: side * hip - legW * 1.1, x1: sx + 2, y1: side * hip + legW * 1.1, z0: lift, z1: lift + 1.6, top: '#2a2c32', side: '#1e1f24' });  // boot
+    const [lt, ls, bt, bs] = sp.legs ?? ['#4a4d56', '#3a3d46', '#2a2c32', '#1e1f24'];
+    limbs.push({ x0: sx - 1.3, y0: side * hip - legW, x1: sx + 1.3, y1: side * hip + legW, z0: lift, z1: 6.8 + lift * 0.3, top: lt, side: ls });
+    limbs.push({ x0: sx - 1.4, y0: side * hip - legW * 1.1, x1: sx + 2, y1: side * hip + legW * 1.1, z0: lift, z1: lift + 1.6, top: bt, side: bs });  // boot
   }
   const zb = 6.8 + bob;
   // torso, shoulders (team), helmet neck
@@ -1571,6 +1573,51 @@ function drawRavager(g: Ctx, a: number, team: string) {
   deckPlate(g, a, 5.4, -9.5, -1.8, -6.5, 1.8, team);
 }
 
+// ---- the Hollow: quartz-pale bodies with the Vey's crystal grown through them ----
+const SHARD = '#8ef4f0', SHARD_DK = '#3aa8b0';
+const shardSpike = (x: number, y: number, z: number, h: number, w = 0.9): Limb =>
+  ({ x0: x - w, y0: y - w, x1: x + w, y1: y + w, z0: z, z1: z + h, top: SHARD, side: SHARD_DK });
+const hollowGlow = (g: Ctx, a: number, z: number, r: number) => {
+  const [x, y] = at(0, 0, a);
+  g.save(); g.globalCompositeOperation = 'lighter'; glow(g, x, y - z, r, 'rgba(120,250,240,0.45)'); g.restore();
+};
+const SHARDKIN: SoldierSpec = {
+  armour: '#9fb8bc', armourTop: '#d8eeee', build: 0.95, helmet: '#c8e8ea',
+  legs: ['#b4ccd0', '#8aa6ac', '#6fd8d6', '#3aa8b0'],   // quartz shins, crystal-grown feet
+  extra: bob => [
+    shardSpike(-2.2, -2.6, 6.8 + bob + 5, 6, 1.1), shardSpike(-1.4, 2.4, 6.8 + bob + 5.5, 4.8, 0.9), shardSpike(-3.2, 0, 6.8 + bob + 3, 7, 1.2),
+    { x0: 0.5, y0: 2, x1: 5.5, y1: 3.2, z0: 6.8 + bob + 3.4, z1: 6.8 + bob + 4.6, top: SHARD, side: SHARD_DK },        // shard claw
+  ],
+  glow: (g, a, bob) => hollowGlow(g, a, 6.8 + bob + 9, 5),
+};
+const BURROWER: SoldierSpec = {
+  armour: '#7f9ca2', armourTop: '#b8d4d6', build: 1.55, helmet: '#a8c8cc',
+  legs: ['#b4ccd0', '#8aa6ac', '#6fd8d6', '#3aa8b0'],   // quartz shins, crystal-grown feet
+  extra: bob => [
+    shardSpike(-3.6, -3, 6.8 + bob + 4, 6, 1.2), shardSpike(-4.2, 0.4, 6.8 + bob + 5, 7.5, 1.3), shardSpike(-3.4, 3.4, 6.8 + bob + 3.5, 5.5, 1.1),
+    shardSpike(-1, -4.6, 6.8 + bob + 5, 3.5), shardSpike(-1, 4.6, 6.8 + bob + 5, 3.5),
+    { x0: 1, y0: -4.8, x1: 4.5, y1: -2.6, z0: 1.5 + bob, z1: 6.8 + bob + 3, top: '#b8d4d6', side: '#6f8c92' },           // digging forelimbs
+    { x0: 1, y0: 2.6, x1: 4.5, y1: 4.8, z0: 1.5 + bob, z1: 6.8 + bob + 3, top: '#b8d4d6', side: '#6f8c92' },
+  ],
+  glow: (g, a, bob) => hollowGlow(g, a, 6.8 + bob + 8, 8),
+};
+const CHOIR: SoldierSpec = {
+  armour: '#a6bcc0', armourTop: '#e2f2f2', build: 0.82, helmet: '#d4eef0',
+  legs: ['#b4ccd0', '#8aa6ac', '#6fd8d6', '#3aa8b0'],   // quartz shins, crystal-grown feet
+  extra: bob => [
+    { x0: 1.2, y0: 2.2, x1: 2, y1: 3, z0: 0.5, z1: 6.8 + bob + 12, top: '#c8b48a', side: '#8a7a5a' },                   // staff
+    shardSpike(1.6, 2.6, 6.8 + bob + 12, 3.2, 1.1),                                                                    // singing crystal
+    shardSpike(-2, 0, 6.8 + bob + 6.5, 2.5, 0.6),
+  ],
+  glow: (g, a, bob) => {
+    const [x, y] = at(1.6, 2.6, a);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    glow(g, x, y - (6.8 + bob + 14), 7, 'rgba(150,255,245,0.6)');
+    glow(g, x, y - (6.8 + bob + 14), 2.5, 'rgba(230,255,255,0.9)');
+    g.restore();
+  },
+};
+
 const soldierArt = (sp: SoldierSpec, reach: number, height: number): VehicleArt => ({
   hull: (g, a, team, phase = 0) => drawSoldier(g, a, team, phase, sp), reach, height, frames: 4, turn: 10,
 });
@@ -1600,6 +1647,9 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   sniper:     soldierArt(SNIPER, 14, 20),
   pyro:       soldierArt(PYRO, 10, 20),
   juggernaut: soldierArt(JUGGERNAUT, 13, 24),
+  shardkin:   soldierArt(SHARDKIN, 11, 22),
+  burrower:   soldierArt(BURROWER, 14, 26),
+  choir:      soldierArt(CHOIR, 10, 30),
   gunship:    { hull: drawSkyhawk, reach: 18, height: 10, turn: 5 },
   bomber:     { hull: drawRavager, reach: 19, height: 8, turn: 3 },
 };

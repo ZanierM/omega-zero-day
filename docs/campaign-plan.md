@@ -1,4 +1,4 @@
-# Omega Zero Day — campaign plan (draft 3, signed off for Act I)
+# Omega Zero Day — campaign plan (draft 3; Acts I and II built)
 
 Status: **story and plan only, nothing implemented.**
 Direction agreed so far: **dark and grim** tone · **two non-human peoples** (native alien life *and* a lost proto-human colony) · the central twist is that **Helion, the player's own side, caused the collapse** · a **silent commander** the story speaks to.
@@ -144,7 +144,12 @@ Nothing starts until this draft is signed off. The plan keeps the current file o
 4. **The Hollow in skirmish** come later, as an optional neutral faction in the skirmish settings once they're balanced in the campaign.
 5. A balance pass using the telemetry.
 
-## 6. Decisions
+## 6. Built so far
+- **Act I** (I-1 Cold Drop, I-2 Flux Lines, I-3 Iron Weather) and **Act II** (II-4 Sparks, II-5 The Green Tide, II-6 Resonance).
+- Act II added: the Hollow as a faction (Shardkin, Burrower, Choir; tunnel mouths), Vey resonance (tremors, crystal storms, dark vents), comms-box choices (Vessa's deal), the shielded Uplink and its relays.
+- Changes from the plan: II-6 is *Resonance* (the Uplink mission, with the Report and Okoye's question), so the Meridian choice moves to Act III as planned (mission 7).
+
+## 7. Decisions
 - **Names:** locked. Cinder, Lantern, the Vey, the Hollow, Meridian.
 - **Ending:** two bleak endings, plus a hidden third (carry the seed) unlocked by protecting the Hollow in mission 7.
 - **The Hollow:** campaign first, an optional skirmish faction later.

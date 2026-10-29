@@ -253,7 +253,7 @@ function defsFor(tab: Tab) {
   // a campaign mission only shows the tech it has cleared
   const ok = (id: string) => techAllowed(PLAYER, id);
   if (tab === 'ups') return Object.values(UPGRADES).filter(d => ok(d.id));
-  if (tab === 'inf' || tab === 'veh') return Object.values(UNITS).filter(d => d.tab === tab && ok(d.id));
+  if (tab === 'inf' || tab === 'veh') return Object.values(UNITS).filter(d => d.tab === tab && !d.nonBuildable && ok(d.id));
   return Object.values(BUILDINGS).filter(d => d.tab === tab && !NON_BUILDABLE.has(d.id) && ok(d.id));
 }
 
@@ -638,6 +638,15 @@ function updateCampaignUI() {
       commsWho.style.color = sp.color;
       commsWho.innerHTML = `${sp.name}<small>${sp.role}</small>`;
       commsText.textContent = line.text;
+      if (line.choice) {
+        const row = document.createElement('div'); row.className = 'commschoice';
+        for (const o of line.choice.options) {
+          const b = document.createElement('button'); b.type = 'button'; b.textContent = o.label;
+          b.addEventListener('click', ev => { ev.stopPropagation(); campaign.choose(o.id); });
+          row.appendChild(b);
+        }
+        commsText.appendChild(row);
+      }
     }
   }
   const objs = campaign.objectives();

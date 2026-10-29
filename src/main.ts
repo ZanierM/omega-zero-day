@@ -189,11 +189,14 @@ function renderMissions() {
   const done = campaign.progress().done;
   const firstOpen = campaign.MISSIONS.find(m => campaign.unlocked(m.id) && !done.includes(m.id)) ?? campaign.MISSIONS[0];
   if (!selectedMission || !campaign.unlocked(selectedMission)) selectedMission = firstOpen.id;
-  missionList.innerHTML = campaign.MISSIONS.map(m => {
+  const ACTS: Record<number, string> = { 1: 'Act I — Landfall', 2: 'Act II — The Corridor' };
+  const button = (m: typeof campaign.MISSIONS[number]) => {
     const open = campaign.unlocked(m.id), fin = done.includes(m.id);
     return `<button class="opt mission${m.id === selectedMission ? ' sel' : ''}" type="button" data-id="${m.id}"${open ? '' : ' disabled'}>`
       + `<i>${fin ? '✓' : open ? m.code : '🔒'}</i>${m.title}<span>${open ? m.tagline : 'Complete the previous mission'}</span></button>`;
-  }).join('');
+  };
+  missionList.innerHTML = [...new Set(campaign.MISSIONS.map(m => m.act))].map(act =>
+    `<div class="optlabel">${ACTS[act]}</div><div class="actrow">${campaign.MISSIONS.filter(m => m.act === act).map(button).join('')}</div>`).join('');
   const m = campaign.MISSIONS.find(x => x.id === selectedMission)!;
   missionBrief.innerHTML = `<div class="optlabel">Transmission · ${m.code} ${m.title}</div>`
     + `<div class="transmission"><img src="portraits/varga.webp" alt="Admiral Varga"><div>${m.briefing.map(p => `<p>${p}</p>`).join('')}</div></div>`

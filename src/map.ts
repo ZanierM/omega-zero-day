@@ -68,8 +68,8 @@ function pickBasePositions(numEnemies: number): { x: number, y: number }[] {
   return corners.slice(0, numEnemies + 1);
 }
 
-export function generateMap(numEnemies: number, crystalMul = 1) {
-  const size = numEnemies >= 3 ? 90 : numEnemies === 2 ? 76 : 60;
+export function generateMap(numEnemies: number, crystalMul = 1, sizeOverride?: number) {
+  const size = sizeOverride ?? (numEnemies >= 3 ? 90 : numEnemies === 2 ? 76 : 60);
   MAP_W = size; MAP_H = size;
   terrain = new Uint8Array(MAP_W * MAP_H);
   crystal = new Uint16Array(MAP_W * MAP_H);

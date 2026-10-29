@@ -41,6 +41,9 @@ export interface UnitDef {
   ability?: AbilityDef;
   air?: boolean;       // aircraft: fly over terrain, only anti-air weapons can hit them
   antiAir?: boolean;   // this unit's weapon can hit aircraft
+  nonBuildable?: boolean;   // campaign-only (the Hollow): never on a build bar
+  crystalRegen?: number;    // hp/s healed while standing within 2 tiles of crystal
+  healAura?: { radius: number; rate: number };   // heals friendly units around it (hp/s; doubled near crystal)
 }
 
 // active/toggle unit abilities, fully data-driven
@@ -139,6 +142,13 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'A soldier in a walking bunker. Requires Armor II.' },
   colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2, ability: ABILITIES.stomp,
                desc: 'Superheavy siege platform. The ground remembers where it walked. Requires Weapons II.' },
+  // ---- the Hollow (campaign): the Meridian's descendants, grown through with the Vey's crystal ----
+  shardkin:  { id: 'shardkin',  name: 'Shardkin',       tab: 'inf', cost: 0,    buildTime: 1,  hp: 150,  speed: 2.7, damage: 15,  range: 2.4, reload: 0.7, vision: 6, radius: 8,  model: 'soldier', mstep: 2, spriteH: 26, nonBuildable: true, crystalRegen: 6,
+               desc: 'Hollow kin with crystal grown through them. Fast, close in, and they mend standing near crystal.' },
+  burrower:  { id: 'burrower',  name: 'Burrower',       tab: 'inf', cost: 0,    buildTime: 1,  hp: 420,  speed: 2.0, damage: 42,  range: 1.8, reload: 1.4, vision: 5, radius: 11, model: 'soldier', mstep: 2, spriteH: 30, nonBuildable: true, crystalRegen: 10,
+               desc: 'A hunched crystal-backed brute that comes up through the rock under machines and crushes them.' },
+  choir:     { id: 'choir',     name: 'Choir',          tab: 'inf', cost: 0,    buildTime: 1,  hp: 110,  speed: 2.2, damage: 6,   range: 5,   reload: 1.2, vision: 8, radius: 8,  model: 'soldier', mstep: 2, spriteH: 28, nonBuildable: true, healAura: { radius: 4, rate: 9 },
+               desc: 'Hollow singer. Its song closes wounds in every Hollow around it, louder near crystal.' },
 };
 
 export const BUILDINGS: Record<string, BuildingDef> = {
@@ -247,11 +257,13 @@ export const UNIT_ARMOR: Record<string, ArmorClass> = {
   trooper: 'infantry', rocketeer: 'infantry', vanguard: 'infantry', pyro: 'infantry', sniper: 'infantry',
   ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light', gunship: 'light', bomber: 'heavy',
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
+  shardkin: 'infantry', burrower: 'light', choir: 'infantry',
 };
 export const UNIT_DMGTYPE: Record<string, DmgType> = {
   trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun', gunship: 'gun', bomber: 'cannon',
   pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
   hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
+  shardkin: 'flame', burrower: 'cannon', choir: 'gun',   // shard claws tear soft targets; a burrower crushes
 };
 export const TURRET_DMGTYPE: Record<string, DmgType> = {
   turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon',
