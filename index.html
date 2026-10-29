@@ -58,14 +58,14 @@
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #14110e; font-family: var(--body); user-select: none; color: var(--cream); }
+    html, body { width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; background: #14110e; font-family: var(--body); user-select: none; color: var(--cream); }
     button { font-family: inherit; }
     * { scrollbar-color: var(--edge) var(--ink); scrollbar-width: thin; }
     #app { display: flex; flex-direction: column; width: 100%; height: 100%; position: relative; }
     #game { flex: 1; display: block; cursor: crosshair; min-height: 0; touch-action: none; }
 
     /* ---- top resource strip: chunky pills floating over the map ---- */
-    #topbar { position: absolute; top: 8px; left: 8px; z-index: 6; display: flex; gap: 6px; align-items: stretch;
+    #topbar { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); z-index: 6; display: flex; gap: 6px; align-items: stretch;
       max-width: calc(100% - 66px); pointer-events: none; }
     #topbar > * { pointer-events: auto; }
     .pill { border-top-color: var(--edge-hi) !important; display: flex; align-items: center; gap: 7px; padding: 5px 12px; min-height: 38px;
@@ -91,6 +91,7 @@
 
     /* ---- bottom command deck: plated console ---- */
     #bottombar { display: flex; flex-direction: column; position: relative;
+      padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
       background: var(--plates); border-top: 4px solid var(--edge-hi);
       box-shadow: 0 -6px 16px rgba(0,0,0,0.55), inset 0 2px 0 #3a2c18, inset 0 3px 0 rgba(255,236,200,0.1); }
 
@@ -170,7 +171,8 @@
     /* scrollable so the deploy button is always reachable on small windows */
     #briefing { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center;
       background: radial-gradient(ellipse 120% 70% at 50% 115%, #6a3a1c 0%, #3a2214 35%, #16110d 70%), #16110d; overflow-y: auto; }
-    #briefwrap { margin: auto; padding: 16px 8px; max-width: 100%; }
+    #briefwrap { margin: auto; max-width: 100%;
+      padding: calc(16px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); }
     .stars { position: fixed; inset: 0; pointer-events: none; opacity: 0.55;
       background-image: radial-gradient(1px 1px at 20% 30%, #ffe6c0 50%, transparent 51%),
         radial-gradient(1px 1px at 60% 70%, #ffffff 50%, transparent 51%),
@@ -273,16 +275,54 @@
       #mutebtn { display: none; }
     }
 
+    /* portrait (foldables first: Galaxy Z Fold inner screen held upright, and
+       its cover screen): stack the deck — minimap + selection readout on top,
+       the build bar across the full width below it */
+    @media (orientation: portrait) {
+      #hudrow { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "mini info" "build build"; gap: 8px; }
+      #minimapwrap { grid-area: mini; }
+      #infopanel { grid-area: info; width: auto; flex-direction: row; flex-wrap: wrap; align-content: flex-start; min-width: 0; }
+      #selinfo { flex: 1 0 100%; }
+      /* actions share one row; the ones the game has hidden drop out of it */
+      .actbtn { flex: 1 1 0; min-width: 0; min-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .actbtn[style*="hidden"] { display: none; }
+      #buildpanel { grid-area: build; }
+      .bbtn { height: 104px; }
+      #toast { top: calc(64px + env(safe-area-inset-top)); bottom: auto; }
+    }
+    /* cover screen (and other narrow phones held upright) */
+    @media (orientation: portrait) and (max-width: 520px) {
+      #hudrow { gap: 6px; padding: 6px 6px 7px; }
+      #minimap { width: 92px; height: 92px; border-width: 3px; border-radius: 8px; }
+      .bbtn { width: 74px; min-width: 74px; height: 80px; padding: 4px 1px 3px; border-radius: 10px; }
+      .bbtn img, .bbtn svg { max-height: 42px; }
+      .bbtn .nm { font-size: 9.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #buildgrid { gap: 5px; }
+      #selinfo { padding: 4px 7px; font-size: 10px; line-height: 1.3; }
+      .actbtn { min-height: 34px; font-size: 10.5px; }
+      #mutebtn { display: none; }          /* sound stays in the pause menu */
+      #powerwrap { min-width: 96px; }
+      #topbar { gap: 4px; }
+    }
+
+    /* touch: finger-sized tabs, no double-tap zoom or tap flash on controls */
+    @media (pointer: coarse) and (min-height: 481px) {
+      .htab { min-height: 34px; padding-left: 14px; padding-right: 14px; }
+    }
+    @media (pointer: coarse) {
+      button, .bbtn, .htab, .opt { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    }
+
     /* ☰ menu button — floats top-right over the map, always available */
-    .mapbtn { position: absolute; top: 8px; z-index: 6; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    .mapbtn { position: absolute; top: calc(8px + env(safe-area-inset-top)); z-index: 6; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
       font-size: 21px; color: var(--gold); background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 12px; cursor: pointer;
       box-shadow: var(--raised);
       -webkit-tap-highlight-color: transparent; user-select: none; }
     .mapbtn:hover { border-color: var(--edge-hi); color: var(--gold-hi); }
-    #menubtn { right: 8px; }
+    #menubtn { right: calc(8px + env(safe-area-inset-right)); }
 
     /* idle-harvester warning button — under the resource strip, only when idle */
-    #idlebtn { display: none; position: absolute; left: 8px; top: 58px; z-index: 6;
+    #idlebtn { display: none; position: absolute; left: calc(8px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top)); z-index: 6;
       height: 36px; padding: 0 12px; align-items: center; gap: 5px;
       font-size: 14px; font-weight: 900; color: #22180a;
       background: linear-gradient(180deg, #ffd27a, #e09a2e); border: 2px solid #7a5a26; border-radius: 11px; cursor: pointer;
@@ -291,7 +331,7 @@
     @keyframes idlepulse { 50% { filter: brightness(1.2); } }
 
     /* enemy orbital-strike dread banner — top-center, below the resource strip */
-    #enemysw { display: none; position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 7;
+    #enemysw { display: none; position: absolute; top: calc(58px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 7;
       padding: 7px 18px; font-family: var(--head); font-size: 15px; font-weight: 800;
       color: #ffe2da; background: linear-gradient(180deg, #5a1e16, #3a120c); border: 2px solid var(--bad); border-radius: 12px;
       box-shadow: 0 3px 0 rgba(0,0,0,0.5); white-space: nowrap; }
@@ -314,9 +354,9 @@
     /* ⛶ box-select toggle — floats over the map, touch devices only */
     #selectmode { display: none; }
     @media (pointer: coarse) {
-      #selectmode { display: flex; left: 8px; }
+      #selectmode { display: flex; left: calc(8px + env(safe-area-inset-left)); }
       #selectmode.active { color: #22180a; background: linear-gradient(180deg, var(--gold-hi), #c99a45); border-color: #7a5a26; }
-      #topbar { left: 60px; max-width: calc(100% - 118px); }
+      #topbar { left: calc(60px + env(safe-area-inset-left)); max-width: calc(100% - 118px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
     }
   </style>
 </head>

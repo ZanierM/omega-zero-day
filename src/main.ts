@@ -4,7 +4,7 @@ import * as game from './game';
 import { update, spawnUnit, placeBuilding, buildingCenter, centerOfTile, initGame } from './game';
 import { updateAI, initAI } from './ai';
 import { initInput, updateCamera, centerCameraOn } from './input';
-import { render, renderMinimap, resize, initRenderer, loadSprites } from './render';
+import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle, setRefinedStyle } from './render';
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted } from './audio';
 
@@ -14,6 +14,9 @@ initInput();
 initUI();
 resize();
 window.addEventListener('resize', resize);
+// folding/unfolding or rotating reflows the command deck, which resizes the
+// map canvas without always firing a window resize
+new ResizeObserver(resize).observe(document.getElementById('game')!);
 
 let started = false;
 let difficulty: import('./ai').Difficulty = 'normal';
@@ -71,6 +74,8 @@ muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 window.addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') { toggleMute(); refreshMuteBtn(); }
+  // prototype: flip between the chunky and refined building render styles
+  if (e.key === 'v' || e.key === 'V') setRefinedStyle(!refinedStyle);
 });
 refreshMuteBtn();
 
