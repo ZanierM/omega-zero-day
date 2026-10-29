@@ -10,7 +10,7 @@ import {
 import * as telemetry from './telemetry';
 import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile, neutralSpots } from './map';
 import { findPath } from './path';
-import { sfx } from './audio';
+import { sfx, sfxAt, FieldSound } from './audio';
 
 // ---------- Entity types ----------
 
@@ -357,7 +357,7 @@ export function activateAbility(u: Unit): boolean {
   if (a.aoeDmg && a.aoeRadius) {
     const r = a.aoeRadius * TILE;
     booms.push({ x: u.x, y: u.y, r: 4, ttl: 0.5, max: r });
-    if (audible(u.x, u.y)) sfx('explosion');
+    if (audible(u.x, u.y)) sfxAt('impact', u.x, u.y, 1.4);
     for (const t of [...units]) {
       if (t.def.air) continue; // a ground slam can't touch aircraft
       if (t.owner !== u.owner && Math.hypot(t.x - u.x, t.y - u.y) <= r + t.def.radius * 0.5) damage(t, a.aoeDmg);
@@ -449,7 +449,10 @@ function destroy(e: Entity) {
   emit({ type: 'destroyed', e });
   const p = entityPos(e);
   booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
-  if (e.owner === PLAYER || audible(p.x, p.y)) sfx('explosion');
+  if (e.owner === PLAYER || audible(p.x, p.y)) {
+    if (e.kind === 'building') sfxAt('explodeBuilding', p.x, p.y, e.def.isWall ? 0.5 : 1.3);
+    else if (UNIT_ARMOR[e.def.id] !== 'infantry') sfxAt('explodeVehicle', p.x, p.y);
+  }
   // stats: what the player lost vs what the player destroyed
   telemetry.lost(e.owner, e.kind);
   if (e.owner === PLAYER) { if (e.kind === 'unit') stats.lost++; }
@@ -710,6 +713,18 @@ export function damageMult(dmgType: DmgType | undefined, target: Entity): number
   return DMG_TABLE[dmgType]?.[armorClassOf(target)] ?? 1;
 }
 
+// what each gun sounds like
+const UNIT_SOUND: Record<string, FieldSound> = {
+  trooper: 'rifle', vanguard: 'rifle', juggernaut: 'autocannon', pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
+  ranger: 'autocannon', raider: 'autocannon', warden: 'autocannon', gunship: 'autocannon',
+  hovertank: 'cannon', dominator: 'cannon', colossus: 'cannon', bomber: 'cannon', artillery: 'artillery',
+};
+const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail' };
+const weaponSound = (e: Unit | Building): FieldSound =>
+  (e.kind === 'unit' ? UNIT_SOUND[e.def.id] : TURRET_SOUND[e.def.id]) ?? 'rifle';
+// the sound of a round landing on this target
+const hitSound = (t: Entity): FieldSound => t.kind === 'building' ? 'hitStructure' : UNIT_ARMOR[t.def.id] === 'infantry' ? 'hitSoft' : 'hitMetal';
+
 function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: string) {
   const from = entityPos(u), to = entityPos(target);
   const dmgType = u.kind === 'unit' ? UNIT_DMGTYPE[u.def.id] : TURRET_DMGTYPE[u.def.id];
@@ -723,11 +738,14 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
       t: 0, dur: Math.max(0.2, d / speed), dmg: damageAmt,
       splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType, by: u.id,
     });
-    if (audible(from.x, from.y)) sfx(u.def.weapon === 'rocket' ? 'shot' : 'shotHeavy');
+    if (audible(from.x, from.y)) sfxAt(weaponSound(u), from.x, from.y);
     return;
   }
   beams.push({ x1: from.x, y1: from.y, x2: to.x + (Math.random() * 8 - 4), y2: to.y + (Math.random() * 8 - 4), ttl: 0.12, color });
-  if (audible(from.x, from.y) || audible(to.x, to.y)) sfx(damageAmt >= 60 ? 'shotHeavy' : 'shot');
+  if (audible(from.x, from.y) || audible(to.x, to.y)) {
+    sfxAt(weaponSound(u), from.x, from.y);
+    if (!(u.kind === 'unit' && u.def.id === 'pyro')) sfxAt(hitSound(target), to.x, to.y, 0.8);   // the flame roar covers its own hits
+  }
   damage(target, damageAmt * damageMult(dmgType, target), u.kind === 'unit' ? u : undefined);
 }
 
@@ -1067,7 +1085,8 @@ function step(dt: number) {
     if (s.t >= s.delay) {
       strikes.splice(i, 1);
       booms.push({ x: s.x, y: s.y, r: 6, ttl: 0.5, max: s.radius * 1.1 });
-      sfx('explosion');
+      // an orbital strike is heard anywhere on the map; a solar flare where it lands
+      if (s.owner >= 0) sfxAt('orbital', s.x, s.y, 2.2); else sfxAt('explodeVehicle', s.x, s.y, 1.2);
       if (s.owner >= 0) flash = 1; // orbital strike (not a solar flare) whites out the sky
       for (const t of [...units]) {
         if (t.owner !== s.owner && Math.hypot(t.x - s.x, t.y - s.y) <= s.radius + t.def.radius * 0.5) damage(t, s.damage);
@@ -1090,7 +1109,7 @@ function step(dt: number) {
     if (p >= 1) {
       shells.splice(i, 1);
       booms.push({ x: s.tx, y: s.ty, r: 4, ttl: 0.5, max: s.splash * 0.95 });
-      if (audible(s.tx, s.ty)) sfx('explosion');
+      if (audible(s.tx, s.ty)) sfxAt('impact', s.tx, s.ty, s.kind === 'rocket' ? 0.8 : 1);
       const firer = s.by !== undefined ? byId.get(s.by) : undefined;
       const attacker = firer?.kind === 'unit' ? firer : undefined;
       for (const t of [...units]) {

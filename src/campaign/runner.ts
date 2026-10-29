@@ -217,6 +217,20 @@ function markComplete(id: string) {
   if (!p.done.includes(id)) p.done.push(id);
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage may be unavailable */ }
 }
+// "Continue" / "Retry" on the end screen: the next page load starts this mission straight away
+const NEXT_KEY = 'ozd-continue';
+export function queueMission(win: boolean) {
+  if (!def) return;
+  const i = MISSIONS.findIndex(m => m.id === def!.id);
+  const next = win ? MISSIONS[i + 1] : def;
+  try { if (next) sessionStorage.setItem(NEXT_KEY, next.id); else sessionStorage.removeItem(NEXT_KEY); } catch { /* storage may be unavailable */ }
+}
+export function takeQueuedMission(): string | null {
+  try { const id = sessionStorage.getItem(NEXT_KEY); sessionStorage.removeItem(NEXT_KEY); return id && MISSIONS.some(m => m.id === id) ? id : null; }
+  catch { return null; }
+}
+export function isLastMission() { return !!def && MISSIONS[MISSIONS.length - 1].id === def.id; }
+
 export function unlocked(id: string) {
   const i = MISSIONS.findIndex(m => m.id === id);
   return i === 0 || progress().done.includes(MISSIONS[i - 1]?.id);
