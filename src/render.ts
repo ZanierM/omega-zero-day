@@ -668,6 +668,67 @@ function punch(g: CanvasRenderingContext2D, c: HTMLCanvasElement, amount: number
 // baked building canvases carry the offset of the footprint's top-left corner
 export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number }
 
+// dark pixel-art outline around everything already drawn on the canvas
+function outline(c: HTMLCanvasElement, color: string, px: number) {
+  const [sil, sg] = makeCanvas(c.width, c.height);
+  sg.drawImage(c, 0, 0);
+  sg.globalCompositeOperation = 'source-in';
+  sg.fillStyle = color;
+  sg.fillRect(0, 0, c.width, c.height);
+  const [o, og] = makeCanvas(c.width, c.height);
+  for (const [dx, dy] of [[-px, 0], [px, 0], [0, -px], [0, px], [px, px]]) og.drawImage(sil, dx, dy);
+  og.drawImage(c, 0, 0);
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, c.width, c.height);
+  g.drawImage(o, 0, 0);
+}
+
+// re-sample a canvas into 2×2 pixel blocks so baked art matches the terrain
+function pixelate(c: HTMLCanvasElement) {
+  const [lo, lg] = makeCanvas(Math.ceil(c.width / 2), Math.ceil(c.height / 2));
+  lg.imageSmoothingEnabled = true;
+  lg.drawImage(c, 0, 0, lo.width, lo.height);
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, c.width, c.height);
+  g.imageSmoothingEnabled = false;
+  g.drawImage(lo, 0, 0, lo.width * 2, lo.height * 2);
+  g.imageSmoothingEnabled = true;
+}
+
+// riveted metal foundation pad with bevelled edges and a team hazard stripe
+function drawPad(g: CanvasRenderingContext2D, w: number, h: number, team: string) {
+  // trampled dirt ring around the pad
+  const dg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+  dg.addColorStop(0, 'rgba(46,24,12,0.45)');
+  dg.addColorStop(1, 'rgba(46,24,12,0)');
+  g.fillStyle = dg;
+  g.fillRect(-14, -14, w + 28, h + 28);
+  const pg = g.createLinearGradient(0, 0, w * 0.6, h);
+  pg.addColorStop(0, '#6a6158'); pg.addColorStop(0.5, '#514a43'); pg.addColorStop(1, '#3a342f');
+  rr(g, 2, 2, w - 4, h - 4, 6);
+  g.fillStyle = pg; g.fill();
+  g.lineWidth = 3; g.strokeStyle = '#1a120c'; g.stroke();
+  g.lineWidth = 1;
+  g.strokeStyle = 'rgba(0,0,0,0.35)';
+  for (let x = 32; x < w - 4; x += 32) { g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - 4); g.stroke(); }
+  for (let y = 32; y < h - 4; y += 32) { g.beginPath(); g.moveTo(4, y); g.lineTo(w - 4, y); g.stroke(); }
+  g.strokeStyle = 'rgba(255,236,200,0.28)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(5, h - 6); g.lineTo(5, 5); g.lineTo(w - 6, 5); g.stroke();
+  g.strokeStyle = 'rgba(0,0,0,0.45)';
+  g.beginPath(); g.moveTo(w - 5, 6); g.lineTo(w - 5, h - 5); g.lineTo(6, h - 5); g.stroke();
+  for (const [rx, ry] of [[9, 9], [w - 9, 9], [9, h - 15], [w - 9, h - 15]]) {
+    g.fillStyle = '#1a120c'; g.beginPath(); g.arc(rx, ry, 2.4, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#b8a688'; g.beginPath(); g.arc(rx - 0.5, ry - 0.5, 1.4, 0, Math.PI * 2); g.fill();
+  }
+  // hazard stripe along the south lip, in team colour
+  g.save();
+  g.beginPath(); g.rect(6, h - 11, w - 12, 5); g.clip();
+  g.fillStyle = team; g.fillRect(6, h - 11, w - 12, 5);
+  g.fillStyle = 'rgba(16,10,6,0.8)';
+  for (let x = 0; x < w + 10; x += 8) { g.beginPath(); g.moveTo(x, h - 11); g.lineTo(x + 4, h - 11); g.lineTo(x, h - 6); g.lineTo(x - 4, h - 6); g.closePath(); g.fill(); }
+  g.restore();
+}
+
 function bakeBuildingSprite(defId: string, owner: number, level: number): BldSprite {
   const def = BUILDINGS[defId];
   const w = def.w * TILE, h = def.h * TILE;
@@ -677,39 +738,45 @@ function bakeBuildingSprite(defId: string, owner: number, level: number): BldSpr
   if (img && !def.isWall) {
     const scale = Math.min((w * 1.3) / img.width, (h * 2.6) / img.height, 1);
     const dw = Math.ceil(img.width * scale), dh = Math.ceil(img.height * scale);
-    const cw = Math.max(w, dw) + 14;
-    const ch = h + Math.max(0, dh - h) + 12;
+
+    // the structure on its own: team wash, NW light, contrast lift, then a
+    // hard dark outline (the pad's hazard stripe carries most of the team colour)
+    const [st, sg] = makeCanvas(dw + 6, dh + 6);
+    sg.imageSmoothingEnabled = true;
+    sg.drawImage(img, 3, 3, dw, dh);
+    sg.globalCompositeOperation = 'source-atop';
+    sg.fillStyle = TEAM_COLORS[owner];
+    sg.globalAlpha = owner === PLAYER ? 0.08 : 0.14;
+    sg.fillRect(0, 0, st.width, st.height);
+    sg.globalAlpha = 1;
+    sg.globalCompositeOperation = 'source-over';
+    bakeLighting(sg, st.width, st.height, 0.5);
+    punch(sg, st, 0.2);
+    outline(st, '#1a120c', 2);
+
+    // long low-sun shadow thrown to the south-east
+    const reachX = Math.ceil(dh * 0.42), reachY = Math.ceil(dh * 0.16);
+    const cw = Math.max(w, st.width) + 16 + reachX * 2;
+    const ch = h + Math.max(0, st.height - h) + 16 + reachY;
     const [c, g] = makeCanvas(cw, ch);
     const ox = (cw - w) / 2;            // footprint offset inside the canvas
-    const oy = ch - h - 4;
-    // disturbed ground within the footprint
+    const oy = ch - h - 6 - reachY;
     g.save(); g.translate(ox, oy);
-    bakeGroundPatch(g, w, h);
+    drawPad(g, w, h, TEAM_COLORS[owner]);
     g.restore();
-    // grounding shadow: a soft skewed quad cast to the south-east, hugging the
-    // base of the structure (no floating-disc look)
-    const bx = cw / 2, by = oy + h - 1;
-    const grd = g.createLinearGradient(bx, by - dh * 0.3, bx + dw * 0.3, by + 6);
-    grd.addColorStop(0, 'rgba(0,0,0,0.0)');
-    grd.addColorStop(1, 'rgba(0,0,0,0.42)');
-    g.fillStyle = grd;
-    g.beginPath();
-    g.moveTo(bx - dw * 0.48, by - dh * 0.30);
-    g.lineTo(bx + dw * 0.52, by - dh * 0.30);
-    g.lineTo(bx + dw * 0.60, by + 4);
-    g.lineTo(bx - dw * 0.38, by + 4);
-    g.closePath(); g.fill();
+    const bx = cw / 2, by = oy + h - 2;
+    g.save();
+    g.translate(bx, by);
+    g.transform(1, 0, -0.42, -0.16, 0, 0);
+    g.globalAlpha = 0.34;
+    g.drawImage(silhouetteOf(st), -st.width / 2, -st.height + 3);
+    g.restore();
+    // contact shadow hugging the base
+    g.fillStyle = 'rgba(16,8,4,0.35)';
+    g.beginPath(); g.ellipse(bx + 3, by - 2, dw * 0.46, Math.min(10, dh * 0.08), 0, 0, Math.PI * 2); g.fill();
     // sprite planted on the plot's south edge
-    g.imageSmoothingEnabled = true;
-    g.drawImage(img, bx - dw / 2, by - dh, dw, dh);
-    // faction tint wash, then a gentle contrast/saturation lift
-    g.globalCompositeOperation = 'source-atop';
-    g.fillStyle = TEAM_COLORS[owner];
-    g.globalAlpha = owner === PLAYER ? 0.08 : 0.20;
-    g.fillRect(0, 0, cw, ch);
-    g.globalCompositeOperation = 'source-over';
-    g.globalAlpha = 1;
-    punch(g, c, 0.22);
+    g.drawImage(st, bx - st.width / 2, by - st.height + 3);
+    pixelate(c);
     const s = c as BldSprite; s.ox = ox; s.oy = oy;
     return s;
   }
@@ -890,6 +957,8 @@ function bakeProceduralBuilding(defId: string, owner: number): BldSprite {
     g.strokeStyle = TEAM_COLORS[owner]; g.lineWidth = 2;
     g.strokeRect(6, 6, w - 12, h - 12);
   }
+  if (def.isWall) outline(c, '#1a120c', 2);
+  pixelate(c);
   const s = c as BldSprite; s.ox = 0; s.oy = 0;
   return s;
 }
@@ -957,29 +1026,74 @@ function g2Glow(x: number, y: number, r: number, color: string) {
   ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
 }
 
-// a single faceted flux-crystal shard: two lit/shadowed faces, a bright ridge,
-// a glowing core and a top highlight — reads as a 3D gem
-function drawShard(bx: number, by: number, h: number, w: number, lean: number, bright: number) {
-  const ax = bx + lean * h, ay = by - h;         // apex
-  const ulx = bx - w, uly = by - h * 0.42;       // upper-left shoulder
-  const urx = bx + w, ury = by - h * 0.42;       // upper-right shoulder
-  const llx = bx - w * 0.66, lrx = bx + w * 0.66;// lower shoulders
-  // left face (shadowed)
-  ctx.fillStyle = '#0c5560';
-  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ulx, uly); ctx.lineTo(llx, by); ctx.lineTo(bx, by); ctx.closePath(); ctx.fill();
-  // right face (lit) — brighter with the ambient pulse
-  const lit = ctx.createLinearGradient(bx, ay, urx, by);
-  lit.addColorStop(0, '#8ffff7'); lit.addColorStop(0.5, '#3ce4dc'); lit.addColorStop(1, '#127f80');
-  ctx.fillStyle = lit;
-  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(urx, ury); ctx.lineTo(lrx, by); ctx.lineTo(bx, by); ctx.closePath(); ctx.fill();
-  // central ridge highlight
-  ctx.strokeStyle = `rgba(220,255,253,${0.55 + bright * 0.35})`; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-  // glowing inner core
-  g2Glow(bx, by - h * 0.4, w * 1.1, `rgba(120,255,246,${0.25 + bright * 0.3})`);
-  // apex sparkle
-  ctx.fillStyle = `rgba(255,255,255,${0.6 * bright})`;
-  ctx.beginPath(); ctx.arc(ax, ay, 1, 0, Math.PI * 2); ctx.fill();
+// ---- flux crystal clusters: baked once per (variant, size) as chunky pixel art ----
+
+const CRY = { out: '#06262c', dk: '#0f646c', mid: '#21a3a0', lt: '#5cdfd2', hi: '#dcfff8' };
+const crystalCache = new Map<number, HTMLCanvasElement>();
+const CRY_W = 56, CRY_H = 64, CRY_AX = 28, CRY_AY = 50; // canvas size + base anchor
+
+// one hexagonal prism with a pointed tip: shadowed left faces, lit right faces,
+// a bright tip facet and a dark outline so neighbouring crystals separate
+function drawCrystal(g: CanvasRenderingContext2D, bx: number, by: number, h: number, w: number, lean: number) {
+  const L = lean * h;
+  const BL: [number, number] = [bx - w, by], BC: [number, number] = [bx, by + w * 0.35], BR: [number, number] = [bx + w, by];
+  const SL: [number, number] = [bx - w + L * 0.65, by - h * 0.65], SC: [number, number] = [bx + L * 0.65, by - h * 0.65 + w * 0.35];
+  const SR: [number, number] = [bx + w + L * 0.65, by - h * 0.65], A: [number, number] = [bx + L, by - h];
+  const poly = (pts: [number, number][], fill: string) => {
+    g.fillStyle = fill; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]);
+    g.closePath(); g.fill();
+  };
+  g.strokeStyle = CRY.out; g.lineWidth = 3; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(...BL); g.lineTo(...BC); g.lineTo(...BR); g.lineTo(...SR); g.lineTo(...A); g.lineTo(...SL); g.closePath(); g.stroke();
+  poly([BL, BC, SC, SL], CRY.dk);
+  poly([BC, BR, SR, SC], CRY.mid);
+  poly([SL, SC, A], CRY.mid);
+  poly([SC, SR, A], CRY.lt);
+  // inner light: a glint down the lit face and along the front ridge
+  g.strokeStyle = CRY.lt; g.lineWidth = 1.6;
+  g.beginPath(); g.moveTo(BC[0] + w * 0.3, BC[1] - 2); g.lineTo(SC[0] + w * 0.3, SC[1] - 1); g.stroke();
+  g.strokeStyle = CRY.hi; g.lineWidth = 1.4;
+  g.beginPath(); g.moveTo(...SC); g.lineTo(...A); g.stroke();
+}
+
+function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
+  const key = variant * 8 + size;
+  const cached = crystalCache.get(key);
+  if (cached) return cached;
+  const hash = (n: number) => { const v = Math.sin(variant * 91.3 + n * 47.1) * 43758.5; return v - Math.floor(v); };
+  const scale = 0.5 + size * 0.17;                // depleting fields shrink
+  // drawn at half resolution, then blown up without smoothing
+  const [lo, g] = makeCanvas(CRY_W / 2, CRY_H / 2);
+  g.scale(0.5, 0.5);
+  const ax = CRY_AX, ay = CRY_AY;
+  g.fillStyle = 'rgba(24,10,4,0.45)';
+  g.beginPath(); g.ellipse(ax + 6, ay + 2, 18 * scale + 4, 5.5, 0, 0, Math.PI * 2); g.fill();
+  // rubble the crystals have pushed up through
+  for (let k = 0; k < 5; k++) {
+    const rx = ax + (hash(k + 20) - 0.5) * 30 * scale, ry = ay + (hash(k + 30) - 0.3) * 8;
+    const rs = 2.5 + hash(k + 40) * 3;
+    g.fillStyle = '#1e140e'; g.beginPath(); g.ellipse(rx, ry, rs + 1.2, rs * 0.7 + 1.2, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#5a463a'; g.beginPath(); g.ellipse(rx, ry, rs, rs * 0.7, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#8a7462'; g.beginPath(); g.ellipse(rx - rs * 0.3, ry - rs * 0.3, rs * 0.45, rs * 0.3, 0, 0, Math.PI * 2); g.fill();
+  }
+  // one tall central crystal flanked by shorter ones leaning outward
+  const parts: { bx: number, by: number, h: number, w: number, lean: number }[] = [];
+  parts.push({ bx: ax + (hash(1) - 0.5) * 4, by: ay, h: (26 + hash(2) * 8) * scale, w: 6.5 * scale + 1.5, lean: (hash(3) - 0.5) * 0.25 });
+  const sides = 2 + Math.floor(hash(4) * 3);
+  for (let k = 0; k < sides; k++) {
+    const side = k % 2 ? 1 : -1;
+    const off = (6 + hash(k + 5) * 9) * side;
+    parts.push({ bx: ax + off * scale * 1.3, by: ay + (hash(k + 9) - 0.6) * 7, h: (12 + hash(k + 13) * 10) * scale,
+      w: (4 + hash(k + 17) * 2) * scale + 1, lean: side * (0.2 + hash(k + 19) * 0.3) });
+  }
+  parts.sort((a, b) => a.by - b.by);
+  for (const p of parts) drawCrystal(g, p.bx, p.by, p.h, p.w, p.lean);
+  const [c, cg] = makeCanvas(CRY_W, CRY_H);
+  cg.imageSmoothingEnabled = false;
+  cg.drawImage(lo, 0, 0, CRY_W, CRY_H);
+  crystalCache.set(key, c);
+  return c;
 }
 
 function buildingOverlay(b: Building) {
@@ -1088,7 +1202,7 @@ function buildingOverlay(b: Building) {
   }
   // upgrade level pips
   if (b.level > 1) {
-    ctx.fillStyle = '#ffd76e';
+    ctx.fillStyle = '#e8c66a';
     for (let i = 0; i < b.level - 1; i++) {
       ctx.beginPath(); ctx.arc(px + 7 + i * 8, py + h - 6, 2.5, 0, Math.PI * 2); ctx.fill();
     }
@@ -1153,24 +1267,22 @@ export function render() {
       if (crystal[i] === 0 || !explored[i]) continue;
       const cx = x * TILE + TILE / 2, cy = y * TILE + TILE / 2;
       const amt = Math.min(1, crystal[i] / 1000);
+      const hash = (n: number) => { const v = Math.sin(x * 127.1 + y * 311.7 + n * 74.7) * 43758.5; return v - Math.floor(v); };
       const pulse = 0.75 + 0.25 * Math.sin(T * 2 + x * 1.7 + y * 2.3);
-      // ground shadow + ambient glow
-      ctx.fillStyle = 'rgba(0,0,0,0.32)';
-      ctx.beginPath(); ctx.ellipse(cx + 1, cy + 6, 11, 4.5, 0, 0, Math.PI * 2); ctx.fill();
-      g2Glow(cx, cy + 2, TILE * 0.5 * pulse, `rgba(67,243,236,${0.08 + amt * 0.1})`);
-      // deterministic per-tile shard layout (stable shapes, animated brightness)
-      const hash = (n: number) => { const s = Math.sin(x * 127.1 + y * 311.7 + n * 74.7) * 43758.5; return s - Math.floor(s); };
-      const count = 3 + Math.floor(hash(0) * 3);           // 3..5 shards
-      const scale = 0.55 + amt * 0.5;                       // depletion shrinks them
-      const order: { bx: number, by: number, h: number, w: number, lean: number }[] = [];
-      for (let k = 0; k < count; k++) {
-        const bx = cx + (hash(k * 3 + 1) - 0.5) * 20;
-        const by = cy + (hash(k * 3 + 2) - 0.25) * 8 + 3;
-        const h = (11 + hash(k * 3 + 3) * 14) * scale;
-        order.push({ bx, by, h, w: h * 0.3, lean: (hash(k * 3 + 4) - 0.5) * 0.45 });
+      // mix of big and small clusters so a field doesn't read as a hedge
+      const size = Math.max(0, Math.min(3, Math.floor(amt * 4)) - (hash(3) < 0.3 ? 2 : hash(3) < 0.55 ? 1 : 0));
+      g2Glow(cx, cy + 2, TILE * 0.5 * pulse, `rgba(67,243,236,${0.07 + amt * 0.09})`);
+      const spr = bakeCrystal(Math.floor(hash(0) * 8), size);
+      const ox = (hash(1) - 0.5) * 18, oy = (hash(2) - 0.5) * 12;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spr, cx + ox - CRY_AX, cy + oy + 6 - CRY_AY);
+      ctx.imageSmoothingEnabled = true;
+      // a rare four-point glint on the tip
+      if (Math.sin(T * 1.3 + x * 3.1 + y * 5.7) > 0.985) {
+        const sx = cx + ox, sy = cy + oy + 6 - (24 + size * 5);
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(sx - 4, sy); ctx.lineTo(sx + 4, sy); ctx.moveTo(sx, sy - 4); ctx.lineTo(sx, sy + 4); ctx.stroke();
       }
-      order.sort((a, b) => a.by - b.by);                    // back-to-front
-      for (const s of order) drawShard(s.bx, s.by, s.h, s.w, s.lean, pulse);
     }
 
   // neutral objectives: flux vents & watchtowers with owner ring + capture arc
