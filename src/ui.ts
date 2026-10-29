@@ -17,6 +17,10 @@ const powerText = document.getElementById('powertext')!;
 const grid = document.getElementById('buildgrid')!;
 const tabsBar = document.getElementById('tabsbar')!;
 const selInfo = document.getElementById('selinfo')!;
+const selCopy = document.getElementById('selcopy')!;
+const selPortrait = document.getElementById('selportrait')!;
+const selHealth = document.getElementById('selhealth')!;
+const selHealthFill = document.getElementById('selhealthfill')!;
 const countdown = document.getElementById('countdown')!;
 const cdTime = document.getElementById('cdtime')!;
 const enemySw = document.getElementById('enemysw')!;
@@ -33,6 +37,9 @@ const overlaySub = document.getElementById('overlaysub')!;
 const toastEl = document.getElementById('toast')!;
 const buildTip = document.getElementById('buildtip')!;
 let shownSelection = '';
+let shownPortrait = '';
+let shownHealth = -1;
+let shownSingle = false;
 
 let activeTab: Tab = 'build';
 let shownCredits = 0;
@@ -41,6 +48,7 @@ interface Btn { el: HTMLElement, defId: string, tab: Tab, prog: HTMLElement, cou
 const btns: Btn[] = [];
 
 const CATEGORIES: Tab[] = ['build', 'def', 'inf', 'veh', 'ups'];
+const compactDeck = matchMedia('(orientation: landscape) and (max-width: 920px) and (max-height: 480px)');
 
 // inline SVG icons for the research tab: crosshair / shield / defence grid
 function upgradeSvg(defId: string): string {
@@ -89,20 +97,51 @@ function bakeIconHtml(tab: Tab, defId: string): string {
 
 const tabBtns = new Map<Tab, HTMLButtonElement>();
 
+function activateTab(t: Tab) {
+  if (t === activeTab) return;
+  activeTab = t;
+  tabBtns.forEach((btn, tab) => {
+    const selected = tab === t;
+    btn.classList.toggle('active', selected);
+    btn.setAttribute('aria-selected', String(selected));
+    btn.tabIndex = selected ? 0 : -1;
+  });
+  grid.setAttribute('aria-label', `${TAB_NAMES[t]} options`);
+  rebuildGrid();
+  sfx('click');
+}
+
 export function initUI() {
   for (const t of CATEGORIES) {
     const b = document.createElement('button');
     b.className = 'htab' + (t === activeTab ? ' active' : '');
     b.textContent = TAB_NAMES[t];
-    b.addEventListener('click', () => {
-      activeTab = t;
-      tabBtns.forEach((btn, tab) => btn.classList.toggle('active', tab === t));
-      rebuildGrid();
-      sfx('click');
-    });
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(t === activeTab));
+    b.tabIndex = t === activeTab ? 0 : -1;
+    b.addEventListener('click', () => activateTab(t));
     tabsBar.appendChild(b);
     tabBtns.set(t, b);
   }
+  tabsBar.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
+    const i = CATEGORIES.indexOf(activeTab);
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? CATEGORIES.length - 1
+      : (i + (e.key === 'ArrowRight' ? 1 : -1) + CATEGORIES.length) % CATEGORIES.length;
+    activateTab(CATEGORIES[next]);
+    tabBtns.get(CATEGORIES[next])?.focus();
+  });
+  grid.addEventListener('keydown', e => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    const focused = btns.findIndex(b => b.el === document.activeElement);
+    if (focused < 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? btns.length - 1
+      : (focused + (e.key === 'ArrowRight' ? 1 : -1) + btns.length) % btns.length;
+    btns[next]?.el.focus();
+  });
   setOnBuildingPlaced(() => {
     // clear the placed (ready) item from whichever construction queue holds it
     for (const tab of ['build', 'def'] as const) {
@@ -328,7 +367,9 @@ export function updateUI() {
       upgBtn.textContent = `Upgrading… ${pct}%`;
       upgBtn.disabled = true;
     } else {
-      upgBtn.textContent = `⬆ Upgrade to Lv ${ob.level + 1} — ◈${buildingUpgradeCost(ob)}`;
+      upgBtn.textContent = compactDeck.matches
+        ? `⬆ Upgrade Lv ${ob.level + 1} · ◈${buildingUpgradeCost(ob)}`
+        : `⬆ Upgrade to Lv ${ob.level + 1} — ◈${buildingUpgradeCost(ob)}`;
       upgBtn.disabled = false;
     }
   } else {
@@ -356,6 +397,23 @@ export function updateUI() {
   if (selection.size > 0) {
     const first = byId.get([...selection][0]);
     if (first) {
+      const single = selection.size === 1;
+      if (single !== shownSingle) { selInfo.classList.toggle('has-selection', single); shownSingle = single; }
+      const portraitKey = single ? `${first.kind}:${first.def.id}` : '';
+      if (portraitKey !== shownPortrait) {
+        selPortrait.innerHTML = single ? iconHtml(first.def.tab, first.def.id) : '';
+        shownPortrait = portraitKey;
+      }
+      if (single) {
+        const health = Math.max(0, Math.min(100, Math.round(first.hp / first.maxHp * 100)));
+        if (health !== shownHealth) {
+          selHealthFill.style.width = `${health}%`;
+          selHealthFill.classList.toggle('warn', health > 25 && health <= 50);
+          selHealthFill.classList.toggle('low', health <= 25);
+          selHealth.setAttribute('aria-valuenow', String(health));
+          shownHealth = health;
+        }
+      }
       const name = first.def.name;
       let lvl = first.kind === 'building' && first.level > 1 ? ` <span style="color:#e8c66a">Lv ${first.level}</span>` : '';
       if (first.kind === 'unit' && first.rank > 0) lvl += ` <span style="color:#e8c66a">${'★'.repeat(first.rank)} ${VET_NAME[first.rank]}</span>`;
@@ -369,14 +427,16 @@ export function updateUI() {
         parts.push(`🛡 ${a}`);
         combat = `<br><span style="color:#c9b48a;font-size:0.9em">${parts.join(' · ')}</span>`;
       }
-      const html = selection.size === 1
+      const html = single
         ? `<b>${name}</b>${lvl} — ${hp}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
         : `<b>${selection.size} units selected</b><br>${name} +${selection.size - 1} more`;
-      if (html !== shownSelection) { selInfo.innerHTML = html; shownSelection = html; }
+      if (html !== shownSelection) { selCopy.innerHTML = html; shownSelection = html; }
     }
   } else {
+    if (shownSingle) { selInfo.classList.remove('has-selection'); shownSingle = false; }
+    if (shownPortrait) { selPortrait.innerHTML = ''; shownPortrait = ''; }
     const html = '<b>Awaiting orders</b><br>Select a unit or building.';
-    if (html !== shownSelection) { selInfo.innerHTML = html; shownSelection = html; }
+    if (html !== shownSelection) { selCopy.innerHTML = html; shownSelection = html; }
   }
 
   // toast
@@ -385,8 +445,12 @@ export function updateUI() {
 
   // game over
   if (gameOver) {
-    if (overlay.style.display !== 'flex') duckMusic();
-    overlay.style.display = 'flex';
+    if (overlay.style.display !== 'flex') {
+      duckMusic();
+      document.getElementById('app')!.inert = true;
+      overlay.style.display = 'flex';
+      (overlay.querySelector('button') as HTMLButtonElement).focus();
+    }
     overlay.className = gameOver;
     const novaExpired = novaTotal > 0 && novaLeft <= 0;
     overlayTitle.textContent = gameOver === 'win' ? 'Victory' : novaExpired ? 'Supernova' : 'Defeat';
