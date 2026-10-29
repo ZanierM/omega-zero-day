@@ -86,6 +86,16 @@ export function initAI(numEnemies: number, difficulty: Difficulty = 'normal') {
   }
 }
 
+// ---------- save / resume ----------
+export interface AISnapshot { difficulty: Difficulty; ais: AIState[] }
+export function snapshotAI(difficulty: Difficulty): AISnapshot {
+  return { difficulty, ais: ais.map(a => ({ ...a })) };
+}
+export function restoreAI(s: AISnapshot) {
+  diff = DIFF[s.difficulty];
+  ais = s.ais.map(a => ({ ...a }));
+}
+
 function myHQ(owner: number) {
   return buildings.find(b => b.owner === owner && b.def.id === 'nexus')
       ?? buildings.find(b => b.owner === owner && !b.def.isWall) ?? null;

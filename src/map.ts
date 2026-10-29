@@ -152,6 +152,29 @@ export function generateMap(numEnemies: number, crystalMul = 1) {
 }
 
 // Find nearest tile matching a predicate via expanding ring search
+// ---------- save / resume ----------
+// occupancy isn't saved: placing the saved buildings rebuilds it
+
+export interface MapSnapshot {
+  w: number; h: number; seed: number;
+  terrain: number[]; crystal: number[]; tint: number[];
+  startBases: { x: number, y: number }[];
+  neutralSpots: { x: number, y: number, kind: 'vent' | 'tower' }[];
+}
+export function snapshotMap(): MapSnapshot {
+  return { w: MAP_W, h: MAP_H, seed, terrain: Array.from(terrain), crystal: Array.from(crystal), tint: Array.from(tint),
+    startBases: startBases.map(b => ({ ...b })), neutralSpots: neutralSpots.map(n => ({ ...n })) };
+}
+export function restoreMap(m: MapSnapshot) {
+  MAP_W = m.w; MAP_H = m.h; seed = m.seed;
+  terrain = Uint8Array.from(m.terrain);
+  crystal = Uint16Array.from(m.crystal);
+  tint = Uint8Array.from(m.tint);
+  occupied = new Int32Array(MAP_W * MAP_H).fill(-1);
+  startBases = m.startBases.map(b => ({ ...b }));
+  neutralSpots = m.neutralSpots.map(n => ({ ...n }));
+}
+
 export function nearestTile(fromX: number, fromY: number, maxR: number, pred: (x: number, y: number) => boolean): { x: number, y: number } | null {
   if (pred(fromX, fromY)) return { x: fromX, y: fromY };
   for (let r = 1; r <= maxR; r++) {

@@ -8,6 +8,7 @@ import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle,
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted } from './audio';
 import { drawBriefingScene } from './briefing-scene';
+import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
 
@@ -61,10 +62,34 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
   }
 
   initAI(numEnemies, difficulty);
+  clearSave();   // a new match replaces the old slot
   started = true;
   game.setPaused(false);
   last = performance.now();
 }
+
+async function resumeGame(save: NonNullable<ReturnType<typeof readSave>>) {
+  applySave(save);
+  difficulty = save.ai.difficulty;
+  await loadSprites();
+  await initRenderer(save.terrainSeed);   // same seed, same ground
+  inputMod.camera.zoom = save.camera.zoom;
+  inputMod.camera.x = save.camera.x; inputMod.camera.y = save.camera.y;
+  started = true;
+  last = performance.now();
+}
+
+// ---------- save / resume (single-player skirmish) ----------
+
+let autosaveTimer = 0;
+function saveNow() { if (started && !game.gameOver) writeSave(difficulty); }
+// a hidden tab may never come back (closed, phone call, app switch): pause and save
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden' || !started || game.gameOver) return;
+  openPause();
+  saveNow();
+});
+window.addEventListener('pagehide', saveNow);
 
 // faction-count + difficulty selectors: segmented buttons (delegated)
 for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts']) {
@@ -113,7 +138,7 @@ menuBtn.addEventListener('click', () => {
   pauseMenu.style.display === 'flex' ? closePause() : openPause();
 });
 document.getElementById('resumebtn')!.addEventListener('click', closePause);
-document.getElementById('restartbtn')!.addEventListener('click', () => location.reload());
+document.getElementById('restartbtn')!.addEventListener('click', () => { clearSave(); location.reload(); });
 pauseMenu.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closePause(); } });
 function trapDialogTabs(dialog: HTMLElement, heading?: HTMLElement) {
   dialog.addEventListener('keydown', e => {
@@ -161,6 +186,36 @@ deployBtn.addEventListener('click', async () => {
   }
 });
 
+const resumeSaveBtn = document.getElementById('resumesave') as HTMLButtonElement;
+const pendingSave = readSave();
+if (pendingSave) {
+  resumeSaveBtn.hidden = false;
+  document.getElementById('resumesavemeta')!.textContent = describeSave(pendingSave);
+}
+resumeSaveBtn.addEventListener('click', async () => {
+  const save = readSave();
+  if (deploying || started || !save) return;
+  deploying = true;
+  resumeSaveBtn.disabled = deployBtn.disabled = true;
+  resumeSaveBtn.setAttribute('aria-busy', 'true');
+  try {
+    initAudio();
+    await resumeGame(save);
+    briefing.style.display = 'none';
+    app.inert = false;
+    document.getElementById('game')!.focus();
+    openPause();   // let the player get their bearings before the clock runs
+  } catch (err) {
+    console.error(err);
+    clearSave();   // a save that can't load would block the briefing forever
+    alert('Could not resume the saved mission: ' + err);
+    location.reload();
+  } finally {
+    deploying = false;
+    resumeSaveBtn.removeAttribute('aria-busy');
+  }
+});
+
 // ---------- game loop ----------
 
 let last = performance.now();
@@ -179,6 +234,9 @@ function frame(now: number) {
 
   mmTimer -= dt;
   if (mmTimer <= 0) { mmTimer = 0.25; renderMinimap(); }
+
+  if (game.gameOver) { if (autosaveTimer >= 0) { clearSave(); autosaveTimer = -1; } }
+  else if (!game.paused && (autosaveTimer += dt) >= 20) { autosaveTimer = 0; saveNow(); }
 }
 
 function rafLoop(now: number) {
