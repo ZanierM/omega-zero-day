@@ -1,4 +1,4 @@
-import { PLAYER, TILE } from './config';
+import { PLAYER, TILE, BROOD } from './config';
 import { generateMap, startBases } from './map';
 import * as game from './game';
 import { update, spawnUnit, placeBuilding, buildingCenter, centerOfTile, initGame } from './game';
@@ -9,6 +9,8 @@ import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted, audioStats } from './audio';
 import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
 import * as campaign from './campaign/runner';
+import { initBrood, seedBrood } from './brood';
+import { nearestTile, MAP_W, MAP_H, terrain, occupied, idx, inBounds, neutralSpots } from './map';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
 
@@ -26,7 +28,7 @@ let started = false;
 let deploying = false;
 let difficulty: import('./ai').Difficulty = 'normal';
 
-interface SkirmishOpts { credits: number; crystalMul: number; nova: number }
+interface SkirmishOpts { credits: number; crystalMul: number; nova: number; brood?: boolean }
 
 async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 5000, crystalMul: 1, nova: 0 }) {
   campaign.endRun();
@@ -53,6 +55,18 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
     }
   }
 
+  // the Vey brood wakes at the heart of the map
+  initBrood(!!opts.brood, difficulty === 'easy' ? 0.6 : difficulty === 'hard' ? 1.15 : 0.85);
+  if (opts.brood) {
+    game.ensureFaction(BROOD);
+    const clear = (x: number, y: number) => {
+      for (let yy = y - 1; yy <= y + 3; yy++) for (let xx = x - 1; xx <= x + 3; xx++)
+        if (!inBounds(xx, yy) || terrain[idx(xx, yy)] !== 0 || occupied[idx(xx, yy)] !== -1) return false;
+      return !neutralSpots.some(n => Math.hypot(n.x - x, n.y - y) < 5);
+    };
+    const at = nearestTile(Math.floor(MAP_W / 2) - 1, Math.floor(MAP_H / 2) - 1, 14, clear);
+    if (at) seedBrood(at);
+  }
   initAI(numEnemies, difficulty);
   clearSave();   // a new match replaces the old slot
   started = true;
@@ -92,7 +106,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveN
 window.addEventListener('pagehide', saveNow);
 
 // faction-count + difficulty selectors: segmented buttons (delegated)
-for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts']) {
+for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts', 'broodopts']) {
   document.getElementById(id)!.addEventListener('click', e => {
     const btn = (e.target as HTMLElement).closest('.opt');
     if (!btn) return;
@@ -159,7 +173,7 @@ deployBtn.addEventListener('click', async () => {
   difficulty = (dsel?.dataset.d ?? 'normal') as import('./ai').Difficulty;
   const pick = (id: string, def: number) =>
     Number((document.querySelector(`#${id} .opt.sel`) as HTMLElement | null)?.dataset.v ?? def);
-  const opts = { credits: pick('creditopts', 5000), crystalMul: pick('crystalopts', 1), nova: pick('novaopts', 0) };
+  const opts = { credits: pick('creditopts', 5000), crystalMul: pick('crystalopts', 1), nova: pick('novaopts', 0), brood: pick('broodopts', 0) === 1 };
   try {
     initAudio(); // must start from a user gesture (browser autoplay rules)
     if (mode === 'campaign') await startMission(selectedMission);

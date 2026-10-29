@@ -1,4 +1,4 @@
-import { TILE, BUILDINGS, UPGRADES, UNITS, PLAYER, FACTION_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, DMG_TABLE } from './config';
+import { TILE, BUILDINGS, UPGRADES, UNITS, PLAYER, FACTION_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, DMG_TABLE, BROOD } from './config';
 import {
   buildings, units, players, startProduction, placeBuilding, canPlace,
   issueOrder, hasBuilding, buildingCenter, powerOf, numPlayers, deployPioneer, tileOf,
@@ -6,6 +6,7 @@ import {
   activateAbility, abilityOn, byId, toast, corridor,
 } from './game';
 import { rand, crystal, idx, nearestTile } from './map';
+import { updateBrood, snapshotBrood, restoreBrood, BroodState } from './brood';
 
 // Each AI opponent follows a long build order toward a large fortified base,
 // keeps its economy running, researches upgrades, and attacks in growing waves.
@@ -145,12 +146,13 @@ export function initAI(numEnemies: number, difficulty: Difficulty = 'normal', on
 }
 
 // ---------- save / resume ----------
-export interface AISnapshot { difficulty: Difficulty; ais: AIState[] }
+export interface AISnapshot { difficulty: Difficulty; ais: AIState[]; brood?: BroodState }
 export function snapshotAI(difficulty: Difficulty): AISnapshot {
-  return { difficulty, ais: ais.map(a => ({ ...a, intel: { ...a.intel } })) };
+  return { difficulty, ais: ais.map(a => ({ ...a, intel: { ...a.intel } })), brood: snapshotBrood() };
 }
 export function restoreAI(s: AISnapshot) {
   diff = DIFF[s.difficulty];
+  restoreBrood(s.brood);
   // older saves predate scouting intel
   ais = s.ais.map(a => ({ ...a, clock: a.clock ?? 0, intel: { ...(a.intel ?? {}) }, intelTimer: a.intelTimer ?? 0, scoutId: a.scoutId ?? -1, scoutTimer: a.scoutTimer ?? 30 }));
 }
@@ -433,19 +435,23 @@ function pickWaveTarget(owner: number) {
   const hq = myHQ(owner);
   if (!hq) return null;
   const myC = buildingCenter(hq);
-  let bestOwner = -1, bestD = Infinity;
+  let bestOwner = -1, bestD = Infinity, broodSeen = false;
   for (const b of buildings) {
     if (b.owner === owner || b.def.isWall) continue;
+    // human factions don't go hunting the brood while there's anyone else to fight
+    if (b.owner === BROOD) { broodSeen = true; continue; }
     const c = buildingCenter(b);
     const d = Math.hypot(c.x - myC.x, c.y - myC.y);
     if (d < bestD) { bestD = d; bestOwner = b.owner; }
   }
+  if (bestOwner === -1 && broodSeen) bestOwner = BROOD;
   if (bestOwner === -1) return null;
-  return buildings.find(b => b.owner === bestOwner && b.def.id === 'nexus')
+  return buildings.find(b => b.owner === bestOwner && (b.def.id === 'nexus' || b.def.id === 'heart'))
       ?? buildings.find(b => b.owner === bestOwner && !b.def.isWall) ?? null;
 }
 
 export function updateAI(dt: number) {
+  updateBrood(dt);
   for (const ai of ais) {
     if (ai.owner >= numPlayers) continue;
     updateOne(ai, dt);

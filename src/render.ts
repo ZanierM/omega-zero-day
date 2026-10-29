@@ -870,7 +870,7 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   const [c, g] = makeCanvas(cw * k, ch * k);
   g.scale(k, k);
   const ox = (cw - w) / 2, oy = ch - h - 6 - reachY;
-  if (!def.isWall) { g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore(); }
+  if (!def.isWall && !def.nonBuildable) { g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore(); }   // the brood grows straight out of the ground
   const bx = cw / 2, by = oy + h;
   // long low-sun shadow, blurred so it reads as light rather than a decal
   g.save();
@@ -1745,7 +1745,78 @@ function drawScorches() {
 
 // ---- the Vey (campaign): tunnel mouths, stressed crystal, crystal storms ----
 
+// ---- the bloom: the brood's living ground, painted 4 px per tile and drawn smoothed ----
+let bloomCanvas: HTMLCanvasElement | null = null, bloomCtx: CanvasRenderingContext2D | null = null;
+let bloomImg: ImageData | null = null, bloomPrev = new Uint8Array(0), bloomDirty = new Uint8Array(0);
+const BLOOM_PX = 8;
+// repaint only the tiles whose bloom changed since last time (and their neighbours,
+// which the smoothing between tiles depends on): usually a thin band along the edge
+function paintBloom(): boolean {
+  const W = MAP_W * BLOOM_PX, H = MAP_H * BLOOM_PX, B = game.bloom;
+  if (!bloomCanvas || bloomCanvas.width !== W || bloomCanvas.height !== H || bloomPrev.length !== B.length) {
+    [bloomCanvas, bloomCtx] = makeCanvas(W, H); bloomImg = bloomCtx.createImageData(W, H);
+    bloomPrev = new Uint8Array(B.length).fill(1);   // forces a full first paint
+  }
+  let x0 = MAP_W, y0 = MAP_H, x1 = -1, y1 = -1;
+  let i0 = 0;
+  while (i0 < B.length && B[i0] === bloomPrev[i0]) i0++;
+  if (i0 === B.length) return false;                 // nothing changed (the usual frame)
+  if (bloomDirty.length !== B.length) bloomDirty = new Uint8Array(B.length); else bloomDirty.fill(0);
+  const dirty = bloomDirty;
+  for (let i = i0; i < B.length; i++) {
+    if (B[i] === bloomPrev[i]) continue;
+    const tx = i % MAP_W, ty = (i / MAP_W) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = tx + dx, y = ty + dy;
+      if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) continue;
+      dirty[y * MAP_W + x] = 1;
+      if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y;
+    }
+  }
+  bloomPrev.set(B);
+  if (x1 < 0) return false;
+  const d = bloomImg!.data;
+  const at2 = (x: number, y: number) => (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) ? 0 : B[y * MAP_W + x];
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    if (!dirty[ty * MAP_W + tx]) continue;
+    for (let py = ty * BLOOM_PX; py < (ty + 1) * BLOOM_PX; py++) for (let px = tx * BLOOM_PX; px < (tx + 1) * BLOOM_PX; px++) {
+      // bilinear strength between tile centres, broken up by noise so the edge is ragged and alive
+      const fx = px / BLOOM_PX - 0.5, fy = py / BLOOM_PX - 0.5, bx = Math.floor(fx), by = Math.floor(fy), kx = fx - bx, ky = fy - by;
+      const v = (at2(bx, by) * (1 - kx) + at2(bx + 1, by) * kx) * (1 - ky) + (at2(bx, by + 1) * (1 - kx) + at2(bx + 1, by + 1) * kx) * ky;
+      const o = (py * W + px) * 4;
+      if (v < 4) { d[o + 3] = 0; continue; }
+      // ragged living edge, mottled flesh, thin branching veins, rare crystal flecks
+      const n = noise(px * 0.11, py * 0.11), n2 = noise(px * 0.37 + 9, py * 0.37 + 3);
+      const vein = Math.min(Math.abs(noise(px * 0.05 + 40, py * 0.05 + 17) - 0.5), Math.abs(noise(px * 0.08 + 7, py * 0.08 + 61) - 0.5));
+      const a = Math.max(0, Math.min(1, (v / 255) * 1.5 - n * 0.6));
+      const m = 0.75 + n2 * 0.5;                                    // mottling
+      let r = 92 * m, gg = 30 * m, b = 70 * m, al = a * 150;        // wet dark flesh, see-through at the edge
+      if (vein < 0.018) { const k = 1 - vein / 0.018; r += 120 * k; gg += 60 * k; b += 170 * k; al = Math.max(al, a * 220 * k); }   // a lit vein
+      else if (n2 > 0.9 && n > 0.45) { r = 130; gg = 240; b = 235; al = a * 210; }   // a crystal fleck
+      d[o] = Math.min(255, r); d[o + 1] = Math.min(255, gg); d[o + 2] = Math.min(255, b); d[o + 3] = Math.round(al);
+    }
+  }
+  bloomCtx!.putImageData(bloomImg!, 0, 0, x0 * BLOOM_PX, y0 * BLOOM_PX, (x1 - x0 + 1) * BLOOM_PX, (y1 - y0 + 1) * BLOOM_PX);
+  return true;
+}
+let bloomAny = false;
+function drawBloom() {
+  const B = game.bloom;
+  if (!B.length) return;
+  paintBloom();
+  if (!bloomAny) { bloomAny = B.some(v => v > 0); if (!bloomAny) return; }
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(bloomCanvas!, 0, 0, MAP_W * TILE, MAP_H * TILE);
+  // a slow heartbeat of light through the veins
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.08 + 0.07 * Math.max(0, Math.sin(T * 2.2));
+  ctx.drawImage(bloomCanvas!, 0, 0, MAP_W * TILE, MAP_H * TILE);
+  ctx.restore();
+}
+
 function drawVeyGround() {
+  drawBloom();
   // tunnel mouths: a dark throat in the ground, ringed with crystal and rubble
   for (const t of game.tunnels) {
     if (!explored[idx(t.tx, t.ty)]) continue;
@@ -2547,6 +2618,7 @@ export function renderMinimap() {
         mmCtx.fillStyle = visible[i] ? 'rgba(67,243,236,0.85)' : 'rgba(67,243,236,0.45)';
         mmCtx.fillRect(x * sx + 0.15, y * sy + 0.15, sx * 0.7, sy * 0.7);
       }
+      if (game.bloom[i] >= 90) { mmCtx.fillStyle = 'rgba(150,70,200,0.55)'; mmCtx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5); }   // living ground
       if (!visible[i]) { mmCtx.fillStyle = 'rgba(7,11,22,0.45)'; mmCtx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5); }   // remembered, not seen
     }
   // neutral objectives: diamonds for vents, triangles for towers (grey until captured)

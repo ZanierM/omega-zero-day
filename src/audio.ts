@@ -177,7 +177,8 @@ export function sfx(name: SfxName) {
 
 export type FieldSound =
   | 'rifle' | 'autocannon' | 'flame' | 'rocket' | 'cannon' | 'artillery' | 'sniper' | 'rail' | 'arc'
-  | 'hitMetal' | 'hitStructure' | 'hitSoft' | 'impact' | 'explodeVehicle' | 'explodeBuilding' | 'orbital';
+  | 'hitMetal' | 'hitStructure' | 'hitSoft' | 'impact' | 'explodeVehicle' | 'explodeBuilding' | 'orbital'
+  | 'bite' | 'spit' | 'squelch';
 
 let lx = 0, ly = 0, lHalf = 600;
 /** Where the player is "standing": the camera centre and half the visible width, in world px. */
@@ -187,11 +188,13 @@ export function setListener(x: number, y: number, halfWidth: number) { lx = x; l
 const FIELD_GAP: Partial<Record<FieldSound, number>> = {
   rifle: 0.045, autocannon: 0.05, flame: 0.12, rocket: 0.08, cannon: 0.1, artillery: 0.15, sniper: 0.1, rail: 0.15, arc: 0.08,
   hitMetal: 0.06, hitStructure: 0.09, hitSoft: 0.07, impact: 0.07, explodeVehicle: 0.1, explodeBuilding: 0.2, orbital: 0.5,
+  bite: 0.05, spit: 0.09, squelch: 0.08,
 };
 // how long each sound's own voice lasts (the echo tail rides the shared bus)
 const FIELD_LEN: Partial<Record<FieldSound, number>> = {
   rifle: 0.12, autocannon: 0.2, flame: 0.35, rocket: 0.6, cannon: 0.65, artillery: 1, sniper: 0.22, rail: 0.75, arc: 0.25,
   hitMetal: 0.2, hitStructure: 0.32, hitSoft: 0.1, impact: 0.7, explodeVehicle: 1.2, explodeBuilding: 2.1, orbital: 3.2,
+  bite: 0.14, spit: 0.4, squelch: 0.7,
 };
 const fieldLast = new Map<string, number>();
 let liveVoices = 0;
@@ -322,6 +325,23 @@ export function sfxAt(name: FieldSound, x: number, y: number, loud = 1) {
       osc('sine', 45, 18, t, 1.8, 0.75, o);
       noise(t + 0.4, 1.6, 0.35, 400, 35, o);
       for (let k = 0; k < 8; k++) noise(t + 0.5 + Math.random() * 1.2, 0.03, 0.12, 3500, 800, o);
+      break;
+    case 'bite':        // the brood: a wet crunch and a click of mandibles
+      noise(t, 0.05, 0.35, 1400 * v, 300, o, 'bandpass', 2);
+      noise(t + 0.02, 0.03, 0.25, 6000, 2500, o, 'highpass');
+      osc('sine', 180 * v, 70, t, 0.07, 0.2, o);
+      break;
+    case 'spit': {      // a throat-sac gurgle, then the hiss of the acid leaving
+      osc('sawtooth', 120 * v, 60, t, 0.14, 0.08, o);
+      noise(t, 0.12, 0.3, 700 * v, 250, o, 'bandpass', 3);
+      noise(t + 0.1, 0.25, 0.28, 3000 * v, 6000, o, 'bandpass', 1.2);
+      break;
+    }
+    case 'squelch':     // something of the brood bursting, and a thin dying screech
+      noise(t, 0.2, 0.5, 900 * v, 120, o);
+      noise(t + 0.02, 0.06, 0.3, 4000, 1500, o, 'bandpass', 3);
+      osc('sawtooth', 1400 * v, 380, t + 0.04, 0.4, 0.05, o);
+      osc('sine', 90 * v, 30, t, 0.3, 0.3, o);
       break;
     case 'orbital':     // the sky tears: a descending shriek, then a blast that shakes everything
       osc('sawtooth', 2400, 300, t, 0.5, 0.06, o);

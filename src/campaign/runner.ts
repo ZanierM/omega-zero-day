@@ -11,6 +11,7 @@ import {
 } from '../game';
 import { generateMap, seedMap, startBases, neutralSpots, terrain, occupied, idx, inBounds, MAP_W, MAP_H, nearestTile } from '../map';
 import { initAI } from '../ai';
+import { initBrood } from '../brood';
 import { centerCameraOn } from '../input';
 import { MISSIONS, MissionDef } from './missions';
 
@@ -222,6 +223,7 @@ export function setupMission(id: string) {
   for (const up of d.startUpgrades ?? []) players[PLAYER].upgrades.add(up);
   const c = makeCtx();
   d.setup(c);
+  initBrood(false);
   initAI(d.enemies, 'normal', d.aiOwners ?? []);
   const hq = buildings.find(b => b.owner === PLAYER);
   if (hq) { const p = buildingCenter(hq); centerCameraOn(p.x, p.y); }
