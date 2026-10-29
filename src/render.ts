@@ -1510,10 +1510,42 @@ function buildingOverlay(b: Building) {
 // ---------------- frame ----------------
 
 function drawHealthBar(x: number, y: number, w: number, frac: number) {
+  const col = frac > 0.5 ? '#3ddc84' : frac > 0.25 ? '#ffb02e' : '#e5484d';
+  if (refinedStyle) {
+    // slim bar: dark rounded well, lit fill, quarter ticks
+    const hh = 3;
+    ctx.fillStyle = 'rgba(10,8,6,0.62)';
+    rr(ctx, x - 0.5, y - 0.5, w + 1, hh + 1, 1.5); ctx.fill();
+    ctx.fillStyle = col;
+    if (frac > 0) { rr(ctx, x, y, Math.max(1.5, w * frac), hh, 1); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x + 0.5, y + 0.3, Math.max(0, w * frac - 1), 0.8);
+    ctx.fillStyle = 'rgba(10,8,6,0.5)';
+    for (const t of [0.25, 0.5, 0.75]) ctx.fillRect(x + w * t - 0.25, y, 0.5, hh);
+    return;
+  }
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(x, y, w, 4.5);
-  ctx.fillStyle = frac > 0.5 ? '#3ddc84' : frac > 0.25 ? '#ffb02e' : '#e5484d';
+  ctx.fillStyle = col;
   ctx.fillRect(x + 0.5, y + 0.5, (w - 1) * frac, 3.5);
+}
+
+// refined selection: a soft gold ring lying on the ground, four ticks turning
+// slowly round it
+function groundRing(x: number, y: number, rx: number, ry: number) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(1, ry / rx);
+  ctx.strokeStyle = 'rgba(232,198,106,0.28)'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,227,154,0.9)'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#fff4cc'; ctx.lineWidth = 2.2;
+  const spin = T * 0.8;
+  for (let k = 0; k < 4; k++) {
+    const a = spin + k * Math.PI / 2;
+    ctx.beginPath(); ctx.arc(0, 0, rx, a - 0.16, a + 0.16); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function cornersSel(x: number, y: number, w: number, h: number) {
@@ -1644,20 +1676,24 @@ export function render() {
     const px = b.tx * TILE, py = b.ty * TILE;
     const w = b.def.w * TILE, h = b.def.h * TILE;
     const s = bldSprite(b.def.id, b.owner, b.level);
+    const sel = selection.has(b.id);
+    if (sel && refinedStyle) groundRing(px + w / 2, py + h * 0.55, w * 0.66, h * 0.5);
     drawBld(s, px, py);
     buildingOverlay(b);
-    const sel = selection.has(b.id);
-    if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, py - 9, w - 8, b.hp / b.maxHp);
+    // refined art stands up over the footprint's top edge, so its bars sit
+    // just below the footprint instead of across the building
+    const barY = refinedStyle ? py + h + 2 : py - 9, upY = refinedStyle ? py + h + 7 : py - 15;
+    if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, barY, w - 8, b.hp / b.maxHp);
     if (b.upgrading) {
       // amber upgrade progress bar + wrench glint
       const frac = 1 - b.upgrading.remaining / b.upgrading.total;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(px + 4, py - 15, w - 8, 4.5);
+      ctx.fillRect(px + 4, upY, w - 8, 4.5);
       ctx.fillStyle = '#ffb02e';
-      ctx.fillRect(px + 4.5, py - 14.5, (w - 9) * frac, 3.5);
+      ctx.fillRect(px + 4.5, upY + 0.5, (w - 9) * frac, 3.5);
       if (Math.sin(T * 6) > 0) g2Glow(px + w - 8, py + 6, 3, 'rgba(255,215,110,0.9)');
     }
-    if (sel) cornersSel(px, py, w, h);
+    if (sel && !refinedStyle) cornersSel(px, py, w, h);
   }
 
   // units: 8-direction isometric sprites with 2-frame walk cycles
@@ -1694,6 +1730,8 @@ export function render() {
       ctx.fillStyle = 'rgba(0,0,0,0.28)';
       ctx.beginPath(); ctx.ellipse(u.x + 3, u.y + sh * 0.34, sw * 0.42, sh * 0.12, 0, 0, Math.PI * 2); ctx.fill();
     }
+    const picked = selection.has(u.id);
+    if (picked && refinedStyle) groundRing(u.x, u.y + 1, u.def.radius + 4, (u.def.radius + 4) * 0.55);
     if (va) {
       drawVehicle(u, moving);
     } else if (u.def.harvester) {
@@ -1749,7 +1787,7 @@ export function render() {
       const w = u.def.radius * 2.2;
       drawHealthBar(u.x - w / 2, u.y - u.def.radius - 10, w, u.hp / u.maxHp);
     }
-    if (sel) {
+    if (sel && !refinedStyle) {
       const r = u.def.radius + 5;
       cornersSel(u.x - r, u.y - r, r * 2, r * 2);
     }
@@ -1884,6 +1922,7 @@ export function render() {
     let s = sprites.get(key);
     if (!s) { s = bakeAirSprite(u.def.id, u.owner, refinedStyle); sprites.set(key, s); }
     const bob = Math.sin(T * 2.2 + u.id) * 2;
+    if (refinedStyle && selection.has(u.id)) groundRing(u.x + 4, u.y + 8, u.def.radius + 3, (u.def.radius + 3) * 0.5);
     // ground shadow, offset from the airframe so the altitude reads
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(u.x + 8, u.y + 10, u.def.radius * 0.9, u.def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
@@ -1903,7 +1942,7 @@ export function render() {
       const w2 = u.def.radius * 2.2;
       drawHealthBar(u.x - w2 / 2, u.y - AIR_ALT - u.def.radius - 8 + bob, w2, u.hp / u.maxHp);
     }
-    if (sel) {
+    if (sel && !refinedStyle) {
       const r2 = u.def.radius + 5;
       cornersSel(u.x - r2, u.y - AIR_ALT - r2 + bob, r2 * 2, r2 * 2);
     }
@@ -1928,12 +1967,28 @@ export function render() {
   if (placement) {
     const def = BUILDINGS[placement.defId];
     const ok = canPlace(PLAYER, placement.defId, placement.tx, placement.ty);
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = ok ? '#3ddc84' : '#e5484d';
-    for (let y = 0; y < def.h; y++)
-      for (let x = 0; x < def.w; x++)
-        ctx.fillRect((placement.tx + x) * TILE + 1, (placement.ty + y) * TILE + 1, TILE - 2, TILE - 2);
-    ctx.globalAlpha = 0.85;
+    if (refinedStyle) {
+      // a soft footprint with faint tile seams, then the ghost on top
+      const gx = placement.tx * TILE, gy = placement.ty * TILE, gw = def.w * TILE, gh = def.h * TILE;
+      const col = ok ? '61,220,132' : '229,72,77';
+      ctx.fillStyle = `rgba(${col},0.16)`;
+      rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.fill();
+      ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      for (let x = 1; x < def.w; x++) { ctx.moveTo(gx + x * TILE, gy + 3); ctx.lineTo(gx + x * TILE, gy + gh - 3); }
+      for (let y = 1; y < def.h; y++) { ctx.moveTo(gx + 3, gy + y * TILE); ctx.lineTo(gx + gw - 3, gy + y * TILE); }
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 1.5;
+      rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.stroke();
+      ctx.globalAlpha = ok ? 0.72 : 0.45;
+    } else {
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = ok ? '#3ddc84' : '#e5484d';
+      for (let y = 0; y < def.h; y++)
+        for (let x = 0; x < def.w; x++)
+          ctx.fillRect((placement.tx + x) * TILE + 1, (placement.ty + y) * TILE + 1, TILE - 2, TILE - 2);
+      ctx.globalAlpha = 0.85;
+    }
     const gs = bldSprite(placement.defId, PLAYER, 1);
     drawBld(gs, placement.tx * TILE, placement.ty * TILE);
     ctx.globalAlpha = 1;
@@ -1955,7 +2010,19 @@ export function render() {
     ctx.fillRect(0, 0, vw, vh);
   }
 
-  if (selectBox) {
+  if (selectBox && refinedStyle) {
+    const { x, y, w, h } = selectBox, k = Math.min(10, w / 3, h / 3);
+    ctx.fillStyle = 'rgba(232,198,106,0.08)'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(232,198,106,0.55)'; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeStyle = '#ffe39a'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + k); ctx.lineTo(x, y); ctx.lineTo(x + k, y);
+    ctx.moveTo(x + w - k, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + k);
+    ctx.moveTo(x + w, y + h - k); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - k, y + h);
+    ctx.moveTo(x + k, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - k);
+    ctx.stroke();
+  } else if (selectBox) {
     ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = 1;
     ctx.strokeRect(selectBox.x, selectBox.y, selectBox.w, selectBox.h);
     ctx.fillStyle = '#ffffff12';
