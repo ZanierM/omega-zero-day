@@ -1431,6 +1431,198 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   pioneer:   { hull: drawPioneerHull,   reach: 20, height: 18 },
 };
 
+// ---------------- defences ----------------
+// Bases are ordinary building art; the aiming heads are TURRET_ART, baked per
+// heading like vehicle turrets and drawn live at the pivot.
+
+// low armoured plinth with a team band, shared by the gun emplacements
+function plinth(g: Ctx, pts: Pt[], z0: number, z1: number, team: string) {
+  prism(g, pts, z0, z1 - 2, null, '#5d6170');
+  detailWalls(g, pts, z0, z1 - 2, 5);
+  prism(g, pts, z1 - 2, z1 - 1, null, team);
+  prism(g, pts, z1 - 1, z1, HULL_TOP, HULL);
+}
+
+// ---- Pulse Turret (1×1)
+
+export function drawPulseTurret(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
+  plinth(g, chamfer(6, 8, 26, 26, 5), 2, 7, team);
+  for (const [x, y] of [[9, 11], [23, 11]] as Pt[]) { g.fillStyle = '#ffb02e'; g.fillRect(x - 0.7, y - 7.7, 1.4, 1.4); spill(g, x, y - 7, 2.5, 'rgba(255,176,46,0.45)'); }
+  box(g, 0, 22, 26, 28, 29.5, 2, 5, '#6a6d78', '#4a4d56');                                  // ammo crate
+  deckPlate(g, 0, 5, 23, 26.6, 27, 27.6, GOLD);
+  g.restore();
+}
+function drawPulseHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 5, 7, 8.6, HULL_TOP, HULL);
+  const away = Math.sin(a) < 0;
+  const guns = () => {
+    barrels(g, a, [-1.6, 1.6], 3.5, 12.5, 9.6, 11, 1.1);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    for (const y of [-1.6, 1.6]) { const [px, py] = at(12.8, y, a); glow(g, px, py - 10.3, 2.2, 'rgba(95,224,240,0.6)'); }
+    g.restore();
+  };
+  if (away) guns();
+  prism(g, rot([[-5, -4], [2.5, -4], [5, -2], [5, 2], [2.5, 4], [-5, 4]], a), 8.6, 12, '#848894', TANK);
+  deckPlate(g, a, 12, -4.5, -3, -2.8, 3, team);
+  deckPlate(g, a, 12, 1.5, -1.2, 3.8, 1.2, GLASS_DK, true);
+  if (!away) guns();
+}
+
+// ---- Rail Cannon (2×2)
+
+export function drawRailCannon(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 61);
+  const coil = (x: number, y: number) => {
+    cylinder(g, x, y, 3, 3, 13, '#6a6d78', HULL);
+    for (const z of [6, 9]) { g.strokeStyle = COPPER; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y - z, 3, 0, Math.PI); g.stroke(); }
+    g.fillStyle = '#5fe0f0'; g.beginPath(); g.arc(x, y - 13, 1.8, 0, Math.PI * 2); g.fill();
+    spill(g, x, y - 13, 5, 'rgba(95,224,240,0.45)');
+  };
+  coil(12, 13); coil(52, 13);
+  plinth(g, chamfer(11, 13, 53, 57, 10), 3, 12, team);
+  coil(12, 56); coil(52, 56);
+  g.restore();
+}
+function drawRailHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 9, 12, 14, HULL_TOP, HULL);
+  const away = Math.sin(a) < 0;
+  const rails = () => {
+    for (const y of [-2.7, 2.7]) box(g, a, 7, y - 0.9, 33, y + 0.9, 15.5, 18, '#b8bcc8', '#5a5d69');
+    deckPlate(g, a, 16.6, 8, -1.6, 32, 1.6, 'rgba(95,224,240,0.55)');
+    for (const x of [13, 19, 25]) box(g, a, x, -3.8, x + 1.6, 3.8, 15, 18.6, COPPER, '#8a4e22');
+    box(g, a, 31.5, -4, 34, 4, 15, 18.6, '#6a6d78', '#3a3c44');
+  };
+  if (away) rails();
+  prism(g, rot([[-9, -7], [5, -7], [8.5, -4], [8.5, 4], [5, 7], [-9, 7], [-10.5, 4.5], [-10.5, -4.5]], a), 14, 20, '#848894', TANK);
+  deckPlate(g, a, 20, -9, -5.5, -6, 5.5, team);
+  for (const y of [-3, 0, 3]) deckPlate(g, a, 20, -4, y - 0.5, 4, y + 0.5, 'rgba(0,0,0,0.28)');
+  if (!away) rails();
+}
+
+// ---- Arc Tower (1×1): a static tesla pylon; the orb's crackle is live
+
+export function arcOrb(w: number): Pt {
+  const s = w / 32;
+  return [16 * s, (19 - 23) * s];
+}
+export function drawArcTower(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  const VIOLET = '#4a4066';
+  prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
+  plinth(g, chamfer(8, 10, 24, 26, 4), 2, 6, team);
+  prism(g, chamfer(12, 15, 20, 23, 2), 6, 19, '#5a5070', VIOLET);
+  detailWalls(g, chamfer(12, 15, 20, 23, 2), 6, 19, 0, 0.3);
+  for (const z of [9, 12.5, 16]) cylinder(g, 16, 19, 4.8, z, z + 1.3, '#8a7fb4', '#6f639a');   // insulators
+  const [ox, oy] = [16, 19 - 23];
+  const og = g.createRadialGradient(ox - 1.5, oy - 1.5, 0.5, ox, oy, 4.5);
+  og.addColorStop(0, '#f2e3ff'); og.addColorStop(0.5, '#b48aff'); og.addColorStop(1, '#4a2a80');
+  g.fillStyle = og; g.beginPath(); g.arc(ox, oy, 4.3, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = edgeOf('#4a2a80'); g.lineWidth = edgeW(); g.stroke();
+  g.restore();
+}
+
+// ---- Bastion Battery (2×2)
+
+export function drawBastion(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 67);
+  // round fort with a team band and merlons on the parapet
+  cylinder(g, 32, 34, 25, 3, 9, HULL_TOP, '#5d6170');
+  cylinder(g, 32, 34, 25, 9, 10.5, team, team);
+  cylinder(g, 32, 34, 25, 10.5, 12, '#7e8290', '#5d6170');
+  for (let k = 0; k < 9; k++) {
+    const t = 0.15 + (k / 8) * (Math.PI - 0.3), x = 32 + Math.cos(t) * 23, y = 34 + Math.sin(t) * 23;
+    prism(g, rot([[-2.2, -1.8], [2.2, -1.8], [2.2, 1.8], [-2.2, 1.8]], t + Math.PI / 2).map(([px, py]) => [px + x, py + y] as Pt), 12, 14.5, '#848894', '#5d6170');
+  }
+  for (const x of [14, 50]) { g.fillStyle = '#ffb02e'; g.fillRect(x - 0.8, 55 - 8.8, 1.6, 1.6); spill(g, x, 55 - 8, 3, 'rgba(255,176,46,0.45)'); }
+  g.restore();
+}
+function drawBastionHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 12, 12, 15, HULL_TOP, HULL);
+  const away = Math.sin(a) < 0;
+  const guns = () => {
+    barrels(g, a, [-5.2, -1.75, 1.75, 5.2], 8, 27, 16.4, 18.6, 2);
+    box(g, a, 26, -6.8, 29, 6.8, 16, 19, '#6a6d78', '#3a3c44');
+  };
+  if (away) guns();
+  prism(g, rot([[-11, -9], [5, -9], [10, -5], [10, 5], [5, 9], [-11, 9], [-13, 5.5], [-13, -5.5]], a), 15, 22, '#848894', TANK);
+  deckPlate(g, a, 22, -11.5, -6.5, -8, 6.5, team);
+  deckPlate(g, a, 22, 3, -7.5, 7.5, -4.5, GLASS_DK, true);
+  for (const y of [-4, -1, 2, 5]) deckPlate(g, a, 22, -6, y - 0.5, 1, y + 0.5, 'rgba(0,0,0,0.28)');
+  if (!away) guns();
+}
+
+// ---- Skyguard AA (1×1)
+
+export function drawSkyguard(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
+  cylinder(g, 16, 18, 10, 2, 5.5, HULL_TOP, '#5d6170');
+  cylinder(g, 16, 18, 10, 5.5, 6.5, team, team);
+  cylinder(g, 16, 18, 10, 6.5, 7, '#7e8290', '#5d6170');
+  g.restore();
+}
+function drawSkyguardHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 4.5, 7, 9, HULL_TOP, HULL);
+  // twin missile pods either side of a sensor block, tubes open to the sky
+  for (const y of [-4.5, 4.5]) {
+    box(g, a, -4, y - 2.8, 4.5, y + 2.8, 9, 15, '#848894', TANK);
+    for (const [dx, dy] of [[-1.5, -1.2], [-1.5, 1.2], [1.8, -1.2], [1.8, 1.2]] as Pt[]) {
+      deckPlate(g, a, 15, dx - 1, y + dy - 0.9, dx + 1, y + dy + 0.9, '#14110e');
+      deckPlate(g, a, 15, dx - 0.5, y + dy - 0.45, dx + 0.5, y + dy + 0.45, '#ff8c3a');
+    }
+  }
+  box(g, a, -2.5, -1.6, 3.5, 1.6, 9, 13, '#6a6d78', '#4a4d56');
+  deckPlate(g, a, 13, 1.5, -1.2, 3.5, 1.2, GLASS, true);
+  deckPlate(g, a, 13, -2.5, -1.4, -1, 1.4, team);
+}
+
+// ---- walls (1×1 segments that butt together into a line)
+
+function drawWallSegment(g: Ctx, w: number, team: string, heavy: boolean) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  const side = heavy ? '#4d535e' : '#6a6e7a', top = heavy ? '#6d737e' : '#8a8f9c', zt = heavy ? 15 : 11;
+  prism(g, [[0, 12], [32, 12], [32, 27], [0, 27]], 0, 2, CONCRETE_TOP, CONCRETE);          // footing
+  const body: Pt[] = [[1, 14], [31, 14], [31, 25], [1, 25]];
+  prism(g, body, 2, zt, top, side);
+  detailWalls(g, body, 2, zt, heavy ? 10 : 15);
+  quad(g, [1, 25 - zt + 3], [31, 25 - zt + 3], [31, 25 - zt + 4.2], [1, 25 - zt + 4.2], team, false);
+  for (const x of [4, 28]) for (const z of [4.5, zt - 1.5]) { g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(x - 0.5, 25 - z - 0.5, 1, 1); }
+  if (heavy) {
+    // armour ribs on the cap and amber hazard corners
+    for (const x of [8, 16, 24]) quad(g, [x - 1, 14 - zt], [x + 1, 14 - zt], [x + 1, 25 - zt], [x - 1, 25 - zt], '#3a3f48', false);
+    for (const x of [1, 28]) quad(g, [x, 25 - zt], [x + 3, 25 - zt], [x + 3, 23 - zt], [x, 23 - zt], '#ffb02e', false);
+  }
+  g.restore();
+}
+export function drawWall(g: Ctx, w: number, _h: number, _level: number, team: string) { drawWallSegment(g, w, team, false); }
+export function drawHeavyWall(g: Ctx, w: number, _h: number, _level: number, team: string) { drawWallSegment(g, w, team, true); }
+
+// aiming heads by building id: pivot in footprint units (scaled by width/32 per tile)
+export interface TurretArt { head: (g: Ctx, a: number, team: string) => void; pivot: Pt; reach: number; height: number }
+export const TURRET_ART: Partial<Record<string, TurretArt>> = {
+  turret:   { head: drawPulseHead,    pivot: [16, 17], reach: 14, height: 14 },
+  railgun:  { head: drawRailHead,     pivot: [32, 35], reach: 36, height: 22 },
+  bastion:  { head: drawBastionHead,  pivot: [32, 34], reach: 30, height: 24 },
+  skyguard: { head: drawSkyguardHead, pivot: [16, 18], reach: 10, height: 17 },
+};
+
 // custom art by building id; anything not listed keeps the pack sprite
 export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number, level: number, team: string) => void>> = {
   nexus: drawNexus,
@@ -1446,4 +1638,11 @@ export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number,
   repairyard: drawRepairYard,
   skyport: drawSkyport,
   uplink: drawUplink,
+  turret: drawPulseTurret,
+  railgun: drawRailCannon,
+  arctower: drawArcTower,
+  bastion: drawBastion,
+  skyguard: drawSkyguard,
+  wall: drawWall,
+  heavywall: drawHeavyWall,
 };
