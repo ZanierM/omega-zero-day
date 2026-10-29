@@ -3,11 +3,11 @@ import {
 } from './config';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
-  gameOver, toastMsg, toast, byId, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
+  gameOver, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
-import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
+import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting, controlGroupIds, saveControlGroup, recallControlGroup } from './input';
 import { sfx, duckMusic } from './audio';
 import { defenceIconUrl, bakeAirSprite, artIconUrl, unitIconUrl, onStyleChange } from './render';
 
@@ -36,10 +36,14 @@ const overlayTitle = document.getElementById('overlaytitle')!;
 const overlaySub = document.getElementById('overlaysub')!;
 const toastEl = document.getElementById('toast')!;
 const buildTip = document.getElementById('buildtip')!;
+const groupBar = document.getElementById('groupbar')!;
 let shownSelection = '';
 let shownPortrait = '';
 let shownHealth = -1;
 let shownSingle = false;
+let shownHalt = false;
+let shownGroupBar = false;
+const groupBtns: { el: HTMLButtonElement, count: HTMLElement, key: string, state: string }[] = [];
 
 let activeTab: Tab = 'build';
 let shownCredits = 0;
@@ -49,6 +53,33 @@ const btns: Btn[] = [];
 
 const CATEGORIES: Tab[] = ['build', 'def', 'inf', 'veh', 'ups'];
 const compactDeck = matchMedia('(orientation: landscape) and (max-width: 920px) and (max-height: 480px)');
+
+function selectedUnits(): Unit[] {
+  const out: Unit[] = [];
+  for (const id of selection) {
+    const e = byId.get(id);
+    if (e?.kind === 'unit' && e.owner === PLAYER) out.push(e);
+  }
+  return out;
+}
+
+function orderText(u: Unit): string {
+  if (u.def.harvester) {
+    if (u.harvestState === 'harvesting') return 'Harvesting flux';
+    if (u.harvestState === 'toBase') return 'Returning cargo';
+    if (u.harvestState === 'toField') return 'Moving to crystal';
+  }
+  if (u.order.type === 'move') return 'Moving';
+  if (u.order.type === 'attackMove') return 'Advancing';
+  if (u.order.type === 'attack' || u.autoTargetId >= 0) return 'Engaging';
+  return 'Idle';
+}
+
+function groupOrderText(units: Unit[]): string {
+  if (!units.length || units.length !== selection.size) return 'Mixed selection';
+  const first = orderText(units[0]);
+  return units.every(u => orderText(u) === first) ? first : 'Mixed orders';
+}
 
 // inline SVG icons for the research tab: crosshair / shield / defence grid
 function upgradeSvg(defId: string): string {
@@ -118,6 +149,28 @@ function activateTab(t: Tab) {
 export function initUI() {
   // icons are baked in the current render style; re-bake them when it flips
   onStyleChange(() => { iconCache.clear(); shownPortrait = ''; rebuildGrid(); });
+  for (const key of ['1', '2', '3']) {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'groupbtn';
+    el.innerHTML = `<span>${key}</span><small>Save</small>`;
+    const count = el.querySelector('small')!;
+    let held = false, timer = 0;
+    el.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'touch' && selection.size && controlGroupIds(key).length)
+        timer = window.setTimeout(() => { held = saveControlGroup(key); }, 550);
+    });
+    el.addEventListener('pointerup', () => clearTimeout(timer));
+    el.addEventListener('pointercancel', () => clearTimeout(timer));
+    el.addEventListener('pointerleave', () => clearTimeout(timer));
+    el.addEventListener('click', () => {
+      if (held) { held = false; return; }
+      if (controlGroupIds(key).length) recallControlGroup(key);
+      else saveControlGroup(key);
+    });
+    groupBar.appendChild(el);
+    groupBtns.push({ el, count, key, state: '' });
+  }
   for (const t of CATEGORIES) {
     const b = document.createElement('button');
     b.className = 'htab' + (t === activeTab ? ' active' : '');
@@ -163,7 +216,10 @@ export function initUI() {
     const u = selectedOwnPioneer();
     if (u) { deployPioneer(u); return; }
     const b = selectedOwnBuilding();
-    if (!b) return;
+    if (!b) {
+      for (const u of selectedUnits()) if (!u.def.harvester && u.order.type !== 'idle') issueOrder(u, { type: 'idle' });
+      return;
+    }
     if (b.def.superweapon && superReady(b)) { startStrikeTargeting(b.id); sfx('click'); return; }
     startRepair(b);
   });
@@ -285,6 +341,20 @@ function abilityUnits(): Unit[] {
 }
 
 export function updateUI() {
+  const showGroups = selection.size > 0 || groupBtns.some(b => controlGroupIds(b.key).length > 0);
+  if (showGroups !== shownGroupBar) { groupBar.classList.toggle('show', showGroups); shownGroupBar = showGroups; }
+  for (const b of groupBtns) {
+    const ids = controlGroupIds(b.key);
+    const current = ids.length > 0 && ids.length === selection.size && ids.every(id => selection.has(id));
+    const state = `${ids.length}:${current}:${selection.size > 0}`;
+    if (state === b.state) continue;
+    b.el.classList.toggle('saved', ids.length > 0);
+    b.el.classList.toggle('current', current);
+    b.el.setAttribute('aria-pressed', String(current));
+    b.el.setAttribute('aria-label', ids.length ? `Recall group ${b.key}, ${ids.length} selected. Hold to replace.` : `Save selection as group ${b.key}`);
+    b.count.textContent = ids.length ? String(ids.length) : 'Save';
+    b.state = state;
+  }
   const p = players[PLAYER];
   // smooth credit ticker, RA2-style
   shownCredits += (p.credits - shownCredits) * 0.2;
@@ -384,6 +454,8 @@ export function updateUI() {
 
   // contextual action button: deploy Pioneer · orbital strike · repair
   const pio = selectedOwnPioneer();
+  const showHalt = !pio && !ob && selectedUnits().some(u => !u.def.harvester && u.order.type !== 'idle');
+  if (showHalt !== shownHalt) { actBtn.classList.toggle('halt', showHalt); shownHalt = showHalt; }
   if (pio) {
     actBtn.style.visibility = 'visible';
     actBtn.textContent = '▼ Deploy command post';
@@ -396,6 +468,10 @@ export function updateUI() {
     actBtn.style.visibility = 'visible';
     if (ob.repairing) { actBtn.textContent = 'Repairing…'; actBtn.disabled = true; }
     else { actBtn.textContent = `🔧 Repair — ◈${repairCost(ob)}`; actBtn.disabled = false; }
+  } else if (showHalt) {
+    actBtn.style.visibility = 'visible';
+    if (actBtn.textContent !== '■ Halt [S]') actBtn.textContent = '■ Halt [S]';
+    actBtn.disabled = false;
   } else {
     actBtn.style.visibility = 'hidden';
   }
@@ -434,9 +510,10 @@ export function updateUI() {
         parts.push(`🛡 ${a}`);
         combat = `<br><span style="color:#c9b48a;font-size:0.9em">${parts.join(' · ')}</span>`;
       }
+      const order = first.kind === 'unit' ? `<span class="selorder">${orderText(first)}</span>` : '';
       const html = single
-        ? `<b>${name}</b>${lvl} — ${hp}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
-        : `<b>${selection.size} units selected</b><br>${name} +${selection.size - 1} more`;
+        ? `<b>${name}</b>${lvl} — ${hp}${order}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
+        : `<b>${selection.size} units selected</b><span class="selorder">${groupOrderText(selectedUnits())}</span>${name} +${selection.size - 1} more`;
       if (html !== shownSelection) { selCopy.innerHTML = html; shownSelection = html; }
     }
   } else {
