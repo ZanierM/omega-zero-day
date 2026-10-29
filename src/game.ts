@@ -4,9 +4,10 @@ import {
   WPN_BONUS, ARM_BONUS, DEF_BONUS, BLD_UPGRADE_COST, BLD_UPGRADE_HP, BLD_UPGRADE_DMG,
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
-  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION,
+  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES,
   VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
+import * as telemetry from './telemetry';
 import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile, neutralSpots } from './map';
 import { findPath } from './path';
 import { sfx } from './audio';
@@ -114,7 +115,17 @@ export interface Neutral {
   owner: number;        // -1 = unclaimed
   prog: number;         // capture progress in seconds
   progOwner: number;    // faction currently capturing
+  contested?: boolean;  // more than one faction standing on it right now
 }
+
+// Second way to win: hold a majority of the flux vents (they power the fleet's
+// launch beacon) for CORRIDOR_HOLD seconds without a break. Any faction can do it.
+export const CORRIDOR_HOLD = 180;
+export const corridor = { owner: -1, held: 0 };
+export function ventsNeeded() { return Math.floor(neutrals.filter(n => n.kind === 'vent').length / 2) + 1; }
+export function ventsHeld(owner: number) { return neutrals.filter(n => n.kind === 'vent' && n.owner === owner).length; }
+/** How the match ended, for the game-over screen. */
+export let endReason: 'conquest' | 'corridor' | 'nova' | 'eliminated' | null = null;
 export const neutrals: Neutral[] = [];
 
 export function initGame(numEnemies: number) {
@@ -130,7 +141,9 @@ export function initGame(numEnemies: number) {
   pings.length = 0;
   lastAlert = { x: 0, y: 0, valid: false };
   alertCooldown = 0;
+  corridor.owner = -1; corridor.held = 0; endReason = null;
   resetStats();
+  telemetry.startMatch(numPlayers);
 }
 
 export interface Beam { x1: number, y1: number, x2: number, y2: number, ttl: number, color: string }
@@ -408,6 +421,7 @@ function destroy(e: Entity) {
   booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
   if (e.owner === PLAYER || audible(p.x, p.y)) sfx('explosion');
   // stats: what the player lost vs what the player destroyed
+  telemetry.lost(e.owner, e.kind);
   if (e.owner === PLAYER) { if (e.kind === 'unit') stats.lost++; }
   else { if (e.kind === 'unit') stats.killed++; else stats.razed++; }
   if (e.kind === 'unit') {
@@ -423,6 +437,7 @@ function destroy(e: Entity) {
 export function damage(target: Entity, amount: number, attacker?: Unit) {
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;
+  if (attacker) telemetry.fight(attacker.owner, target.owner);
   // "our base is under attack" — alert when any player structure takes a hit
   if (target.owner === PLAYER && target.kind === 'building') {
     const c = buildingCenter(target);
@@ -792,6 +807,7 @@ function updateHarvester(u: Unit, dt: number) {
     const dock = { x: c.x, y: (best.ty + best.def.h) * TILE + TILE / 2 };
     if (moveToward(u, dock.x, dock.y, dt) || Math.hypot(c.x - u.x, c.y - u.y) < TILE * 2.2) {
       p.credits += Math.round(u.cargo);
+      telemetry.earned(u.owner, u.cargo);
       if (u.owner === PLAYER) { stats.flux += Math.round(u.cargo); sfx('cash'); }
       u.cargo = 0;
       u.path = null;
@@ -808,6 +824,14 @@ let frameParity = false; // flips each frame to fairly rotate unit update order
 
 export function update(dt: number) {
   if (gameOver || paused) return;
+  const t0 = performance.now();
+  step(dt);
+  telemetry.updateTimed(performance.now() - t0);
+  telemetry.tick(stats.time, dt, units.length, buildings.length);
+  if (gameOver) telemetry.endMatch(gameOver, endReason);
+}
+
+function step(dt: number) {
   if (toastMsg.ttl > 0) toastMsg.ttl -= dt;
 
   // building upgrades tick like construction (and slow down on low power)
@@ -1075,6 +1099,7 @@ export function update(dt: number) {
       if (u.def.harvester || u.def.air) continue; // only ground fighters can hold a point
       if (Math.hypot(u.x - cx, u.y - cy) <= CAPTURE_RADIUS * TILE) present.add(u.owner);
     }
+    n.contested = present.size > 1;
     if (present.size === 1) {
       const o = [...present][0];
       if (n.owner !== o) {
@@ -1093,9 +1118,12 @@ export function update(dt: number) {
     }
     if (n.kind === 'vent' && n.owner >= 0) {
       players[n.owner].credits += VENT_INCOME * dt;
+      telemetry.earned(n.owner, VENT_INCOME * dt);
       if (n.owner === PLAYER) stats.flux += VENT_INCOME * dt;
     }
   }
+
+  updateCorridor(dt);
 
   // fog of war (player perspective), cheap enough to refresh a few times a second
   fogTimer -= dt;
@@ -1140,12 +1168,37 @@ export function update(dt: number) {
 
   // win / lose: walls don't keep a faction "alive"
   const alive = (owner: number) => buildings.some(b => b.owner === owner && !b.def.isWall);
-  if (!alive(PLAYER)) gameOver = 'lose';
-  else {
+  if (!alive(PLAYER)) { gameOver = 'lose'; endReason = 'eliminated'; }
+  else if (corridor.owner >= 0 && corridor.held >= CORRIDOR_HOLD) {
+    gameOver = corridor.owner === PLAYER ? 'win' : 'lose'; endReason = 'corridor';
+  } else {
     let anyEnemy = false;
     for (let o = 1; o < numPlayers; o++) if (alive(o)) anyEnemy = true;
-    if (!anyEnemy) gameOver = 'win';
-    else if (novaTotal > 0 && novaLeft <= 0) gameOver = 'lose'; // the sun went nova first
+    if (!anyEnemy) { gameOver = 'win'; endReason = 'conquest'; }
+    else if (novaTotal > 0 && novaLeft <= 0) { gameOver = 'lose'; endReason = 'nova'; } // the sun went nova first
+  }
+}
+
+function updateCorridor(dt: number) {
+  const need = ventsNeeded();
+  let leader = -1;
+  for (let o = 0; o < numPlayers; o++) if (ventsHeld(o) >= need) leader = o;
+  if (leader !== corridor.owner) {
+    const was = corridor.owner;
+    corridor.owner = leader; corridor.held = 0;
+    if (leader === PLAYER) { toast(`Launch corridor secured — hold ${need} vents for ${CORRIDOR_HOLD / 60} min`); sfx('ready'); }
+    else if (leader >= 0) { toast(`${FACTION_NAMES[leader]} is securing the launch corridor`); sfx('alert'); }
+    else if (was === PLAYER) { toast('Launch corridor lost'); sfx('error'); }
+    else if (was >= 0) toast(`${FACTION_NAMES[was]} lost the corridor`);
+    return;
+  }
+  if (leader < 0) return;
+  const before = CORRIDOR_HOLD - corridor.held;
+  corridor.held += dt;
+  const left = CORRIDOR_HOLD - corridor.held;
+  for (const mark of [60, 30]) if (before > mark && left <= mark) {
+    toast(leader === PLAYER ? `Corridor launch in ${mark}s — hold the vents` : `${FACTION_NAMES[leader]} launches in ${mark}s — break their hold`);
+    sfx(leader === PLAYER ? 'ready' : 'alert');
   }
 }
 
@@ -1160,6 +1213,7 @@ export interface GameSnapshot {
   units: Plain<Unit>[]; buildings: Plain<Building>[];
   explored: number[]; novaTotal: number; novaLeft: number; flareTimer: number;
   neutrals: Neutral[]; stats: typeof stats;
+  corridor?: { owner: number; held: number };
 }
 export function snapshotGame(): GameSnapshot {
   const plain = <T extends { def: { id: string } }>(e: T) => { const { def, ...rest } = e; return { ...rest, defId: def.id }; };
@@ -1169,7 +1223,7 @@ export function snapshotGame(): GameSnapshot {
     units: units.filter(u => u.hp > 0).map(u => ({ ...plain(u), path: null })),
     buildings: buildings.filter(b => b.hp > 0).map(b => plain(b)),
     explored: Array.from(explored), novaTotal, novaLeft, flareTimer,
-    neutrals: neutrals.map(n => ({ ...n })), stats: { ...stats },
+    neutrals: neutrals.map(n => ({ ...n })), stats: { ...stats }, corridor: { ...corridor },
   };
 }
 export function restoreGame(s: GameSnapshot) {
@@ -1182,6 +1236,8 @@ export function restoreGame(s: GameSnapshot) {
   novaTotal = s.novaTotal; novaLeft = s.novaLeft; flareTimer = s.flareTimer;
   neutrals.length = 0; neutrals.push(...s.neutrals.map(n => ({ ...n })));
   Object.assign(stats, s.stats);
+  telemetry.startMatch(numPlayers, true, stats.time);
+  corridor.owner = s.corridor?.owner ?? -1; corridor.held = s.corridor?.held ?? 0; endReason = null;
   for (const p of s.buildings) {
     const { defId, ...rest } = p;
     const b: Building = { ...rest, def: BUILDINGS[defId] };

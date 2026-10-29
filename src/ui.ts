@@ -1,9 +1,10 @@
 import {
   BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, VET_NAME,
+  FACTION_NAMES,
 } from './config';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
-  gameOver, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
+  gameOver, endReason, corridor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
@@ -569,8 +570,13 @@ export function updateUI() {
     overlay.className = gameOver;
     const novaExpired = novaTotal > 0 && novaLeft <= 0;
     overlayTitle.textContent = gameOver === 'win' ? 'Victory' : novaExpired ? 'Supernova' : 'Defeat';
-    overlaySub.textContent = gameOver === 'win'
+    const viaCorridor = endReason === 'corridor';
+    overlaySub.textContent = gameOver === 'win' && viaCorridor
+      ? 'The vents held long enough to light the beacon. The ark-fleet rides the corridor out — humanity survives.'
+      : gameOver === 'win'
       ? 'The launch corridor is clear. The ark-fleet jumps at dawn — humanity survives.'
+      : viaCorridor
+      ? `${FACTION_NAMES[corridor.owner] ?? 'A rival faction'} held the vents and launched first. The corridor closes behind them.`
       : novaExpired
       ? 'Helios detonated with the enemy still standing. The fleet burns. There is no dawn.'
       : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.';
