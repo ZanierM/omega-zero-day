@@ -415,6 +415,12 @@
     #overlay button { min-height: 44px; text-transform: uppercase; }
     #toast { position: fixed; max-width: min(460px, calc(100vw - 26px)); padding: 12px 24px; text-align: center; font-family: var(--head); font-size: var(--type-sm); letter-spacing: .06em; }
     #deploy:disabled { cursor: progress; filter: saturate(.72); }
+    #resumesave { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; margin-bottom: 10px; padding: 10px 0; font-family: var(--head); font-size: 16px; font-weight: 800; letter-spacing: 1px; cursor: pointer;
+      color: var(--steel-hi); background: linear-gradient(180deg, var(--steel-dk), var(--plate-dk)); border: 2px solid var(--steel); }
+    #resumesave:hover { border-color: var(--steel-hi); color: var(--cream); }
+    #resumesave[hidden] { display: none; }
+    #resumesave:disabled { cursor: progress; filter: saturate(.72); }
+    #resumesavemeta { font-size: 11px; font-weight: 600; letter-spacing: .5px; opacity: .75; }
     #briefbox { background: var(--rivets), var(--brief-glass); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
     #pausemenu { padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
     #briefwrap { position: relative; z-index: 1; }
@@ -580,6 +586,7 @@
           <button class="opt" type="button" data-v="1500">25 min</button>
         </div>
       </div>
+      <button id="resumesave" type="button" hidden>Resume saved mission ▸<span id="resumesavemeta"></span></button>
       <button id="deploy" type="button">Commence operation ▸</button>
     </div>
     </div>

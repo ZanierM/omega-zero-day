@@ -14,6 +14,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `perf-load`):** `initRenderer()` in `render.ts` is now async (it paints the ground in slices so the page stays live), so `startGame` in `src/main.ts` awaits it. Keep the `await` when touching the deploy flow.
 
+**Small cross-file change (Claude, `intent-and-saves`):** save/resume lives in a new `src/save.ts`. `src/main.ts` now auto-pauses and saves when the tab is hidden, autosaves every 20 s of play, clears the slot on game over, restart and a new deploy, and has a `resumeGame()` path behind a new `#resumesave` button in the briefing (`index.html`, styled next to `#deploy`). Keep these when reworking the briefing or the pause menu.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

@@ -1428,14 +1428,17 @@ function updateFogTexture() {
 
 // ---------------- init ----------------
 
-export async function initRenderer(): Promise<void> {
+/** Seed the ground was painted with, so a saved match repaints the same map. */
+export function terrainPaintSeed() { return terrainSeed; }
+
+export async function initRenderer(seed = -1): Promise<void> {
   // the deck appears as the briefing hides, resizing the map canvas; take its
   // size now so the late resize notification doesn't shift the camera the game
   // is about to centre on the base
   resize();
   lastViewW = canvas.clientWidth; lastViewH = canvas.clientHeight;
   sprites.clear();
-  terrainSeed = -1;
+  terrainSeed = seed;
   terrainTex = null;   // no stale ground from a previous game
   await paintTerrain();
   [fogCanvas, fogCtx] = makeCanvas(MAP_W, MAP_H);
@@ -2329,6 +2332,38 @@ export function render() {
       const r2 = u.def.radius + 5;
       cornersSel(u.x - r2, u.y - AIR_ALT - r2 + bob, r2 * 2, r2 * 2);
     }
+  }
+
+  // where the player just sent units: a ring closing on the spot with four
+  // inward chevrons (move green, attack-move amber, harvest cyan); an attack
+  // order brackets its target in red and follows it
+  for (const m of game.orderMarkers) {
+    const f = m.ttl / m.max;                    // 1 → 0 over its short life
+    let { x, y } = m;
+    if (m.kind === 'attack' && m.targetId !== undefined) {
+      const t = byId.get(m.targetId);
+      if (t) ({ x, y } = game.entityPos(t));
+    }
+    const col = m.kind === 'attack' ? '255,90,74' : m.kind === 'attackMove' ? '255,176,46' : m.kind === 'harvest' ? '67,243,236' : '61,220,132';
+    const r = 6 + 14 * f;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(1, 0.6);
+    ctx.globalAlpha = Math.min(1, f * 2.5);
+    ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = `rgb(${col})`; ctx.lineWidth = 1.6;
+    if (m.kind === 'attack') {
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; ctx.beginPath(); ctx.arc(0, 0, r, a - 0.45, a + 0.45); ctx.stroke(); }
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 2, d = r + 6;
+        ctx.save(); ctx.rotate(a);
+        ctx.beginPath(); ctx.moveTo(d + 3, -3); ctx.lineTo(d, 0); ctx.lineTo(d + 3, 3); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    ctx.restore();
   }
 
   // alert pings — expanding rings where the player is being attacked

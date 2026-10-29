@@ -41,6 +41,11 @@ export interface Unit {
   abilityTimer: number;          // seconds left on a timed active effect
   xp: number;                    // veterancy experience
   rank: number;                  // 0 Rookie · 1 Veteran · 2 Elite
+  guardX: number; guardY: number; // where an idle unit stands guard and returns to
+  leashX: number; leashY: number; // where it broke off to chase an auto-acquired target
+  returning: boolean;            // walking back to its guard spot after giving up a chase
+  ignoreId: number;              // target it just gave up on (-1 none)...
+  ignoreTimer: number;           // ...and for how long it won't re-acquire it
 }
 
 export interface Building {
@@ -239,6 +244,7 @@ export function spawnUnit(defId: string, owner: number, px: number, py: number):
     harvestState: def.harvester ? 'toField' : 'none',
     autoTargetId: -1, repathTimer: 0, facing: 0, starved: false,
     toggled: false, abilityCd: 0, abilityTimer: 0, xp: 0, rank: 0,
+    guardX: px, guardY: py, leashX: px, leashY: py, returning: false, ignoreId: -1, ignoreTimer: 0,
   };
   units.push(u);
   byId.set(u.id, u);
@@ -529,16 +535,42 @@ function finishUnit(owner: number, defId: string) {
     (x, y) => inBounds(x, y) && terrain[idx(x, y)] === 0 && occupied[idx(x, y)] === -1);
   if (!spot) return;
   const u = spawnUnit(defId, owner, centerOfTile(spot.x), centerOfTile(spot.y));
-  issueOrder(u, { type: 'move', x: src.rallyX, y: src.rallyY });
+  issueOrder(u, { type: 'move', x: src.rallyX, y: src.rallyY }, true);
 }
 
 // ---------- Orders & movement ----------
 
-export function issueOrder(u: Unit, order: Order) {
+// how far (tiles) a unit chases a target it picked up by itself, measured from
+// where it was guarding or broke off its attack-move, before giving up
+const CHASE_LIMIT = 6;
+const IGNORE_AFTER_GIVING_UP = 2.5;   // s before it will re-acquire the same target
+
+// brief marker where the player sent units: one per group order, not per unit
+export interface OrderMarker { x: number; y: number; kind: Order['type']; ttl: number; max: number; targetId?: number }
+export const orderMarkers: OrderMarker[] = [];
+function markOrder(order: Order) {
+  if (order.type === 'idle') return;
+  let x = order.x, y = order.y;
+  if (order.type === 'attack' && order.targetId !== undefined) {
+    const t = byId.get(order.targetId);
+    if (!t) return;
+    ({ x, y } = entityPos(t));
+  }
+  if (x === undefined || y === undefined) return;
+  // a group order spreads its units' destinations; keep the one marker
+  for (const m of orderMarkers) if (m.ttl > m.max - 0.1 && m.kind === order.type && Math.hypot(m.x - x, m.y - y) < 120) return;
+  orderMarkers.push({ x, y, kind: order.type, ttl: 0.7, max: 0.7, targetId: order.targetId });
+}
+
+// quiet: issued by the game itself (factory rally), so no destination marker
+export function issueOrder(u: Unit, order: Order, quiet = false) {
   u.order = order;
   u.autoTargetId = -1;
   u.path = null;
   u.repathTimer = 0; // path on the next tick, not after a leftover retry delay
+  u.returning = false; u.ignoreId = -1; u.ignoreTimer = 0;
+  if (order.type === 'idle') { u.guardX = u.x; u.guardY = u.y; }   // stop = guard here
+  if (u.owner === PLAYER && !quiet) markOrder(order);
   if (u.def.harvester) {
     u.harvestState = order.type === 'harvest' ? 'toField' : 'none';
     if (order.type === 'idle') u.harvestState = 'toField';
@@ -846,20 +878,38 @@ export function update(dt: number) {
     }
 
     // combat unit logic
+    if (u.ignoreTimer > 0) u.ignoreTimer -= dt;
     let target: Entity | null = null;
     if (u.order.type === 'attack' && u.order.targetId !== undefined) {
+      // an explicit attack order is the player's intent: chase it to the end
       target = byId.get(u.order.targetId) ?? null;
       if (target && !canHit(u, target)) target = null; // e.g. a tank ordered onto a gunship
-      if (!target) u.order = { type: 'idle' };
+      if (!target) { u.order = { type: 'idle' }; u.guardX = u.x; u.guardY = u.y; }
     }
     if (!target && (u.order.type === 'idle' || u.order.type === 'attackMove')) {
+      const inRange = (t: Entity) => distBetween(u, t) <= unitRange(u) * TILE;
       if (u.autoTargetId !== -1) {
         target = byId.get(u.autoTargetId) ?? null;
+        // chase limit: an auto-acquired target is only followed so far, then
+        // the unit goes back to what it was asked to do
+        if (target && !inRange(target) && Math.hypot(u.x - u.leashX, u.y - u.leashY) > CHASE_LIMIT * TILE) {
+          u.ignoreId = target.id; u.ignoreTimer = IGNORE_AFTER_GIVING_UP;
+          target = null;
+          u.path = null; u.repathTimer = 0;   // drop the chase route so it turns back at once
+          if (u.order.type === 'idle') u.returning = true;   // attack-move just carries on
+        }
         if (!target) u.autoTargetId = -1;
       }
       if (!target) {
-        target = findEnemyInRange(u, u.def.vision);
-        if (target) u.autoTargetId = target.id;
+        // walking home it only answers what's already shooting range, so it
+        // doesn't get dragged straight back out
+        const t = findEnemyInRange(u, u.returning ? unitRange(u) : u.def.vision);
+        if (t && !(t.id === u.ignoreId && u.ignoreTimer > 0 && !inRange(t))) {
+          target = t;
+          u.autoTargetId = t.id;
+          if (u.order.type === 'idle' && !u.returning) { u.leashX = u.guardX; u.leashY = u.guardY; }
+          else { u.leashX = u.x; u.leashY = u.y; }
+        }
       }
     }
 
@@ -878,9 +928,15 @@ export function update(dt: number) {
         moveToward(u, tp.x, tp.y, dt);
       }
     } else if ((u.order.type === 'move' || u.order.type === 'attackMove') && u.order.x !== undefined) {
-      if (moveToward(u, u.order.x, u.order.y!, dt)) u.order = { type: 'idle' };
+      if (moveToward(u, u.order.x, u.order.y!, dt)) { u.order = { type: 'idle' }; u.guardX = u.x; u.guardY = u.y; }
+    } else if (u.order.type === 'idle') {
+      // a fight over (target dead or given up): back to the guard spot
+      if (!u.returning && Math.hypot(u.x - u.guardX, u.y - u.guardY) > 1.5 * TILE) u.returning = true;
+      if (u.returning && moveToward(u, u.guardX, u.guardY, dt)) u.returning = false;
     }
   }
+
+  for (let i = orderMarkers.length - 1; i >= 0; i--) if ((orderMarkers[i].ttl -= dt) <= 0) orderMarkers.splice(i, 1);
 
   // gentle unit separation so stacks spread out
   for (let i = 0; i < units.length; i++) {
@@ -1091,4 +1147,55 @@ export function update(dt: number) {
     if (!anyEnemy) gameOver = 'win';
     else if (novaTotal > 0 && novaLeft <= 0) gameOver = 'lose'; // the sun went nova first
   }
+}
+
+// ---------- save / resume ----------
+// Everything needed to rebuild a running match. Transient effects (beams,
+// shells in flight, pings) are dropped; unit paths are recomputed on load.
+
+type Plain<T> = Omit<T, 'def'> & { defId: string };
+export interface GameSnapshot {
+  nextId: number; numPlayers: number;
+  players: { credits: number; queues: Record<Tab, QueueItem[]>; upgrades: string[] }[];
+  units: Plain<Unit>[]; buildings: Plain<Building>[];
+  explored: number[]; novaTotal: number; novaLeft: number; flareTimer: number;
+  neutrals: Neutral[]; stats: typeof stats;
+}
+export function snapshotGame(): GameSnapshot {
+  const plain = <T extends { def: { id: string } }>(e: T) => { const { def, ...rest } = e; return { ...rest, defId: def.id }; };
+  return {
+    nextId, numPlayers,
+    players: players.map(p => ({ credits: p.credits, queues: JSON.parse(JSON.stringify(p.queues)), upgrades: [...p.upgrades] })),
+    units: units.filter(u => u.hp > 0).map(u => ({ ...plain(u), path: null })),
+    buildings: buildings.filter(b => b.hp > 0).map(b => plain(b)),
+    explored: Array.from(explored), novaTotal, novaLeft, flareTimer,
+    neutrals: neutrals.map(n => ({ ...n })), stats: { ...stats },
+  };
+}
+export function restoreGame(s: GameSnapshot) {
+  units.length = 0; buildings.length = 0; byId.clear();
+  beams.length = 0; booms.length = 0; shells.length = 0; strikes.length = 0; pings.length = 0; orderMarkers.length = 0;
+  numPlayers = s.numPlayers;
+  players = s.players.map(p => ({ credits: p.credits, queues: p.queues, upgrades: new Set(p.upgrades) }));
+  explored = Uint8Array.from(s.explored);
+  visible = new Uint8Array(MAP_W * MAP_H);
+  novaTotal = s.novaTotal; novaLeft = s.novaLeft; flareTimer = s.flareTimer;
+  neutrals.length = 0; neutrals.push(...s.neutrals.map(n => ({ ...n })));
+  Object.assign(stats, s.stats);
+  for (const p of s.buildings) {
+    const { defId, ...rest } = p;
+    const b: Building = { ...rest, def: BUILDINGS[defId] };
+    buildings.push(b); byId.set(b.id, b);
+    for (let y = b.ty; y < b.ty + b.def.h; y++) for (let x = b.tx; x < b.tx + b.def.w; x++) occupied[idx(x, y)] = b.id;
+  }
+  for (const p of s.units) {
+    const { defId, ...rest } = p;
+    const u: Unit = { ...rest, def: UNITS[defId], path: null, repathTimer: 0 };
+    units.push(u); byId.set(u.id, u);
+  }
+  nextId = s.nextId;
+  gameOver = null; flash = 0;
+  lastAlert = { x: 0, y: 0, valid: false }; alertCooldown = 0;
+  toastMsg = { text: '', ttl: 0 };
+  fogTimer = 0;   // recompute visibility on the first tick
 }
