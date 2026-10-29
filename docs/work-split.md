@@ -8,6 +8,8 @@ edits the other's files and branches merge cleanly.
 | Owns | `src/art.ts`, `src/render.ts`, `src/game.ts`, `src/path.ts`, `src/ai.ts` | `index.html`, `src/ui.ts`, `src/main.ts`, `src/input.ts`, `src/audio.ts`, `src/briefing-scene.ts`, `public/*`, new UI-only files |
 | Shared, by agreement | `src/config.ts`: the UI agent may change **name/desc strings only**; anything else goes through the user | |
 
+**Temporary ownership change:** for the camera and mouse-controls round, Claude has `src/input.ts` (branch `reskin-input`). The UI agent should leave it alone until that branch is merged into `main`, then it returns to the UI agent.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---
@@ -48,6 +50,7 @@ edits the other's files and branches merge cleanly.
 7. **Selection panel:** show a portrait of the selected unit or building using `artIconUrl` (and `unitIconUrl` once it exists), and a slim health bar matching the in-world one.
 8. Wire `unitIconUrl(defId)` into `bakeIconHtml` in `ui.ts` for infantry, vehicle and aircraft icons once Claude exports it, through the existing `iconCache`.
 9. Accessibility polish: keyboard navigation between build tabs and buttons, sensible focus order in menus, and a `prefers-reduced-motion` rule that calms the pulsing animations (countdown flash, idle-harvester pulse, strike banner).
+10. `main.ts` keydown handler: `(e.target as HTMLElement).closest(...)` throws when the event's target is the window or document (no `closest`). Real key presses come from elements so players don't hit it, but guard it the way `input.ts` now does (`e.target instanceof Element ? e.target : null`).
 
 ---
 
