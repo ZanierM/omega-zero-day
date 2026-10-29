@@ -15,6 +15,26 @@ export let selectBox: { x: number, y: number, w: number, h: number } | null = nu
 export let placement: { defId: string, tx: number, ty: number } | null = null;
 export let attackMovePending = false;          // press A, then left-click a spot
 const controlGroups = new Map<string, number[]>(); // '1'..'9' → entity ids
+
+export function controlGroupIds(key: string): number[] {
+  return (controlGroups.get(key) ?? []).filter(id => byId.get(id)?.owner === PLAYER);
+}
+
+export function saveControlGroup(key: string): boolean {
+  const ids = [...selection].filter(id => byId.get(id)?.owner === PLAYER);
+  if (!ids.length) return false;
+  controlGroups.set(key, ids);
+  toast(`Control group ${key} set`);
+  return true;
+}
+
+export function recallControlGroup(key: string): boolean {
+  const ids = controlGroupIds(key);
+  if (!ids.length) return false;
+  selection.clear();
+  for (const id of ids) selection.add(id);
+  return true;
+}
 let usingTouch = false;    // true once any touch happens → disables mouse edge-scroll
 let selectMode = false;    // ⛶ toggle: one-finger drag box-selects instead of panning
 let lastMouseClick = 0, lastMouseUnit = -1; // for desktop double-click select-type
@@ -228,15 +248,10 @@ export function initInput() {
     // control groups: Ctrl/Cmd+digit assigns, digit recalls
     if (e.key >= '1' && e.key <= '9') {
       if (e.ctrlKey || e.metaKey) {
-        controlGroups.set(e.key, [...selection]);
-        toast(`Control group ${e.key} set`);
+        saveControlGroup(e.key);
         e.preventDefault();
       } else {
-        const ids = controlGroups.get(e.key);
-        if (ids?.length) {
-          selection.clear();
-          for (const id of ids) if (byId.has(id)) selection.add(id);
-        }
+        recallControlGroup(e.key);
       }
     }
   });
