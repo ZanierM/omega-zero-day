@@ -22,6 +22,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `polish-round`):** the classic art style is gone (the user's call): no `?style=classic`, no V key, no Graphics button in the pause menu, and `render.ts` no longer exports `refinedStyle`, `setRefinedStyle` or `onStyleChange`. The duplicate DOM order ring (`#ordermarker` and `markOrder` in `input.ts`) is removed; orders are marked by the canvas marker in `render.ts`.
 
+**Campaign Act II (Claude, `campaign-act2`):** the comms box can carry a choice (`.commschoice` buttons, built in `ui.ts`, styled in `index.html`); the briefing's mission list is grouped by act; `defsFor` in `ui.ts` skips `nonBuildable` units (the Hollow). New portraits in `public/portraits` (Reyes, Vessa Kol, Seren).
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

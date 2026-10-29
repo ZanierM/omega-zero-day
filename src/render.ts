@@ -1251,10 +1251,10 @@ function drawObjectiveStatus(n: game.Neutral, cx: number, cy: number) {
   ctx.restore();
 
   const what = n.kind === 'vent' ? 'VENT' : 'TOWER';
-  const text = n.contested ? `${what} · CONTESTED`
+  const text = n.dark ? `${what} · DARK · STORM` : n.contested ? `${what} · CONTESTED`
     : capturing ? `${what} · ${n.progOwner === PLAYER ? '' : shortName(n.progOwner).toUpperCase() + ' '}CAPTURING ${Math.floor(n.prog / CAPTURE_TIME * 100)}%`
     : n.owner >= 0 ? `${what} · ${shortName(n.owner).toUpperCase()}` : `${what} · UNCLAIMED`;
-  const col = n.contested ? '#ff5a4a' : capturing ? TEAM_COLORS[n.progOwner] : n.owner >= 0 ? TEAM_COLORS[n.owner] : '#b8ae98';
+  const col = n.dark ? '#7a9aa0' : n.contested ? '#ff5a4a' : capturing ? TEAM_COLORS[n.progOwner] : n.owner >= 0 ? TEAM_COLORS[n.owner] : '#b8ae98';
   ctx.font = '700 9px system-ui, sans-serif';
   const w = ctx.measureText(text).width + 12, y = cy + 30;
   ctx.fillStyle = 'rgba(10,12,20,0.78)';
@@ -1742,6 +1742,69 @@ function drawScorches() {
 }
 
 
+
+// ---- the Vey (campaign): tunnel mouths, stressed crystal, crystal storms ----
+
+function drawVeyGround() {
+  // tunnel mouths: a dark throat in the ground, ringed with crystal and rubble
+  for (const t of game.tunnels) {
+    if (!explored[idx(t.tx, t.ty)]) continue;
+    const x = (t.tx + 0.5) * TILE, y = (t.ty + 0.5) * TILE;
+    const open = Math.min(1, (game.stats.time - t.born) / 1.2 + 0.05);
+    const r = 15 * open;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.6);
+    const rim = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, r * 1.6);
+    rim.addColorStop(0, 'rgba(60,46,36,0.9)'); rim.addColorStop(1, 'rgba(60,46,36,0)');
+    ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2); ctx.fill();
+    const pit = ctx.createRadialGradient(0, 2, 0, 0, 0, r);
+    pit.addColorStop(0, '#020304'); pit.addColorStop(0.7, '#0a0c10'); pit.addColorStop(1, '#2a2420');
+    ctx.fillStyle = pit; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // crystal teeth around the rim, faintly lit from below
+    for (let k = 0; k < 7; k++) {
+      const a = k / 7 * Math.PI * 2 + t.id, cx = x + Math.cos(a) * r * 1.05, cy = y + Math.sin(a) * r * 0.62;
+      const hgt = (4 + ((k * 37 + t.id) % 5)) * open;
+      ctx.fillStyle = k % 2 ? '#8ef4f0' : '#3aa8b0';
+      ctx.beginPath(); ctx.moveTo(cx - 2, cy); ctx.lineTo(cx, cy - hgt); ctx.lineTo(cx + 2, cy); ctx.closePath(); ctx.fill();
+    }
+    g2Glow(x, y, r * (0.6 + 0.15 * Math.sin(T * 2 + t.id)), 'rgba(120,250,240,0.16)');
+  }
+  if (!game.mission.resonance) return;
+  // stressed crystal pulses: brighter and faster the closer a patch is to breaking
+  const z = camera.zoom, vw = canvas.clientWidth / z, vh = canvas.clientHeight / z;
+  const x0 = Math.max(0, Math.floor(camera.x / TILE)), y0 = Math.max(0, Math.floor(camera.y / TILE));
+  const x1 = Math.min(MAP_W - 1, Math.ceil((camera.x + vw) / TILE)), y1 = Math.min(MAP_H - 1, Math.ceil((camera.y + vh) / TILE));
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+    const i = idx(tx, ty);
+    if (!crystal[i] || !explored[i]) continue;
+    const lvl = game.resonance[game.resCell(tx, ty)];
+    if (lvl < 0.3) continue;
+    const pulse = 0.5 + 0.5 * Math.sin(T * (2 + lvl * 6) + tx * 0.7 + ty * 1.3);
+    const hot = lvl >= game.RES_TREMOR;
+    g2Glow((tx + 0.5) * TILE, (ty + 0.5) * TILE, TILE * (0.5 + lvl * 0.6),
+      hot ? `rgba(255,${Math.round(120 + 100 * (1 - lvl))},200,${0.12 + 0.25 * lvl * pulse})` : `rgba(120,250,240,${0.08 + 0.2 * lvl * pulse})`);
+  }
+}
+
+// a crystal storm: a glittering cyan haze over the patch, thick enough to hide things in
+function drawStorms() {
+  if (!game.mission.resonance) return;
+  for (let c = 0; c < game.resonance.length; c++) {
+    const lvl = game.resonance[c];
+    if (lvl < game.RES_STORM) continue;
+    const tx = (c % game.resCols) * game.RES_CELL, ty = Math.floor(c / game.resCols) * game.RES_CELL;
+    if (!explored[idx(Math.min(MAP_W - 1, tx + 5), Math.min(MAP_H - 1, ty + 5))]) continue;
+    const x = tx * TILE, y = ty * TILE, s2 = game.RES_CELL * TILE;
+    const k = (lvl - game.RES_STORM) / (1 - game.RES_STORM);
+    const gr = ctx.createRadialGradient(x + s2 / 2, y + s2 / 2, s2 * 0.1, x + s2 / 2, y + s2 / 2, s2 * 0.75);
+    gr.addColorStop(0, `rgba(150,240,240,${0.18 + 0.12 * k})`); gr.addColorStop(1, 'rgba(150,240,240,0)');
+    ctx.fillStyle = gr; ctx.fillRect(x - s2 * 0.25, y - s2 * 0.25, s2 * 1.5, s2 * 1.5);
+    // wind-driven glitter
+    if (Math.random() < 0.6) addAmbient({ x: x + Math.random() * s2, y: y + Math.random() * s2, z: rnd(4, 26), vx: WIND.x * 4 + rnd(-10, 10), vy: WIND.y * 3 + rnd(-6, 6), vz: rnd(-4, 4),
+      life: rnd(0.8, 1.6), max: 1.6, size: rnd(1, 2), kind: 'mote', col: '200,255,250' });
+  }
+}
+
 // ---- structure life cycle: rise on placement, scaffold while upgrading, rubble after ----
 
 const RISE = 1.2;                                          // seconds a new structure takes to rise
@@ -1957,6 +2020,10 @@ export function render() {
   // offsets shimmers and judders as the camera moves
   const px = 1 / (z * devicePixelRatio);
   ctx.translate(-Math.round(camera.x / px) * px, -Math.round(camera.y / px) * px);
+  if (game.quake > 0) {   // a tremor in view: the ground heaves
+    const q = game.quake * game.quake * 5;
+    ctx.translate(Math.sin(T * 61) * q, Math.cos(T * 47) * q * 0.6);
+  }
 
   // blit only the part of the terrain texture that actually exists — clamping to
   // the map bounds prevents the browser from edge-smearing the last row/column
@@ -1973,6 +2040,7 @@ export function render() {
     ctx.imageSmoothingEnabled = true;
   }
   drawScorches();
+  drawVeyGround();
   trackStructures();
   drawRubble();
 
@@ -2025,7 +2093,7 @@ export function render() {
       ctx.fillStyle = '#120d08';
       ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fill();
       const pulse = 0.6 + 0.4 * Math.sin(T * 2.4 + n.id);
-      g2Glow(cx, cy - 4 - pulse * 5, 5 + pulse * 4, `rgba(67,243,236,${0.35 + pulse * 0.35})`);
+      if (!n.dark) g2Glow(cx, cy - 4 - pulse * 5, 5 + pulse * 4, `rgba(67,243,236,${0.35 + pulse * 0.35})`);   // a storm chokes the plume
     } else {
       // watchtower: stone pillar with a rotating scanner light
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -2084,6 +2152,20 @@ export function render() {
         const sx = px + rnd(4, w - 4), sy = py + h - rnd(6, Math.min(tall, h * 1.4));
         for (let k2 = 0; k2 < 3; k2++) addParticle({ x: sx, y: sy, z: 0, vx: rnd(-40, 40), vy: rnd(-20, 30), vz: rnd(-10, 30), life: rnd(0.2, 0.4), max: 0.4, size: 1, kind: 'spark' });
       }
+    }
+    if (b.shielded) {
+      // a relay-fed shield: a shimmering dome with a slow hex sweep
+      const cx = px + w / 2, cy = py + h * 0.4, r = Math.max(w, h) * 0.95;
+      ctx.save();
+      const sg = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
+      sg.addColorStop(0, 'rgba(120,200,255,0.02)'); sg.addColorStop(0.85, 'rgba(120,200,255,0.12)'); sg.addColorStop(1, 'rgba(160,220,255,0.35)');
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(170,225,255,${0.35 + 0.2 * Math.sin(T * 3)})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.85, 0, 0, Math.PI * 2); ctx.stroke();
+      const a0 = (T * 0.8) % (Math.PI * 2);
+      ctx.strokeStyle = 'rgba(200,240,255,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.85, 0, a0, a0 + 0.7); ctx.stroke();
+      ctx.restore();
     }
     const up = upgradedAt.get(b.id);
     if (up !== undefined && T - up < 0.7) {
@@ -2267,6 +2349,7 @@ export function render() {
   for (const bo of booms) drawRefinedBoom(bo);
 
   drawParticles();
+  drawStorms();
 
   // incoming orbital strikes: pulsing target reticle → searing beam at impact
   for (const s of strikes) {

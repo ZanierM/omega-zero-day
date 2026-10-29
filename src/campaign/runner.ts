@@ -30,25 +30,38 @@ let def: MissionDef | null = null;
 
 // ---------- comms ----------
 export interface CommLine { who: Speaker; text: string }
-export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'reyes';
+export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'reyes' | 'vessa';
 // portrait: file in public/portraits (speakers without one get a lettered badge)
 export const SPEAKERS: Record<Speaker, { name: string; role: string; color: string; portrait?: string }> = {
   varga:   { name: 'Adm. Ines Varga',   role: 'Ark-fleet command',    color: '#e8c66a', portrait: 'varga.webp' },
   okoye:   { name: 'Sgt. Mara Okoye',   role: 'Helion ground lead',   color: '#4db8ff', portrait: 'okoye.webp' },
   lind:    { name: 'Dr. Teodor Lind',   role: 'Flux engineering',     color: '#43f3ec', portrait: 'lind.webp' },
   kessler: { name: 'Marshal Kessler',   role: 'Kessler Collective',   color: '#e58a3a', portrait: 'kessler.webp' },
-  reyes:   { name: 'Speaker Ama Reyes', role: 'Verdant Pact',         color: '#57c46a' },
-  seren:   { name: 'Unknown signal',    role: 'source: under the crust', color: '#bfeef2' },
+  reyes:   { name: 'Speaker Ama Reyes', role: 'Verdant Pact',         color: '#57c46a', portrait: 'reyes.webp' },
+  vessa:   { name: 'Vessa Kol',         role: 'Ashen Syndicate',      color: '#c2683e', portrait: 'vessa.webp' },
+  seren:   { name: 'Unknown signal',    role: 'source: under the crust', color: '#bfeef2', portrait: 'seren.webp' },
 };
-const queue: CommLine[] = [];
-let current: (CommLine & { ttl: number }) | null = null;
+// a line can carry a choice: buttons in the comms box, the default taken if it times out
+export interface CommChoice { key: string; options: { id: string; label: string }[]; fallback: string }
+const queue: (CommLine & { choice?: CommChoice })[] = [];
+let current: (CommLine & { ttl: number; choice?: CommChoice }) | null = null;
 export function say(who: Speaker, text: string) { queue.push({ who, text }); }
-export function currentComm(): (CommLine & { ttl: number }) | null { return current; }
-export function skipComm() { if (current) current.ttl = 0; }
+export function ask(who: Speaker, text: string, choice: CommChoice) { queue.push({ who, text, choice }); }
+export function currentComm() { return current; }
+export function skipComm() { if (current && !current.choice) current.ttl = 0; }
+/** The player answered the comms box's question. */
+export function choose(optionId: string) {
+  if (!current?.choice || !def || !run) return;
+  const ch = current.choice;
+  current.ttl = 0; current.choice = undefined;
+  run.vars[`choice:${ch.key}`] = ch.options.findIndex(o => o.id === optionId);
+  def.onChoice?.(makeCtx(), ch.key, optionId);
+}
 function tickComms(dt: number) {
   if (current && (current.ttl -= dt) > 0) return;
+  if (current?.choice) { const fb = current.choice.fallback; current.ttl = 1; choose(fb); return; }   // ran out of time
   const next = queue.shift();
-  current = next ? { ...next, ttl: 3.2 + next.text.length * 0.045 } : null;
+  current = next ? { ...next, ttl: next.choice ? 25 : 3.2 + next.text.length * 0.045 } : null;
 }
 
 // ---------- the context missions script against ----------
@@ -71,6 +84,10 @@ export interface Ctx {
   flux(): number;                          // flux the player has delivered this mission
   reveal(tx: number, ty: number, r: number): void;
   ping(tx: number, ty: number, color?: string): void;
+  ask: typeof ask;
+  show(id: string): void;                  // reveal a hidden objective
+  /** Open a tunnel near a tile and bring Hollow up through it, attacking a target. */
+  ambush(tx: number, ty: number, defIds: string[], group: string, targetId?: number): Unit[];
 }
 
 function tileClear(defW: number, defH: number, tx: number, ty: number) {
@@ -114,6 +131,19 @@ function makeCtx(): Ctx {
         if (inBounds(x, y) && Math.hypot(x - tx, y - ty) <= rad) explored[idx(x, y)] = 1;
     },
     ping(tx, ty, color = '#ffb02e') { pings.push({ x: centerOfTile(tx), y: centerOfTile(ty), t: 0, color }); },
+    ask,
+    show(id) { if (!r.shown.includes(id)) r.shown.push(id); },
+    ambush(tx, ty, defIds, group, targetId) {
+      const spot = nearestTile(tx, ty, 8, (x, y) => tileClear(1, 1, x, y)) ?? { x: tx, y: ty };
+      game.openTunnel(spot.x, spot.y);
+      const us = this.spawn(defIds, 4, spot.x, spot.y, group);
+      for (const u of us) {
+        if (targetId !== undefined && game.byId.has(targetId)) issueOrder(u, { type: 'attack', targetId });
+        else { const p = buildings.find(b => b.owner === PLAYER); if (p) { const c = buildingCenter(p); issueOrder(u, { type: 'attackMove', x: c.x, y: c.y }); } }
+      }
+      this.ping(spot.x, spot.y, '#bfeef2'); this.reveal(spot.x, spot.y, 4);
+      return us;
+    },
   };
 }
 
@@ -170,6 +200,7 @@ function install(d: MissionDef, r: RunState) {
   mission.active = true;
   mission.corridor = false;
   mission.allowed = new Set(d.allowed);
+  mission.resonance = !!d.resonance;
   mission.tick = tick;
   mission.checkEnd = checkEnd;
   gameEvents.length = 0;
@@ -181,13 +212,14 @@ export function setupMission(id: string) {
   const d = MISSIONS.find(m => m.id === id);
   if (!d) throw new Error(`Unknown mission ${id}`);
   seedMap(d.seed);
-  generateMap(d.enemies, d.crystalMul ?? 1);
+  generateMap(d.enemies, d.crystalMul ?? 1, d.size);
   initGame(d.enemies);
   ensureFaction(4);   // the Hollow's slot exists in every mission, used or not
   game.setSupernova(0);
   install(d, { id, t: 0, fired: [], done: [], shown: [], vars: {}, groups: {}, flux0: 0 });
   for (const p of players) p.credits = 0;
   players[PLAYER].credits = d.credits;
+  for (const up of d.startUpgrades ?? []) players[PLAYER].upgrades.add(up);
   const c = makeCtx();
   d.setup(c);
   initAI(d.enemies, 'normal', d.aiOwners ?? []);

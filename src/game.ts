@@ -61,6 +61,7 @@ export interface Building {
   upgrading: { remaining: number, total: number } | null;
   repairing: boolean;
   charge: number;                // superweapon: seconds until the strike is ready (0 = ready)
+  shielded?: boolean;            // campaign: takes no damage while its relays stand
   cooldown: number;              // turret reload
   rallyX: number; rallyY: number;
   facing: number;                // turret barrel angle
@@ -116,6 +117,40 @@ export interface Neutral {
   prog: number;         // capture progress in seconds
   progOwner: number;    // faction currently capturing
   contested?: boolean;  // more than one faction standing on it right now
+  dark?: boolean;       // smothered by a crystal storm: no flux while it lasts
+}
+
+// ---------- the Vey (campaign) ----------
+// Harvesting wounds the living crystal. Each RES_CELL×RES_CELL patch of the map
+// carries a resonance level that harvesting there raises and time lets settle.
+// High resonance shakes the ground (tremors crack structures); higher still
+// whips up a crystal storm that blinds units and chokes the vents.
+export const RES_CELL = 10, RES_TREMOR = 0.55, RES_STORM = 0.8;
+const RES_PER_FLUX = 1 / 25000;     // two harvesters on one field reach a tremor in ~2 min; one alone takes ~9
+const RES_DECAY = 0.003;            // per second: a full patch settles in about five and a half minutes
+export let resonance = new Float32Array(0);
+export let resCols = 0, resRows = 0;
+let resTick = 0;
+const tremorAt = new Map<number, number>();   // cell → seconds until its next tremor
+export let quake = 0;                         // 0..1 screen shake from a tremor in view
+export const resCell = (tx: number, ty: number) => Math.floor(ty / RES_CELL) * resCols + Math.floor(tx / RES_CELL);
+export const inStorm = (tx: number, ty: number) => mission.resonance && resonance[resCell(tx, ty)] >= RES_STORM;
+/** Missions use this to make a field cry out (a capture, a deep cut). */
+export function addResonance(tx: number, ty: number, amount: number) {
+  if (!mission.resonance || !inBounds(tx, ty)) return;
+  const c = resCell(tx, ty);
+  const before = resonance[c];
+  resonance[c] = Math.min(1, before + amount);
+  for (const lvl of [RES_TREMOR, RES_STORM]) if (before < lvl && resonance[c] >= lvl) emit({ type: 'resonance', cell: c, level: lvl });
+}
+
+// tunnel mouths the Hollow come up through (campaign)
+export interface Tunnel { id: number; tx: number; ty: number; born: number }
+export const tunnels: Tunnel[] = [];
+export function openTunnel(tx: number, ty: number) {
+  const t = { id: nextId++, tx, ty, born: stats.time };
+  tunnels.push(t);
+  return t;
 }
 
 // Second way to win: hold a majority of the flux vents (they power the fleet's
@@ -135,9 +170,10 @@ export const mission = {
   checkEnd: null as null | (() => 'win' | 'lose' | null),
   corridor: true,                       // launch-corridor victory in play
   allowed: null as Set<string> | null,  // player tech allowed (null = everything)
+  resonance: false,                     // the Vey reacts to harvesting
 };
 export function resetMission() {
-  mission.active = false; mission.tick = null; mission.checkEnd = null; mission.corridor = true; mission.allowed = null;
+  mission.active = false; mission.tick = null; mission.checkEnd = null; mission.corridor = true; mission.allowed = null; mission.resonance = false;
 }
 export const techAllowed = (owner: number, id: string) => owner !== PLAYER || !mission.allowed || mission.allowed.has(id);
 
@@ -145,7 +181,8 @@ export type GameEvent =
   | { type: 'destroyed'; e: Entity }
   | { type: 'built'; b: Building }
   | { type: 'delivered'; owner: number; amount: number }
-  | { type: 'captured'; n: Neutral; owner: number };
+  | { type: 'captured'; n: Neutral; owner: number }
+  | { type: 'resonance'; cell: number; level: number };
 export const gameEvents: ((ev: GameEvent) => void)[] = [];
 const emit = (ev: GameEvent) => { for (const fn of gameEvents) fn(ev); };
 
@@ -170,6 +207,9 @@ export function initGame(numEnemies: number) {
   lastAlert = { x: 0, y: 0, valid: false };
   alertCooldown = 0;
   corridor.owner = -1; corridor.held = 0; endReason = null;
+  resCols = Math.ceil(MAP_W / RES_CELL); resRows = Math.ceil(MAP_H / RES_CELL);
+  resonance = new Float32Array(resCols * resRows); tremorAt.clear(); quake = 0;
+  tunnels.length = 0;
   resetStats();
   telemetry.startMatch(numPlayers);
 }
@@ -497,6 +537,7 @@ export function burrowUnit(u: Unit) {
 }
 
 export function damage(target: Entity, amount: number, attacker?: Unit) {
+  if (target.kind === 'building' && target.shielded) return;   // the shield takes it
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;
   if (attacker) telemetry.fight(attacker.owner, target.owner);
@@ -540,7 +581,7 @@ export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
     return !players[owner].queues.ups.some(q => q.defId === defId);
   }
   const def = tab === 'inf' || tab === 'veh' ? UNITS[defId] : BUILDINGS[defId];
-  if (!def) return false;
+  if (!def || (def as UnitDef).nonBuildable) return false;
   if (def.prereq && !hasBuilding(owner, def.prereq)) return false;
   if (def.prereqUp && !players[owner].upgrades.has(def.prereqUp)) return false;
   if (tab === 'inf' && !hasBuilding(owner, 'barracks')) return false;
@@ -726,6 +767,7 @@ const UNIT_SOUND: Record<string, FieldSound> = {
   trooper: 'rifle', vanguard: 'rifle', juggernaut: 'autocannon', pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
   ranger: 'autocannon', raider: 'autocannon', warden: 'autocannon', gunship: 'autocannon',
   hovertank: 'cannon', dominator: 'cannon', colossus: 'cannon', bomber: 'cannon', artillery: 'artillery',
+  shardkin: 'hitMetal', burrower: 'impact', choir: 'arc',   // crystal on crystal: a ringing clink, a crunch, a hum
 };
 const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail' };
 const weaponSound = (e: Unit | Building): FieldSound =>
@@ -872,6 +914,7 @@ function updateHarvester(u: Unit, dt: number) {
     const take = Math.min(HARVEST_RATE * dt, crystal[i], HARVESTER_CAPACITY - u.cargo);
     crystal[i] -= take;
     u.cargo += take;
+    if (mission.resonance) addResonance(near.x, near.y, take * RES_PER_FLUX);
     if (u.cargo >= HARVESTER_CAPACITY - 0.5) u.harvestState = 'toBase';
   } else if (u.harvestState === 'toBase') {
     let best: Building | null = null, bestD = Infinity;
@@ -1171,7 +1214,20 @@ function step(dt: number) {
         }
       }
     }
+    // the Hollow mend standing near crystal; a Choir's song heals the kin around it
+    const nearCrystal = (u: Unit, r: number) => !!nearestTile(tileOf(u.x), tileOf(u.y), r, (x, y) => crystal[idx(x, y)] > 0);
+    for (const u of units) {
+      if (u.def.crystalRegen && u.hp < u.maxHp && nearCrystal(u, 2)) u.hp = Math.min(u.maxHp, u.hp + u.def.crystalRegen * 0.5);
+      const aura = u.def.healAura;
+      if (!aura) continue;
+      const rate = aura.rate * 0.5 * (nearCrystal(u, 3) ? 2 : 1);
+      for (const v of units) {
+        if (v === u || v.owner !== u.owner || v.hp >= v.maxHp) continue;
+        if (Math.hypot(v.x - u.x, v.y - u.y) <= aura.radius * TILE) v.hp = Math.min(v.maxHp, v.hp + rate);
+      }
+    }
   }
+  if (mission.resonance) updateVey(dt);
 
   // neutral objectives: capture by uncontested presence, income while held
   for (const n of neutrals) {
@@ -1199,7 +1255,8 @@ function step(dt: number) {
     } else if (present.size === 0 && n.prog > 0) {
       n.prog = Math.max(0, n.prog - dt); // decay when abandoned; contested = frozen
     }
-    if (n.kind === 'vent' && n.owner >= 0) {
+    n.dark = n.kind === 'vent' && inStorm(n.tx, n.ty);
+    if (n.kind === 'vent' && n.owner >= 0 && !n.dark) {
       players[n.owner].credits += VENT_INCOME * dt;
       telemetry.earned(n.owner, VENT_INCOME * dt);
       if (n.owner === PLAYER) stats.flux += VENT_INCOME * dt;
@@ -1224,7 +1281,10 @@ function step(dt: number) {
           }
         }
     };
-    for (const u of units) if (u.owner === PLAYER) reveal(tileOf(u.x), tileOf(u.y), u.def.vision);
+    for (const u of units) if (u.owner === PLAYER) {
+      const tx = tileOf(u.x), ty = tileOf(u.y);
+      reveal(tx, ty, inStorm(tx, ty) ? Math.ceil(u.def.vision / 2) : u.def.vision);   // a crystal storm blinds
+    }
     for (const b of buildings) if (b.owner === PLAYER) reveal(b.tx + Math.floor(b.def.w / 2), b.ty + Math.floor(b.def.h / 2), b.def.vision);
     // captured watchtowers are long-range eyes; owned vents show their surroundings
     for (const n of neutrals) {
@@ -1266,6 +1326,31 @@ function step(dt: number) {
   }
 }
 
+function updateVey(dt: number) {
+  quake = Math.max(0, quake - dt * 1.8);
+  resTick -= dt;
+  if (resTick > 0) return;
+  resTick = 1;
+  for (let c = 0; c < resonance.length; c++) {
+    const before = resonance[c];
+    if (before <= 0) continue;
+    resonance[c] = Math.max(0, before - RES_DECAY);
+    if (resonance[c] < RES_TREMOR) { tremorAt.delete(c); continue; }
+    // tremors: the patch heaves every few seconds, cracking whatever stands on it
+    const next = (tremorAt.get(c) ?? 2) - 1;
+    if (next > 0) { tremorAt.set(c, next); continue; }
+    tremorAt.set(c, resonance[c] >= RES_STORM ? 5 : 9);
+    const x0 = (c % resCols) * RES_CELL, y0 = Math.floor(c / resCols) * RES_CELL;
+    const cx = (x0 + RES_CELL / 2) * TILE, cy = (y0 + RES_CELL / 2) * TILE;
+    for (const b of [...buildings]) {
+      if (b.tx < x0 || b.tx >= x0 + RES_CELL || b.ty < y0 || b.ty >= y0 + RES_CELL) continue;
+      damage(b, b.maxHp * 0.04);
+    }
+    booms.push({ x: cx, y: cy, r: 4, ttl: 0.6, max: RES_CELL * TILE * 0.35 });
+    if (visible[idx(Math.min(MAP_W - 1, x0 + 5), Math.min(MAP_H - 1, y0 + 5))]) { quake = 1; sfxAt('impact', cx, cy, 0.9); }
+  }
+}
+
 function updateCorridor(dt: number) {
   const need = ventsNeeded();
   let leader = -1;
@@ -1301,6 +1386,7 @@ export interface GameSnapshot {
   explored: number[]; novaTotal: number; novaLeft: number; flareTimer: number;
   neutrals: Neutral[]; stats: typeof stats;
   corridor?: { owner: number; held: number };
+  resonance?: number[]; tunnels?: Tunnel[];
 }
 export function snapshotGame(): GameSnapshot {
   const plain = <T extends { def: { id: string } }>(e: T) => { const { def, ...rest } = e; return { ...rest, defId: def.id }; };
@@ -1311,6 +1397,7 @@ export function snapshotGame(): GameSnapshot {
     buildings: buildings.filter(b => b.hp > 0).map(b => plain(b)),
     explored: Array.from(explored), novaTotal, novaLeft, flareTimer,
     neutrals: neutrals.map(n => ({ ...n })), stats: { ...stats }, corridor: { ...corridor },
+    resonance: Array.from(resonance), tunnels: tunnels.map(t => ({ ...t })),
   };
 }
 export function restoreGame(s: GameSnapshot) {
@@ -1325,6 +1412,10 @@ export function restoreGame(s: GameSnapshot) {
   Object.assign(stats, s.stats);
   telemetry.startMatch(numPlayers, true, stats.time);
   corridor.owner = s.corridor?.owner ?? -1; corridor.held = s.corridor?.held ?? 0; endReason = null;
+  resCols = Math.ceil(MAP_W / RES_CELL); resRows = Math.ceil(MAP_H / RES_CELL);
+  resonance = s.resonance ? Float32Array.from(s.resonance) : new Float32Array(resCols * resRows);
+  tremorAt.clear(); quake = 0;
+  tunnels.length = 0; if (s.tunnels) tunnels.push(...s.tunnels);
   for (const p of s.buildings) {
     const { defId, ...rest } = p;
     const b: Building = { ...rest, def: BUILDINGS[defId] };
