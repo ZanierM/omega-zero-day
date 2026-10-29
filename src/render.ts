@@ -1224,30 +1224,81 @@ function sprite(kind: 'b' | 'u', defId: string, owner: number, variant = 0): HTM
 const bldSprite = (defId: string, owner: number, level: number) => sprite('b', defId, owner, level) as BldSprite;
 
 // build-bar icon for a structure with hand-drawn art (null if it has none)
+// crop an icon canvas to its visible pixels so it fills its button
+function cropToContent(c: HTMLCanvasElement): HTMLCanvasElement {
+  const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < c.width; x++)
+      if (d[(y * c.width + x) * 4 + 3] > 8) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (x1 < x0) return c;
+  const [t, tg] = makeCanvas(x1 - x0 + 1, y1 - y0 + 1);
+  tg.drawImage(c, -x0, -y0);
+  return t;
+}
+
+// refined icons are downscaled smoothly here to twice their on-screen box
+// (the build bar shows them pixelated), so a 2× screen draws them 1:1
+const ICON_MAX_W = 172, ICON_MAX_H = 120;
+function iconUrl(c: HTMLCanvasElement): string {
+  const t = cropToContent(c);
+  const f = Math.min(1, ICON_MAX_W / t.width, ICON_MAX_H / t.height);
+  if (f >= 1) return t.toDataURL();
+  const [o, og] = makeCanvas(Math.round(t.width * f), Math.round(t.height * f));
+  og.imageSmoothingEnabled = true; og.imageSmoothingQuality = 'high';
+  og.drawImage(t, 0, 0, o.width, o.height);
+  return o.toDataURL();
+}
+
+// build-bar icon for a structure with hand-drawn art (null if it has none);
+// defences show their turret head, aimed toward the viewer
+const ICON_AIM = 0.6;
 export function artIconUrl(defId: string): string | null {
   const art = BUILDING_ART[defId];
   if (!art) return null;
   const def = BUILDINGS[defId];
   const w = def.w * TILE, h = def.h * TILE, head = Math.ceil(w * 0.75), m = 4;
+  if (refinedStyle) {
+    const k = 2;
+    const [c, g] = makeCanvas((w + m * 2) * k, (h + head + m * 2) * k);
+    g.scale(k, k); g.translate(m, m + head);
+    setFineArt(true);
+    art(g, w, h, 1, TEAM_COLORS[PLAYER]);
+    const ta = TURRET_ART[defId];
+    if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[PLAYER]); g.restore(); }
+    setFineArt(false);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    gradeWarmCool(c, 0.7);
+    outline(c, 'rgba(20,12,8,0.55)', 1);
+    return iconUrl(c);
+  }
   const [c, g] = makeCanvas(w + m * 2, h + head + m * 2);
   g.translate(m, m + head);
   art(g, w, h, 1, TEAM_COLORS[PLAYER]);
   g.setTransform(1, 0, 0, 1, 0, 0);
   outline(c, '#1a120c', 2);
   pixelate(c);
-  // crop the empty headroom so the icon fills its button
-  const d = g.getImageData(0, 0, c.width, c.height).data;
-  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
-  for (let y = 0; y < c.height; y++)
-    for (let x = 0; x < c.width; x++)
-      if (d[(y * c.width + x) * 4 + 3] > 8) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  if (x1 < x0) return c.toDataURL();
-  const [t, tg] = makeCanvas(x1 - x0 + 1, y1 - y0 + 1);
-  tg.drawImage(c, -x0, -y0);
-  return t.toDataURL();
+  return cropToContent(c).toDataURL();
 }
 
-// build-bar icon for procedurally drawn defences (turret, wall)
+// build-bar icon for a unit drawn in code (infantry, vehicles, aircraft),
+// three-quarter view facing the viewer; null if it has no code-drawn art
+export function unitIconUrl(defId: string): string | null {
+  const va = VEHICLE_ART[defId];
+  if (!va) return null;
+  const k = 3, ww = va.reach * 2 + 4, wh = ww + va.height;
+  const [c, g] = makeCanvas(ww * k, wh * k);
+  g.scale(k, k); g.translate(ww / 2, ww / 2 + va.height);
+  setFineArt(true);
+  va.hull(g, ICON_AIM, TEAM_COLORS[PLAYER], 0);
+  va.turret?.(g, ICON_AIM, TEAM_COLORS[PLAYER]);
+  setFineArt(false);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  gradeWarmCool(c, 0.7);
+  outline(c, 'rgba(16,10,8,0.6)', 2);
+  return iconUrl(c);
+}
+
 export function defenceIconUrl(defId: string): string {
   const s = bakeProceduralBuilding(defId, PLAYER);
   if (defId === 'turret') {
@@ -1283,6 +1334,11 @@ function updateFogTexture() {
 // ---------------- init ----------------
 
 export function initRenderer() {
+  // the deck appears as the briefing hides, resizing the map canvas; take its
+  // size now so the late resize notification doesn't shift the camera the game
+  // is about to centre on the base
+  resize();
+  lastViewW = canvas.clientWidth; lastViewH = canvas.clientHeight;
   sprites.clear();
   terrainSeed = -1;
   paintTerrain();
@@ -1507,6 +1563,133 @@ function buildingOverlay(b: Building) {
   }
 }
 
+// ---------------- refined effects ----------------
+// Purely visual: new beams, explosions and shells from the simulation are
+// spotted as they appear and spawn flashes, sparks, debris, smoke, trails and
+// scorch marks that live and die here.
+
+interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; kind: 'spark' | 'smoke' | 'debris' | 'flash' }
+const particles: Particle[] = [];
+const scorches: { x: number; y: number; r: number; life: number; max: number }[] = [];
+const seenFx = new WeakSet<object>();
+const trails = new WeakMap<object, [number, number][]>();
+const MAX_PARTICLES = 420, MAX_SCORCHES = 70;
+const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+
+function addParticle(p: Particle) {
+  if (particles.length >= MAX_PARTICLES) particles.shift();
+  particles.push(p);
+}
+function shellLift(s: { t: number; dur: number; kind: string }) {
+  const p = Math.min(1, s.t / s.dur);
+  return s.kind === 'shell' ? Math.sin(p * Math.PI) * 26 : Math.sin(p * Math.PI) * 6;
+}
+
+function spawnEffects(dt: number) {
+  for (const bm of beams) {
+    if (seenFx.has(bm)) continue;
+    seenFx.add(bm);
+    addParticle({ x: bm.x1, y: bm.y1, z: 6, vx: 0, vy: 0, vz: 0, life: 0.07, max: 0.07, size: 6, kind: 'flash' });
+    for (let k = 0; k < 4; k++) {
+      const a = Math.random() * Math.PI * 2, sp = rnd(40, 95);
+      addParticle({ x: bm.x2, y: bm.y2, z: 4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(20, 60), life: rnd(0.2, 0.38), max: 0.38, size: 1, kind: 'spark' });
+    }
+  }
+  for (const bo of booms) {
+    if (seenFx.has(bo)) continue;
+    seenFx.add(bo);
+    const big = bo.max;
+    for (let k = 0; k < Math.min(12, 4 + big / 4); k++) {
+      const a = Math.random() * Math.PI * 2, sp = rnd(30, 70) * (0.6 + big / 40);
+      addParticle({ x: bo.x, y: bo.y, z: 3, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(50, 110), life: rnd(0.6, 1.1), max: 1.1, size: rnd(1.8, 3.4), kind: 'debris' });
+    }
+    for (let k = 0; k < Math.min(6, 2 + big / 10); k++)
+      addParticle({ x: bo.x + rnd(-big, big) * 0.3, y: bo.y + rnd(-big, big) * 0.2, z: rnd(2, 8), vx: rnd(-6, 6) + 5, vy: rnd(-3, 3), vz: rnd(8, 18), life: rnd(1.2, 2.2), max: 2.2, size: big * rnd(0.25, 0.4), kind: 'smoke' });
+    for (let k = 0; k < 5; k++) {
+      const a = Math.random() * Math.PI * 2, sp = rnd(60, 130);
+      addParticle({ x: bo.x, y: bo.y, z: 5, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(40, 90), life: rnd(0.25, 0.45), max: 0.45, size: 1, kind: 'spark' });
+    }
+    if (scorches.length >= MAX_SCORCHES) scorches.shift();
+    scorches.push({ x: bo.x, y: bo.y + 2, r: big * 0.7, life: 25, max: 25 });
+  }
+  // shells: remember the recent flight path; rockets shed smoke as they go
+  for (const sh of shells) {
+    let tr = trails.get(sh);
+    if (!tr) { tr = []; trails.set(sh, tr); }
+    const y = sh.y - shellLift(sh);
+    tr.push([sh.x, y]);
+    if (tr.length > 10) tr.shift();
+    if (sh.kind === 'rocket' && dt > 0)
+      addParticle({ x: sh.x, y, z: 0, vx: rnd(-4, 4), vy: rnd(-4, 4), vz: 6, life: 0.55, max: 0.55, size: 2.2, kind: 'smoke' });
+  }
+}
+
+function updateEffects(dt: number) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    if (p.kind === 'spark' || p.kind === 'debris') {
+      p.vz -= 260 * dt;
+      if (p.z < 0) { p.z = 0; p.vz *= -0.3; p.vx *= 0.55; p.vy *= 0.55; }
+    } else if (p.kind === 'smoke') {
+      p.size += dt * 6; p.vx *= 1 - dt * 0.8; p.vy *= 1 - dt * 0.8;
+    }
+  }
+  for (let i = scorches.length - 1; i >= 0; i--) if ((scorches[i].life -= dt) <= 0) scorches.splice(i, 1);
+}
+
+function drawScorches() {
+  for (const sc of scorches) {
+    // a burn mark, not a hole: soft sooty centre, warm singed rim
+    const a = Math.min(1, sc.life / 6) * 0.3;
+    const gr = ctx.createRadialGradient(sc.x, sc.y, 0, sc.x, sc.y, sc.r);
+    gr.addColorStop(0, `rgba(24,14,8,${a})`); gr.addColorStop(0.55, `rgba(46,24,12,${a * 0.55})`);
+    gr.addColorStop(0.85, `rgba(90,44,18,${a * 0.25})`); gr.addColorStop(1, 'rgba(90,44,18,0)');
+    ctx.save(); ctx.translate(sc.x, sc.y); ctx.scale(1, 0.62); ctx.translate(-sc.x, -sc.y);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(sc.x, sc.y, sc.r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const f = p.life / p.max, sy = p.y - p.z;
+    if (p.kind === 'smoke') {
+      const gr = ctx.createRadialGradient(p.x, sy, 0, p.x, sy, p.size);
+      gr.addColorStop(0, `rgba(52,46,42,${0.6 * f})`); gr.addColorStop(0.5, `rgba(60,54,50,${0.32 * f})`); gr.addColorStop(1, 'rgba(60,54,50,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, sy, p.size, 0, Math.PI * 2); ctx.fill();
+    } else if (p.kind === 'debris') {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(p.x - p.size / 2 + 1, p.y - p.size / 4, p.size, p.size / 2);
+      ctx.fillStyle = '#3a302a'; ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, p.size);
+      ctx.fillStyle = 'rgba(255,190,120,0.5)'; ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, 0.6);
+    } else if (p.kind === 'spark') {
+      ctx.strokeStyle = `rgba(255,${200 + 40 * f | 0},120,${f})`; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(p.x, sy); ctx.lineTo(p.x - p.vx * 0.025, sy - p.vy * 0.025 + p.vz * 0.025); ctx.stroke();
+    } else {
+      g2Glow(p.x, sy, p.size * (0.6 + f), `rgba(255,236,190,${0.9 * f})`);
+      ctx.strokeStyle = `rgba(255,255,240,${f})`; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(p.x - p.size, sy); ctx.lineTo(p.x + p.size, sy); ctx.moveTo(p.x, sy - p.size * 0.7); ctx.lineTo(p.x, sy + p.size * 0.7); ctx.stroke();
+    }
+  }
+}
+
+// refined explosion: white core, layered fireball and a thin shock ring
+function drawRefinedBoom(bo: { x: number; y: number; r: number; ttl: number; max: number }) {
+  const life = Math.max(0, bo.ttl / 0.5), r = bo.r * 1.25;
+  const fg = ctx.createRadialGradient(bo.x, bo.y - r * 0.15, 0, bo.x, bo.y, r);
+  fg.addColorStop(0, `rgba(255,250,230,${life})`);
+  fg.addColorStop(0.25, `rgba(255,214,130,${life * 0.95})`);
+  fg.addColorStop(0.6, `rgba(240,120,50,${life * 0.7})`);
+  fg.addColorStop(1, 'rgba(90,30,12,0)');
+  ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(bo.x, bo.y, r, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(bo.x, bo.y); ctx.scale(1, 0.6);
+  ctx.strokeStyle = `rgba(255,236,200,${life * 0.55})`; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(0, 0, bo.r * 1.9, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
 // ---------------- frame ----------------
 
 function drawHealthBar(x: number, y: number, w: number, frac: number) {
@@ -1563,6 +1746,7 @@ export function render() {
   if (!terrainTex) return; // not initialized yet (briefing screen)
   T = performance.now() / 1000;
   vizDt = Math.min(0.1, Math.max(0, T - vizT)); vizT = T;
+  if (refinedStyle) { const fdt = game.paused ? 0 : vizDt; spawnEffects(fdt); updateEffects(fdt); }
   if (vehViz.size > units.length + 64) for (const id of [...vehViz.keys()]) if (!byId.has(id)) vehViz.delete(id);
   const vw = canvas.clientWidth, vh = canvas.clientHeight;
   const z = camera.zoom;
@@ -1591,6 +1775,7 @@ export function render() {
       bx0, by0, bx1 - bx0, by1 - by0);
     ctx.imageSmoothingEnabled = true;
   }
+  if (refinedStyle) drawScorches();
 
   const tx0 = Math.max(0, Math.floor(camera.x / TILE));
   const ty0 = Math.max(0, Math.floor(camera.y / TILE));
@@ -1795,6 +1980,13 @@ export function render() {
 
   // projectiles: shells arc high, rockets fly flat with a flame trail
   for (const s2 of shells) {
+    const tr = refinedStyle ? trails.get(s2) : undefined;
+    if (tr && tr.length > 1 && s2.kind === 'shell') {
+      for (let k = 1; k < tr.length; k++) {
+        ctx.strokeStyle = `rgba(255,190,110,${(k / tr.length) * 0.5})`; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(tr[k - 1][0], tr[k - 1][1]); ctx.lineTo(tr[k][0], tr[k][1]); ctx.stroke();
+      }
+    }
     const p = Math.min(1, s2.t / s2.dur);
     const arc = s2.kind === 'shell' ? Math.sin(p * Math.PI) * 26 : Math.sin(p * Math.PI) * 6;
     // ground shadow
@@ -1852,6 +2044,7 @@ export function render() {
 
   // explosions
   for (const bo of booms) {
+    if (refinedStyle) { drawRefinedBoom(bo); continue; }
     const life = Math.max(0, bo.ttl / 0.5);
     const fg = ctx.createRadialGradient(bo.x, bo.y, 0, bo.x, bo.y, bo.r * 1.2);
     fg.addColorStop(0, `rgba(255,240,200,${life})`);
@@ -1871,6 +2064,8 @@ export function render() {
     }
     ctx.globalAlpha = 1;
   }
+
+  if (refinedStyle) drawParticles();
 
   // incoming orbital strikes: pulsing target reticle → searing beam at impact
   for (const s of strikes) {
