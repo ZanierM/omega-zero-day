@@ -23,6 +23,8 @@ export function isWalkable(x: number, y: number): boolean {
 
 // Deterministic-ish pseudo random with seed so maps are varied but debuggable
 let seed = Date.now() % 100000;
+/** Fix the generator so a campaign mission gets the same map every time. */
+export function seedMap(s: number) { seed = s; }
 export function rand(): number {
   seed = (seed * 16807) % 2147483647;
   return (seed % 10000) / 10000;

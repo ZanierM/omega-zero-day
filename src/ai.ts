@@ -124,10 +124,11 @@ function manageAbilities(owner: number) {
 let ais: AIState[] = [];
 let diff = DIFF.normal;
 
-export function initAI(numEnemies: number, difficulty: Difficulty = 'normal') {
+export function initAI(numEnemies: number, difficulty: Difficulty = 'normal', only?: number[]) {
   diff = DIFF[difficulty];
   ais = [];
   for (let i = 0; i < numEnemies; i++) {
+    if (only && !only.includes(i + 1)) continue;   // scripted by a campaign mission instead
     ais.push({
       owner: i + 1,
       buildIndex: 0,
@@ -138,7 +139,7 @@ export function initAI(numEnemies: number, difficulty: Difficulty = 'normal') {
       abilCooldown: 0,
       clock: 0, intel: {}, intelTimer: 0, scoutId: -1, scoutTimer: 40 + i * 15,
     });
-    ais[i].attackTimer *= doctrineOf(i + 1).firstWave;
+    ais[ais.length - 1].attackTimer *= doctrineOf(i + 1).firstWave;
     if (diff.headStart) players[i + 1].upgrades.add('wpn1'); // hard AIs land pre-armed
   }
 }

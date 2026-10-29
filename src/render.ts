@@ -1461,6 +1461,7 @@ function drawObjectiveStatus(n: game.Neutral, cx: number, cy: number) {
 
 let hudTop = 56, hudLeft = 8, hudTopCheck = 0;
 function drawCorridorStrip(vw: number) {
+  if (!game.mission.corridor) return;   // campaign missions track their own objectives
   const vents = game.neutrals.filter(n => n.kind === 'vent');
   if (!vents.length) return;
   // the top bar wraps on narrow screens; re-measure now and then, never every frame

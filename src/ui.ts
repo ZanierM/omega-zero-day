@@ -2,9 +2,10 @@ import {
   BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, VET_NAME,
   FACTION_NAMES,
 } from './config';
+import * as campaign from './campaign/runner';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
-  gameOver, endReason, corridor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
+  gameOver, endReason, corridor, techAllowed, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
@@ -250,9 +251,11 @@ export function initUI() {
 }
 
 function defsFor(tab: Tab) {
-  if (tab === 'ups') return Object.values(UPGRADES);
-  if (tab === 'inf' || tab === 'veh') return Object.values(UNITS).filter(d => d.tab === tab);
-  return Object.values(BUILDINGS).filter(d => d.tab === tab && !NON_BUILDABLE.has(d.id));
+  // a campaign mission only shows the tech it has cleared
+  const ok = (id: string) => techAllowed(PLAYER, id);
+  if (tab === 'ups') return Object.values(UPGRADES).filter(d => ok(d.id));
+  if (tab === 'inf' || tab === 'veh') return Object.values(UNITS).filter(d => d.tab === tab && ok(d.id));
+  return Object.values(BUILDINGS).filter(d => d.tab === tab && !NON_BUILDABLE.has(d.id) && ok(d.id));
 }
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -363,6 +366,7 @@ function abilityUnits(): Unit[] {
 }
 
 export function updateUI() {
+  updateCampaignUI();
   const showDetailsBtn = selection.size > 0;
   if (showDetailsBtn !== shownDetailsBtn) {
     detailsBtn.classList.toggle('show', showDetailsBtn);
@@ -580,6 +584,13 @@ export function updateUI() {
       : novaExpired
       ? 'Helios detonated with the enemy still standing. The fleet burns. There is no dawn.'
       : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.';
+    const m = campaign.activeMission();
+    if (m) {
+      const end = gameOver === 'win' ? m.endWin : m.endLose;
+      overlayTitle.textContent = end.title;
+      overlaySub.textContent = end.text;
+      againBtn.textContent = gameOver === 'win' ? 'Continue campaign' : 'Retry mission';
+    }
     if (!overlayStats.childElementCount) {
       const rows: [string, string][] = [
         ['Time', fmtTime(stats.time)],
@@ -592,5 +603,46 @@ export function updateUI() {
       ];
       overlayStats.innerHTML = rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join('');
     }
+  }
+}
+
+// ---------- campaign: comms box and objective tracker ----------
+const againBtn = document.getElementById('againbtn')!;
+const comms = document.getElementById('comms')!;
+const commsBadge = document.getElementById('commsbadge')!;
+const commsWho = document.getElementById('commswho')!;
+const commsText = document.getElementById('commstext')!;
+const objTracker = document.getElementById('objtracker')!;
+const objTitle = document.getElementById('objtitle')!;
+const objList = document.getElementById('objlist')!;
+comms.addEventListener('click', () => campaign.skipComm());
+let shownComm: object | null = null, shownObjs = '', shownMission: object | null = null;
+function updateCampaignUI() {
+  const m = campaign.activeMission();
+  if (m !== shownMission) { shownMission = m; rebuildGrid(); }   // the build bar follows the mission's tech list
+  const line = campaign.currentComm();
+  if (line !== shownComm) {   // only touch the DOM when the line changes
+    shownComm = line;
+    comms.hidden = !line;
+    if (line) {
+      const sp = campaign.SPEAKERS[line.who];
+      // sit just above the command deck, however tall it is in this layout
+      const deck = document.getElementById('bottombar')?.getBoundingClientRect();
+      if (deck) comms.style.setProperty('--deck-h', `${Math.round(innerHeight - deck.top)}px`);
+      comms.className = line.who;
+      commsBadge.textContent = line.who === 'seren' ? '?' : sp.name.split(' ').pop()![0];
+      commsBadge.style.background = sp.color;
+      commsWho.style.color = sp.color;
+      commsWho.innerHTML = `${sp.name}<small>${sp.role}</small>`;
+      commsText.textContent = line.text;
+    }
+  }
+  const objs = campaign.objectives();
+  const key = objs.map(o => (o.done ? '1' : '0') + o.text).join('|');
+  if (key !== shownObjs) {
+    shownObjs = key;
+    objTracker.hidden = !objs.length;
+    objTitle.textContent = campaign.missionTitle();
+    objList.innerHTML = objs.map(o => `<li class="${o.done ? 'done' : ''}">${o.text}${o.optional ? ' (optional)' : ''}</li>`).join('');
   }
 }
