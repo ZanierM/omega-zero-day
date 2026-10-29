@@ -663,7 +663,7 @@ function drawVehicle(u: Unit, moving: boolean) {
   const va = VEHICLE_ART[u.def.id]!, n = vehAngles(u.def.id);
   const v = vehViz.get(u.id) ?? { hull: u.facing, tur: u.facing };
   vehViz.set(u.id, v);
-  v.hull = turnToward(v.hull, u.facing, 4 * vizDt);
+  v.hull = turnToward(v.hull, u.facing, (va.turn ?? 4) * vizDt);
   const tid = u.order.type === 'attack' ? u.order.targetId ?? -1 : u.autoTargetId;
   const tgt = tid >= 0 ? byId.get(tid) : undefined;
   let aim = v.hull;

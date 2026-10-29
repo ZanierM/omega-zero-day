@@ -1163,8 +1163,6 @@ function drawHoverTankTurret(g: Ctx, a: number, team: string) {
   if (!away) barrels();
 }
 
-// refined-style vehicle art by unit id: hull and turret are baked separately so
-// the turret can aim on its own
 // ---------------- shared vehicle parts ----------------
 
 // a box in the vehicle's own frame (x forward, y to the right)
@@ -1411,6 +1409,118 @@ function hazardPlate(g: Ctx, a: number, z: number, x0: number, y0: number, x1: n
   for (let x = x0; x < x1; x += 2.4) deckPlate(g, a, z, x, y0, x + 1.1, y1, 'rgba(16,10,6,0.85)');
 }
 
+// ---------------- infantry (refined style) ----------------
+// A soldier is a handful of small boxes and a helmet, sorted back to front by
+// where they land on screen at this heading, so limbs overlap correctly.
+
+interface Limb { x0: number; y0: number; x1: number; y1: number; z0: number; z1: number; top: string; side: string }
+interface SoldierSpec {
+  armour: string; armourTop: string;          // body plates
+  build: number;                              // 1 = trooper; bulk multiplies width
+  helmet: string;
+  extra?: (lift: number) => Limb[];           // kit: weapon, pack, shield...
+  glow?: (g: Ctx, a: number, lift: number) => void;   // emissive bits drawn last
+}
+
+function drawSoldier(g: Ctx, a: number, team: string, phase: number, sp: SoldierSpec) {
+  const t = phase * Math.PI * 2, B = sp.build;
+  const stride = 2.3, step = Math.sin(t) * stride;
+  const bob = Math.abs(Math.sin(t)) * 0.45;            // the body rises over each stride
+  const hip = 1.9 * B, legW = 1.1 * B;
+  const limbs: Limb[] = [];
+  // legs: each foot swings along x, the swinging one lifted a little
+  for (const [side, sx] of [[-1, step], [1, -step]] as [number, number][]) {
+    const lift = Math.max(0, Math.cos(t) * side) * 1.1;
+    limbs.push({ x0: sx - 1.3, y0: side * hip - legW, x1: sx + 1.3, y1: side * hip + legW, z0: lift, z1: 6.8 + lift * 0.3, top: '#4a4d56', side: '#3a3d46' });
+    limbs.push({ x0: sx - 1.4, y0: side * hip - legW * 1.1, x1: sx + 2, y1: side * hip + legW * 1.1, z0: lift, z1: lift + 1.6, top: '#2a2c32', side: '#1e1f24' });  // boot
+  }
+  const zb = 6.8 + bob;
+  // torso, shoulders (team), helmet neck
+  limbs.push({ x0: -2.4 * B, y0: -3.3 * B, x1: 2.3 * B, y1: 3.3 * B, z0: zb, z1: zb + 7, top: sp.armourTop, side: sp.armour });
+  for (const y of [-1, 1]) limbs.push({ x0: -1.8 * B, y0: y * 3.3 * B - 1.3, x1: 1.8 * B, y1: y * 3.3 * B + 1.3, z0: zb + 5, z1: zb + 7.6, top: team, side: shade(team, 0.72) });
+  if (sp.extra) limbs.push(...sp.extra(bob));
+  const depth = (l: Limb) => at((l.x0 + l.x1) / 2, (l.y0 + l.y1) / 2, a)[1] + l.z0 * 0.01;
+  limbs.sort((p, q) => depth(p) - depth(q));
+  // the helmet sits in the sort at the torso's centre, just above it
+  let helmetDone = false;
+  const helmet = () => {
+    const [hx, hy] = at(0.2, 0, a);
+    cylinder(g, hx, hy, 1.5 * B, zb + 7, zb + 8, '#4a4d56', '#3a3d46');
+    dome(g, hx, hy, 2.9 * B, zb + 8, sp.helmet);
+    const [vx, vy] = at(2.2 * B, 0, a);                                     // visor glint, facing forward
+    g.fillStyle = 'rgba(95,224,240,0.9)'; g.fillRect(vx - 1.2, vy - zb - 10.2, 2.4, 1.1);
+    helmetDone = true;
+  };
+  for (const l of limbs) {
+    if (!helmetDone && depth(l) > at(0.2, 0, a)[1] + 0.5 && l.z0 >= zb) helmet();
+    box(g, a, l.x0, l.y0, l.x1, l.y1, l.z0, l.z1, l.top, l.side);
+  }
+  if (!helmetDone) helmet();
+  sp.glow?.(g, a, bob);
+}
+
+const GUN = '#3a3c44', GUN_TOP = '#6a6d78', KIT = '#5a5048', KIT_TOP = '#7a6e60';
+const rifle = (len: number, bob: number, y = 2.4): Limb[] => [
+  { x0: 0.5, y0: y - 0.7, x1: 3.2, y1: y + 0.7, z0: 6.8 + bob + 3.4, z1: 6.8 + bob + 5, top: '#5d6170', side: '#4a4d56' },     // forearm
+  { x0: 1, y0: y - 0.55, x1: len, y1: y + 0.55, z0: 6.8 + bob + 4, z1: 6.8 + bob + 5.3, top: GUN_TOP, side: GUN },
+];
+const backpack = (bob: number, w = 2.6): Limb => ({ x0: -4, y0: -w, x1: -2.2, y1: w, z0: 6.8 + bob + 1, z1: 6.8 + bob + 6.2, top: KIT_TOP, side: KIT });
+
+const TROOPER: SoldierSpec = {
+  armour: '#727784', armourTop: '#9da2ae', build: 1, helmet: '#a4a9b4',
+  extra: bob => [backpack(bob), ...rifle(8.5, bob)],
+};
+const ROCKETEER: SoldierSpec = {
+  armour: '#727784', armourTop: '#9da2ae', build: 1, helmet: '#a4a9b4',
+  extra: bob => [backpack(bob, 2.2),
+    { x0: -3.5, y0: 2.1, x1: 7, y1: 4.3, z0: 6.8 + bob + 6, z1: 6.8 + bob + 8.4, top: '#6a7a5a', side: '#4a5640' }],    // tube on the shoulder
+  glow: (g, a, bob) => { const [x, y] = at(7.3, 3.2, a); g.fillStyle = '#ff8c3a'; g.fillRect(x - 0.8, y - 6.8 - bob - 8, 1.6, 1.6); },
+};
+const VANGUARD: SoldierSpec = {
+  armour: '#6a6e7a', armourTop: '#a0a5b0', build: 1.22, helmet: '#b0b5c0',
+  extra: bob => [
+    { x0: -4.4, y0: -2.8, x1: -2.6, y1: 2.8, z0: 6.8 + bob + 1, z1: 6.8 + bob + 7, top: '#6a6d78', side: '#4a4d56' },        // power pack
+    ...rifle(7, bob, 2.9),
+    { x0: 2.8, y0: -4.8, x1: 3.7, y1: -0.6, z0: 2 + bob, z1: 6.8 + bob + 6, top: '#9a9eaa', side: '#6a6d78' },          // shield
+  ],
+  glow: (g, a, bob) => { const [x, y] = at(3.8, -2.7, a); g.fillStyle = 'rgba(95,224,240,0.8)'; g.fillRect(x - 0.6, y - 6.8 - bob - 3, 1.2, 4); },
+};
+const SNIPER: SoldierSpec = {
+  armour: '#5a6656', armourTop: '#7e8c74', build: 0.95, helmet: '#6a7862',
+  extra: bob => [
+    { x0: -3.6, y0: -3.6, x1: 1, y1: 3.6, z0: 6.8 + bob + 0.5, z1: 6.8 + bob + 6.6, top: '#56604f', side: '#3e4639' },        // cloak
+    ...rifle(12.5, bob),
+    { x0: 3, y0: 1.9, x1: 6, y1: 2.9, z0: 6.8 + bob + 5.3, z1: 6.8 + bob + 6.4, top: '#1e1f24', side: '#14110e' },          // scope
+  ],
+  glow: (g, a, bob) => { const [x, y] = at(6.1, 2.4, a); g.fillStyle = 'rgba(255,80,80,0.9)'; g.fillRect(x - 0.4, y - 6.8 - bob - 6, 0.8, 0.8); },
+};
+const PYRO: SoldierSpec = {
+  armour: '#7a6a58', armourTop: '#a08a70', build: 1.05, helmet: '#8a8f9c',
+  extra: bob => [
+    { x0: -4.6, y0: -2.6, x1: -2.4, y1: -0.3, z0: 6.8 + bob, z1: 6.8 + bob + 7, top: '#c84a2a', side: '#8a3018' },           // fuel tanks
+    { x0: -4.6, y0: 0.3, x1: -2.4, y1: 2.6, z0: 6.8 + bob, z1: 6.8 + bob + 7, top: '#c84a2a', side: '#8a3018' },
+    ...rifle(7.5, bob),
+  ],
+  glow: (g, a, bob) => {
+    const [x, y] = at(7.8, 2.4, a);
+    g.save(); g.globalCompositeOperation = 'lighter'; glow(g, x, y - 6.8 - bob - 4.6, 3, 'rgba(255,150,60,0.8)'); g.restore();
+    g.fillStyle = '#fff0c0'; g.fillRect(x - 0.4, y - 6.8 - bob - 5, 0.8, 0.8);
+  },
+};
+const JUGGERNAUT: SoldierSpec = {
+  armour: '#5f6570', armourTop: '#8a909c', build: 1.5, helmet: '#8a909c',
+  extra: bob => [
+    { x0: -5.2, y0: -3.4, x1: -3.4, y1: 3.4, z0: 6.8 + bob + 1, z1: 6.8 + bob + 8, top: '#3a3f48', side: '#2c3038' },        // armour backplate
+    { x0: 0, y0: 3.6, x1: 4, y1: 6.2, z0: 6.8 + bob + 2.5, z1: 6.8 + bob + 6, top: '#6a6d78', side: '#4a4d56' },             // minigun housing
+    { x0: 3.5, y0: 4.2, x1: 9.5, y1: 5.6, z0: 6.8 + bob + 3.3, z1: 6.8 + bob + 5.2, top: '#9a9eaa', side: '#4a4d56' },       // barrels
+  ],
+  glow: (g, a, bob) => { const [x, y] = at(2.6, 0, a); g.fillStyle = 'rgba(255,176,46,0.9)'; g.fillRect(x - 1.2, y - 6.8 - bob - 12.6, 2.4, 0.8); },
+};
+
+const soldierArt = (sp: SoldierSpec, reach: number, height: number): VehicleArt => ({
+  hull: (g, a, team, phase = 0) => drawSoldier(g, a, team, phase, sp), reach, height, frames: 4, turn: 10,
+});
+
 // refined-style vehicle art by unit id: hull and turret are baked separately so
 // the turret can aim on its own; walkers bake `frames` steps of their gait
 export interface VehicleArt {
@@ -1418,6 +1528,7 @@ export interface VehicleArt {
   turret?: (g: Ctx, a: number, team: string) => void;
   reach: number; height: number;
   frames?: number;
+  turn?: number;          // hull turn rate in rad/s (vehicles 4, infantry faster)
 }
 export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   hovertank: { hull: drawHoverTankHull, turret: drawHoverTankTurret, reach: 24, height: 16 },
@@ -1429,6 +1540,12 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   colossus:  { hull: drawColossusHull,  turret: drawColossusTurret,  reach: 30, height: 30, frames: 4 },
   harvester: { hull: drawHarvesterHull, reach: 20, height: 16 },
   pioneer:   { hull: drawPioneerHull,   reach: 20, height: 18 },
+  trooper:    soldierArt(TROOPER, 11, 20),
+  rocketeer:  soldierArt(ROCKETEER, 10, 20),
+  vanguard:   soldierArt(VANGUARD, 11, 22),
+  sniper:     soldierArt(SNIPER, 14, 20),
+  pyro:       soldierArt(PYRO, 10, 20),
+  juggernaut: soldierArt(JUGGERNAUT, 13, 24),
 };
 
 // ---------------- defences ----------------
