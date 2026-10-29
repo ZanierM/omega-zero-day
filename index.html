@@ -6,7 +6,7 @@
   <title>Omega Zero Day</title>
   <!-- PWA: installable, fullscreen, offline -->
   <link rel="manifest" href="manifest.webmanifest">
-  <meta name="theme-color" content="#0a0402">
+  <meta name="theme-color" content="#14110e">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,304 +15,326 @@
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    /* ---- theme: riveted gunmetal plates, bronze trim, gold lettering ---- */
+    :root {
+      --ink: #0f0d0b;          /* recessed wells */
+      --well: #1a1714;
+      --plate: #2e2a25;
+      --plate-dk: #221f1b;
+      --edge: #5a4830;         /* bronze trim */
+      --edge-hi: #9c7a44;
+      --gold: #e8c66a;
+      --gold-hi: #ffe39a;
+      --cream: #efe3c8;
+      --muted: #a8977a;
+      --dim: #7a6c56;
+      --good: #7fcf6a;
+      --bad: #e0614f;
+      --head: 'Exo 2', 'Nunito', system-ui, sans-serif;
+      --body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      /* brushed metal plates with vertical seams — the sci-fi cousin of wooden planks */
+      --plates:
+        linear-gradient(180deg, rgba(255,240,210,0.07), transparent 30%, transparent 70%, rgba(0,0,0,0.25)),
+        repeating-linear-gradient(90deg, transparent 0 46px, rgba(0,0,0,0.45) 46px 48px, rgba(255,240,210,0.07) 48px 49px,
+          rgba(0,0,0,0.07) 49px 95px, rgba(0,0,0,0.45) 95px 97px, rgba(255,240,210,0.07) 97px 98px, rgba(255,240,210,0.03) 98px 142px),
+        repeating-linear-gradient(0deg, rgba(255,240,210,0.02) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, #3a342c, #27231e);
+      --plates-dk:
+        linear-gradient(180deg, rgba(255,240,210,0.06), transparent 35%, rgba(0,0,0,0.22)),
+        repeating-linear-gradient(90deg, transparent 0 30px, rgba(0,0,0,0.38) 30px 32px, rgba(255,240,210,0.05) 32px 33px, rgba(0,0,0,0.06) 33px 63px, rgba(0,0,0,0.38) 63px 65px, rgba(255,240,210,0.05) 65px 66px),
+        linear-gradient(180deg, #2e2a24, #1d1a16);
+      /* raised plate: lit top lip, dark bottom lip, drop shadow */
+      --raised: inset 0 2px 0 rgba(255,236,200,0.13), inset 0 -3px 0 rgba(0,0,0,0.38), 0 4px 0 rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3);
+      --sunk: inset 0 3px 6px rgba(0,0,0,0.65), inset 0 -1px 0 rgba(255,236,200,0.06);
+      --rivets:
+        radial-gradient(circle at 9px 9px, #b39a70 0 1.6px, #3a3024 2.2px, transparent 3px),
+        radial-gradient(circle at calc(100% - 9px) 9px, #b39a70 0 1.6px, #3a3024 2.2px, transparent 3px),
+        radial-gradient(circle at 9px calc(100% - 9px), #b39a70 0 1.6px, #3a3024 2.2px, transparent 3px),
+        radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), #b39a70 0 1.6px, #3a3024 2.2px, transparent 3px);
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0402; font-family: "Segoe UI", Arial, sans-serif; user-select: none; }
-    #app { display: flex; flex-direction: column; width: 100%; height: 100%; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #14110e; font-family: var(--body); user-select: none; color: var(--cream); }
+    button { font-family: inherit; }
+    #app { display: flex; flex-direction: column; width: 100%; height: 100%; position: relative; }
     #game { flex: 1; display: block; cursor: crosshair; min-height: 0; touch-action: none; }
 
-    /* ---- bottom command console: field-terminal style ---- */
-    #bottombar {
-      display: flex; flex-direction: column;  /* sizes itself from content so buttons never overflow */
-      font-family: 'Share Tech Mono', 'SF Mono', Menlo, Consolas, monospace;
-      background: linear-gradient(180deg, #160a06, #0e0504); border-top: 1px solid #ff8c3a55; color: #f5dcc8;
-      position: relative;
-    }
-    /* pointer-events none is load-bearing: this overlay sits above every button */
-    #bottombar::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 5;
-      background: repeating-linear-gradient(0deg, rgba(255,200,150,0.02) 0 1px, transparent 1px 3px); }
+    /* ---- top resource strip: chunky pills floating over the map ---- */
+    #topbar { position: absolute; top: 8px; left: 8px; z-index: 6; display: flex; gap: 6px; align-items: stretch;
+      max-width: calc(100% - 66px); pointer-events: none; }
+    #topbar > * { pointer-events: auto; }
+    .pill { border-top-color: var(--edge-hi) !important; display: flex; align-items: center; gap: 7px; padding: 5px 12px; min-height: 38px;
+      background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 11px;
+      box-shadow: var(--raised); white-space: nowrap; }
+    #credits { font-family: var(--head); font-size: 19px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.5); }
+    #creditlabel { display: none; }
+    #powerwrap { flex-direction: column; align-items: stretch; justify-content: center; gap: 3px; min-width: 150px; padding: 4px 12px; }
+    #powerhead { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--muted); }
+    #powertext { color: var(--cream); font-weight: 700; }
+    #powerbar { height: 8px; background: var(--ink); border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.7); }
+    #powerfill { height: 100%; width: 50%; border-radius: 5px; background: linear-gradient(180deg, #a6e48a, #5aa846); transition: width .2s; }
+    #powerfill.low { background: linear-gradient(180deg, #f39a7f, #b8402f); }
+    #countdown { display: none; gap: 8px; }
+    #cdlabel { font-size: 12px; font-weight: 800; color: var(--muted); }
+    #cdtime { font-family: var(--head); font-size: 17px; font-weight: 800; color: #ffb35a; font-variant-numeric: tabular-nums; }
+    #countdown.warn { border-color: var(--bad); animation: cdflash 1s steps(2) infinite; }
+    #countdown.warn #cdtime { color: #ff7a62; }
+    @keyframes cdflash { 50% { background: #3a1a14; } }
+    #mutebtn { cursor: pointer; font-size: 16px; padding: 4px 10px; color: var(--cream); }
+    #mutebtn:hover { border-color: var(--edge-hi); }
 
-    /* category tab bar running along the top of the HUD */
-    #tabsbar { display: flex; gap: 2px; padding: 0 8px; background: #0c0503; border-bottom: 1px solid #3a2012; }
-    .htab {
-      font-family: 'Orbitron', 'Share Tech Mono', monospace;
-      padding: 6px 14px 5px; font-family: inherit; font-size: 11px; letter-spacing: 2px; font-weight: 700;
-      color: #b07a54; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
-    }
-    .htab:hover { color: #ffe4c8; }
-    .htab.active { color: #ffd76e; border-bottom-color: #ffd76e; background: linear-gradient(180deg, #ffd76e14, transparent); }
+    /* ---- bottom command deck: plated console ---- */
+    #bottombar { display: flex; flex-direction: column; position: relative;
+      background: var(--plates); border-top: 4px solid var(--edge-hi);
+      box-shadow: 0 -6px 16px rgba(0,0,0,0.55), inset 0 2px 0 #3a2c18, inset 0 3px 0 rgba(255,236,200,0.1); }
+
+    /* category tabs: rounded folder tabs sitting on the deck */
+    #tabsbar { display: flex; gap: 4px; padding: 6px 10px 0; border-bottom: 2px solid rgba(0,0,0,0.35); overflow-x: auto; }
+    .htab { padding: 6px 14px 5px; font-size: 13px; font-weight: 800; color: var(--muted); cursor: pointer; white-space: nowrap;
+      background: rgba(0,0,0,0.22); border: 2px solid transparent; border-bottom: none; border-radius: 10px 10px 0 0; }
+    .htab:hover { color: var(--cream); }
+    .htab.active { color: var(--gold); background: var(--plates-dk); border-color: var(--edge); }
     .htab.locked { opacity: 0.4; }
 
-    #hudrow { display: flex; align-items: stretch; gap: 8px; padding: 8px; min-height: 0; }
+    #hudrow { display: flex; align-items: stretch; gap: 10px; padding: 9px 10px 10px; min-height: 0; }
     #minimapwrap { display: flex; flex-direction: column; gap: 4px; }
-    #minimap { display: block; width: 140px; height: 140px; border: 1px solid #3a2012; cursor: pointer; image-rendering: pixelated;
-      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+    #minimap { display: block; width: 140px; height: 140px; cursor: pointer; image-rendering: pixelated;
+      border: 4px solid var(--edge); border-top-color: var(--edge-hi); border-bottom-color: #3a2c18; border-radius: 9px; background: #000;
+      box-shadow: 0 0 0 2px #1a140d, 0 4px 0 rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3); }
 
     #buildpanel { flex: 1; display: flex; min-width: 0; }
-    #buildgrid { flex: 1; display: flex; gap: 7px; overflow-x: auto; overflow-y: hidden; padding: 2px; align-items: stretch; }
-    .bbtn { position: relative; width: 98px; min-width: 98px; border: 1px solid #4a2a16; background: linear-gradient(180deg, #1c0d07, #140a06); cursor: pointer; overflow: hidden;
-      display: flex; flex-direction: column; align-items: center; padding: 4px 0; gap: 1px;
-      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
-    .bbtn:hover { border-color: #ff8c3a; background: linear-gradient(180deg, #2a140a, #160b06); }
+    #buildgrid { flex: 1; display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 4px; align-items: stretch; }
+    .bbtn { position: relative; width: 102px; min-width: 102px; cursor: pointer; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; padding: 6px 2px 5px; gap: 1px;
+      background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 12px;
+      box-shadow: var(--raised); transition: border-color .12s, box-shadow .12s; }
+    .bbtn, .actbtn, .opt, .mapbtn, #pausebox button { border-top-color: #6a5638; border-bottom-color: #2a2118; }
+    .bbtn:hover { border-color: var(--gold); box-shadow: 0 0 14px rgba(232,198,106,0.4), var(--raised); }
+    .bbtn:active { transform: translateY(1px); }
     /* icon fills the space above the labels and is centered by object-fit */
-    .bbtn img, .bbtn svg { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 88px; max-height: 62px; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
-    .bbtn .nm { font-size: 9.5px; letter-spacing: 0.5px; color: #f5dcc8; text-align: center; line-height: 1.1; padding: 0 2px; z-index: 1; }
-    .bbtn .cost { font-size: 10px; color: #ffd76e; z-index: 1; }
-    .bbtn.locked { opacity: 0.5; filter: grayscale(0.7); }
-    .bbtn .prog { position: absolute; left: 0; bottom: 0; height: 4px; background: #ff8c3a; width: 0%; z-index: 2; }
-    .bbtn .count { position: absolute; top: 3px; right: 6px; min-width: 18px; text-align: center; background: #ffd76e; color: #131313;
-      font-size: 11px; font-weight: 800; border-radius: 2px; padding: 1px 4px; display: none; z-index: 2; }
-    .bbtn.ready { border-color: #3ddc84; box-shadow: 0 0 10px #3ddc8466 inset; }
-    .bbtn.ready::after { content: "PLACE"; position: absolute; top: 4px; left: 8px; font-size: 9px; letter-spacing: 1px; color: #3ddc84; font-weight: 700; z-index: 2; }
-    .bbtn.done { border-color: #3ddc84; }
-    .bbtn.done::after { content: "DONE"; position: absolute; top: 4px; left: 8px; font-size: 9px; letter-spacing: 1px; color: #3ddc84; font-weight: 700; }
+    .bbtn img, .bbtn svg { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 88px; max-height: 62px; object-fit: contain; image-rendering: pixelated; pointer-events: none;
+      filter: drop-shadow(0 3px 2px rgba(0,0,0,0.55)); }
+    .bbtn .nm { font-size: 12px; font-weight: 800; color: var(--cream); text-align: center; line-height: 1.1; padding: 0 3px; z-index: 1; }
+    .bbtn .cost { font-size: 12px; font-weight: 700; color: var(--gold); z-index: 1; }
+    .bbtn.locked { opacity: 0.45; filter: grayscale(0.8); }
+    .bbtn .prog { position: absolute; left: 0; bottom: 0; height: 5px; background: linear-gradient(180deg, var(--gold-hi), #b8923e); width: 0%; z-index: 2; }
+    .bbtn .count { position: absolute; top: 4px; right: 5px; min-width: 22px; text-align: center; background: var(--gold); color: #1d160c;
+      font-size: 12px; font-weight: 900; border-radius: 10px; padding: 1px 6px; display: none; z-index: 2; box-shadow: 0 2px 0 rgba(0,0,0,0.4); }
+    .bbtn.ready { border-color: var(--good); box-shadow: 0 0 12px rgba(127,207,106,0.4); }
+    .bbtn.ready::after { content: "PLACE"; position: absolute; top: 5px; left: 7px; font-size: 10px; font-weight: 900; color: #10200b;
+      background: var(--good); border-radius: 6px; padding: 0 5px; z-index: 2; }
+    .bbtn.done { border-color: var(--good); }
+    .bbtn.done::after { content: "DONE"; position: absolute; top: 5px; left: 7px; font-size: 10px; font-weight: 900; color: var(--good); }
 
-    /* right console: big resource readouts */
-    #infopanel { width: 264px; display: flex; flex-direction: column; gap: 5px; }
-    #resline { display: flex; flex-wrap: nowrap; white-space: nowrap; justify-content: space-between; align-items: center; gap: 6px;
-      padding: 3px 10px; background: #0c0503; border: 1px solid #3a2012;
-      clip-path: polygon(8px 0, 100% 0, 100% 100%, 0 100%, 0 8px); }
-    #credits { font-family: 'Orbitron', 'Share Tech Mono', monospace; font-size: 18px; font-weight: 800; color: #ffd76e; font-variant-numeric: tabular-nums; letter-spacing: 1px;
-      text-shadow: 0 0 12px rgba(255,215,110,0.45); }
-    #creditlabel { font-size: 8.5px; letter-spacing: 2px; color: #b07a54; }
-    #mutebtn { background: none; border: 1px solid #4a2a16; color: #cf9d72; font-family: inherit; font-size: 8.5px; letter-spacing: 1px;
-      padding: 3px 6px; cursor: pointer; }
-    #mutebtn:hover { border-color: #ff8c3a; color: #f5dcc8; }
-    #powerwrap { font-size: 9px; letter-spacing: 1.5px; color: #b07a54; padding: 3px 10px 5px; background: #0c0503; border: 1px solid #3a2012; }
-    #powertext { color: #ffd0a0; font-size: 10px; }
-    #countdown { display: none; align-items: baseline; justify-content: space-between; padding: 3px 10px; background: #0c0503; border: 1px solid #3a2012; }
-    #cdlabel { font-size: 8px; letter-spacing: 2px; color: #b07a54; }
-    #cdtime { font-family: 'Orbitron', monospace; font-size: 15px; font-weight: 800; color: #ffb02e; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
-    #countdown.warn { border-color: #e5484d99; animation: cdflash 1s steps(2) infinite; }
-    #countdown.warn #cdtime { color: #ff5a4a; }
-    @keyframes cdflash { 50% { background: #2a0c08; } }
-    #powerbar { height: 10px; background: #080302; border: 1px solid #3a2012; margin-top: 3px; overflow: hidden; }
-    #powerfill { height: 100%; width: 50%; background: linear-gradient(90deg, #1fae68, #3ddc84); transition: width .2s;
-      box-shadow: 0 0 8px rgba(61,220,132,0.5); }
-    #powerfill.low { background: linear-gradient(90deg, #a3272b, #e5484d); box-shadow: 0 0 8px rgba(229,72,77,0.6); }
-    #selinfo { flex: 1; min-height: 0; padding: 5px 10px; background: #0c0503; border: 1px solid #3a2012; font-size: 10.5px; color: #d8a87e; line-height: 1.5; overflow: hidden; }
-    #selinfo b { color: #fff0dc; letter-spacing: 1px; }
-    #upgbtn { visibility: hidden; flex-shrink: 0; padding: 4px 0; font-family: inherit; font-size: 10.5px; letter-spacing: 1.5px; font-weight: 700; cursor: pointer;
-      background: linear-gradient(180deg, #2a2410, #1a1608); color: #ffd76e; border: 1px solid #ffb02e; }
-    #upgbtn:hover { background: #2e2812; box-shadow: 0 0 10px rgba(255,176,46,0.3); }
-    #upgbtn:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
-    #actbtn { visibility: hidden; flex-shrink: 0; padding: 4px 0; font-family: inherit; font-size: 11px; letter-spacing: 2px; font-weight: 700; cursor: pointer;
-      background: linear-gradient(180deg, #10301e, #081a10); color: #3ddc84; border: 1px solid #3ddc84; }
-    #actbtn:hover { background: #123a24; box-shadow: 0 0 10px rgba(61,220,132,0.3); }
-    #actbtn:disabled { opacity: 0.6; cursor: default; box-shadow: none; }
-    #abilbtn { visibility: hidden; flex-shrink: 0; padding: 4px 0; font-family: inherit; font-size: 11px; letter-spacing: 1.5px; font-weight: 700; cursor: pointer;
-      background: linear-gradient(180deg, #2a1440, #140a24); color: #c88bff; border: 1px solid #a86ff0; }
-    #abilbtn:hover { background: #331a4e; box-shadow: 0 0 10px rgba(168,111,240,0.35); }
-    #abilbtn.on { background: linear-gradient(180deg, #4a2a80, #2a1650); color: #f2e3ff; border-color: #d9b8ff; box-shadow: 0 0 10px rgba(200,139,255,0.4) inset; }
-    #abilbtn:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
+    /* right console: selection readout + action buttons */
+    #infopanel { width: 270px; display: flex; flex-direction: column; gap: 6px; }
+    #selinfo { flex: 1; min-height: 0; padding: 7px 11px; background: var(--well); border: 2px solid #3c3122; border-radius: 10px;
+      box-shadow: var(--sunk); font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; }
+    #selinfo b { color: var(--cream); font-family: var(--head); font-size: 14px; font-weight: 800; }
+    .actbtn { visibility: hidden; flex-shrink: 0; padding: 6px 4px; font-size: 13px; font-weight: 800; cursor: pointer;
+      color: var(--cream); background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 10px;
+      box-shadow: var(--raised); }
+    .actbtn:hover { border-color: var(--gold); }
+    .actbtn:active { transform: translateY(1px); }
+    .actbtn:disabled { opacity: 0.55; cursor: default; border-color: #4a3d2c; transform: none; }
+    #upgbtn { color: var(--gold); }
+    #actbtn { color: #a6e48a; }
+    #abilbtn { color: #d2b0ff; }
+    #abilbtn.on { border-color: #b48aff; background: linear-gradient(180deg, #3a2c4e, #241b31); color: #f2e3ff; }
 
     /* ---- overlays ---- */
     #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px;
-      background: #0c0302cc; z-index: 10; color: #fff; }
-    #overlay h1 { font-family: 'Orbitron', monospace; font-size: 46px; letter-spacing: 6px; }
-    #overlay.win h1 { color: #3ddc84; } #overlay.lose h1 { color: #e5484d; }
-    #overlay button { padding: 10px 26px; font-size: 15px; background: #2a1710; color: #f5dcc8; border: 1px solid #ffb02e; border-radius: 5px; cursor: pointer; font-family: 'Share Tech Mono', monospace; letter-spacing: 2px; }
-    #overlaystats { font-family: 'Share Tech Mono', monospace; color: #cfae8a; font-size: 13px; line-height: 1.9;
+      background: rgba(12,10,8,0.82); z-index: 10; color: var(--cream); padding: 16px; text-align: center; }
+    #overlay h1 { font-family: var(--head); font-size: 54px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 4px 0 rgba(0,0,0,0.6); }
+    #overlay.win h1 { color: var(--gold); } #overlay.lose h1 { color: var(--bad); }
+    #overlaysub { font-size: 16px; color: var(--muted); }
+    #overlay button { padding: 12px 34px; font-size: 17px; font-weight: 900; cursor: pointer; color: #22180a;
+      background: linear-gradient(180deg, var(--gold-hi), #c99a45); border: 2px solid #7a5a26; border-radius: 12px;
+      box-shadow: 0 4px 0 #5a4018; }
+    #overlaystats { color: var(--cream); font-size: 14px; line-height: 1.9; padding: 12px 22px;
+      background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 12px;
       display: grid; grid-template-columns: auto auto; gap: 2px 26px; margin: 4px 0 6px; }
-    #overlaystats .k { color: #8a6a4a; text-align: right; letter-spacing: 1px; }
-    #overlaystats .v { color: #ffd76e; text-align: left; font-variant-numeric: tabular-nums; }
-    #toast { position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); background: #1e0f08ee; border: 1px solid #54301a; color: #ffd76e;
-      padding: 7px 16px; border-radius: 5px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 5; }
+    #overlaystats .k { color: var(--muted); text-align: right; font-weight: 700; }
+    #overlaystats .v { color: var(--gold); text-align: left; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #toast { position: fixed; left: 50%; bottom: 200px; transform: translateX(-50%); background: var(--plates-dk); border: 2px solid var(--edge); color: var(--gold);
+      padding: 8px 18px; border-radius: 11px; font-size: 14px; font-weight: 800; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 5;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
 
-    /* ---- mission briefing: holographic command terminal ---- */
+    /* ---- mission briefing: a plated card over a dim planet horizon ---- */
     /* scrollable so the deploy button is always reachable on small windows */
     #briefing { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center;
-      background: #0a0302; overflow-y: auto; font-family: 'Share Tech Mono', 'SF Mono', Menlo, Consolas, monospace; }
+      background: radial-gradient(ellipse 120% 70% at 50% 115%, #6a3a1c 0%, #3a2214 35%, #16110d 70%), #16110d; overflow-y: auto; }
     #briefwrap { margin: auto; padding: 16px 8px; max-width: 100%; }
-    /* drifting starfield (two parallax layers) */
-    .stars, .stars2 { position: fixed; inset: -50%; pointer-events: none;
-      background-image: radial-gradient(1px 1px at 20% 30%, #ffd0a0 50%, transparent 51%),
+    .stars { position: fixed; inset: 0; pointer-events: none; opacity: 0.55;
+      background-image: radial-gradient(1px 1px at 20% 30%, #ffe6c0 50%, transparent 51%),
         radial-gradient(1px 1px at 60% 70%, #ffffff 50%, transparent 51%),
-        radial-gradient(1.5px 1.5px at 80% 20%, #ffc9a0 50%, transparent 51%),
-        radial-gradient(1px 1px at 40% 80%, #cfe8ff 50%, transparent 51%),
+        radial-gradient(1.5px 1.5px at 80% 20%, #ffd9a8 50%, transparent 51%),
+        radial-gradient(1px 1px at 40% 80%, #e6f0ff 50%, transparent 51%),
         radial-gradient(1px 1px at 90% 55%, #ffffff 50%, transparent 51%),
-        radial-gradient(1.5px 1.5px at 10% 60%, #ffd9b8 50%, transparent 51%);
-      background-size: 420px 420px; animation: drift 180s linear infinite; opacity: 0.7; }
-    .stars2 { background-size: 260px 260px; animation-duration: 90s; opacity: 0.35; }
-    @keyframes drift { from { transform: translate(0,0); } to { transform: translate(420px, 210px); } }
-    /* nebula + perspective grid floor */
-    .nebula { position: fixed; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse 60% 40% at 70% 25%, rgba(190,60,18,0.42), transparent 70%),
-                  radial-gradient(ellipse 50% 35% at 25% 65%, rgba(130,70,12,0.32), transparent 70%); }
-    .gridfloor { position: fixed; left: -30%; right: -30%; bottom: -12%; height: 55%; pointer-events: none;
-      background: linear-gradient(transparent, rgba(255,140,58,0.05)),
-        repeating-linear-gradient(90deg, rgba(255,140,58,0.16) 0 1px, transparent 1px 70px),
-        repeating-linear-gradient(0deg, rgba(255,140,58,0.16) 0 1px, transparent 1px 46px);
-      transform: perspective(420px) rotateX(62deg); transform-origin: 50% 100%;
-      mask-image: linear-gradient(transparent, #000 45%); -webkit-mask-image: linear-gradient(transparent, #000 45%); }
-    /* the terminal panel */
-    #briefbox { position: relative; max-width: min(600px, calc(100vw - 20px)); margin: 12px 0; padding: 30px 38px 28px; color: #f5dcc8;
-      background: linear-gradient(165deg, rgba(10,20,36,0.92), rgba(6,10,22,0.94));
-      border: 1px solid rgba(255,140,58,0.45);
-      clip-path: polygon(26px 0, 100% 0, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%, 0 26px);
-      box-shadow: 0 0 44px rgba(255,140,58,0.14), inset 0 0 70px rgba(15,45,80,0.45); }
-    /* animated scan sweep + scanlines inside the panel */
-    #briefbox::before { content: ""; position: absolute; inset: 0; pointer-events: none;
-      background: repeating-linear-gradient(0deg, rgba(255,200,150,0.028) 0 1px, transparent 1px 3px); }
-    #briefbox::after { content: ""; position: absolute; left: 0; right: 0; height: 70px; top: -80px; pointer-events: none;
-      background: linear-gradient(rgba(255,140,58,0), rgba(255,140,58,0.10), rgba(255,140,58,0));
-      animation: sweep 5.5s linear infinite; }
-    @keyframes sweep { 0% { top: -80px; } 100% { top: 110%; } }
-    /* corner brackets */
-    .hudcorner { position: absolute; width: 16px; height: 16px; border: 2px solid #ff8c3a; pointer-events: none; opacity: .9; }
-    .hudcorner.tl { top: 6px; left: 6px; border-right: none; border-bottom: none; }
-    .hudcorner.tr { top: 6px; right: 6px; border-left: none; border-bottom: none; }
-    .hudcorner.bl { bottom: 6px; left: 6px; border-right: none; border-top: none; }
-    .hudcorner.br { bottom: 6px; right: 6px; border-left: none; border-top: none; }
-    .brieftag { display: flex; align-items: center; gap: 8px; font-size: 10px; letter-spacing: 3px; color: #ffb02e; margin-bottom: 14px; }
-    .livedot { width: 7px; height: 7px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; animation: blink 1.1s steps(2) infinite; }
-    @keyframes blink { 50% { opacity: 0.15; } }
-    .brieftag .fill { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,176,46,0.6), transparent); }
-    #briefbox h1 { font-family: 'Orbitron', 'Share Tech Mono', monospace; font-size: 30px; letter-spacing: 6px; color: #fff0dc; margin-bottom: 3px; font-weight: 700;
-      text-shadow: 0 0 14px rgba(255,120,40,0.8), 0 0 40px rgba(255,90,20,0.4); }
-    #briefbox h1 span { color: #ff8c3a; }
-    #briefbox h2 { font-size: 10.5px; letter-spacing: 3px; color: #b07a54; font-weight: 400; margin-bottom: 16px; }
-    #briefbox h2 b { color: #ffd0a0; font-weight: 400; }
-    #briefbox p { font-size: 12.5px; line-height: 1.7; color: #dcae8a; margin-bottom: 12px; }
-    #briefbox p b { color: #fff0dc; }
-    .objectives { margin: 0 0 18px 0; padding: 11px 16px; list-style: none; font-size: 11.5px; line-height: 1.9; color: #f5dcc8;
-      background: rgba(255,140,58,0.05); border: 1px solid rgba(255,140,58,0.22);
-      clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px); }
-    .objectives li::before { content: "⬢ "; color: #ff8c3a; font-size: 9px; }
-    /* radar ring decoration */
-    .radar { position: absolute; right: 26px; top: 24px; width: 58px; height: 58px; border-radius: 50%; pointer-events: none;
-      border: 1px solid rgba(255,140,58,0.4); box-shadow: inset 0 0 14px rgba(255,140,58,0.12); }
-    .radar::before { content: ""; position: absolute; inset: 12px; border-radius: 50%; border: 1px dashed rgba(255,140,58,0.35); }
-    .radar::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
-      background: conic-gradient(rgba(255,140,58,0.5), transparent 70deg, transparent);
-      animation: spin 3s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    /* opponent selector: segmented threat cards */
-    #opponents { margin-bottom: 18px; }
-    #opplabel { font-size: 10px; letter-spacing: 3px; color: #b07a54; margin-bottom: 7px; }
-    #aiopts, #diffopts, .paramrow { display: flex; gap: 8px; }
-    .paramrow .opt { font-size: 11px; letter-spacing: 1px; padding: 8px 4px 7px; }
-    .opt { flex: 1; padding: 9px 6px 7px; text-align: center; cursor: pointer; color: #c89068; background: rgba(12,26,44,0.7);
-      border: 1px solid rgba(255,140,58,0.25); font-family: inherit; font-size: 17px; font-weight: 700; letter-spacing: 1px;
-      clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); transition: all .15s; }
-    .opt span { display: block; font-size: 8.5px; font-weight: 400; letter-spacing: 1.5px; margin-top: 3px; color: #b07a54; }
-    .opt:hover { border-color: #ff8c3a; color: #ffe4c8; }
-    .opt.sel { background: rgba(255,140,58,0.16); border-color: #ff8c3a; color: #fff0dc;
-      box-shadow: 0 0 14px rgba(255,140,58,0.25), inset 0 0 18px rgba(255,140,58,0.12); }
-    .opt.sel span { color: #ffd0a0; }
-    #deploy { font-family: 'Orbitron', 'Share Tech Mono', monospace; position: relative; width: 100%; padding: 14px 0; font-size: 14px; letter-spacing: 5px; font-weight: 700; cursor: pointer;
-      font-family: inherit; color: #1e0a02; background: linear-gradient(180deg, #ffa244, #d3541e);
-      border: none; clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
-      text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
-    #deploy:hover { background: linear-gradient(180deg, #ffc067, #e86a28); box-shadow: 0 0 26px rgba(255,140,58,0.5); }
-    #deploy::after { content: "▸▸▸"; position: absolute; right: 18px; letter-spacing: 2px; animation: chev 1s steps(3) infinite; }
-    @keyframes chev { 50% { opacity: 0.25; } }
+        radial-gradient(1.5px 1.5px at 10% 60%, #ffe0c0 50%, transparent 51%);
+      background-size: 380px 380px; }
+    /* the dying sun, low on the horizon */
+    .sun { position: fixed; left: 50%; bottom: -38vh; width: 80vh; height: 80vh; transform: translateX(-50%); border-radius: 50%; pointer-events: none;
+      background: radial-gradient(circle, rgba(255,170,80,0.55) 0%, rgba(230,110,40,0.28) 35%, rgba(160,60,20,0) 70%); }
+    #briefbox { position: relative; max-width: min(620px, calc(100vw - 20px)); margin: 12px 0; padding: 30px 34px 28px; color: var(--cream);
+      background: var(--rivets), var(--plates); border: 3px solid var(--edge); border-radius: 18px;
+      box-shadow: 0 0 0 2px #120e0a, 0 18px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,240,210,0.1); }
+    .brieftag { font-size: 12px; font-weight: 800; color: var(--muted); margin-bottom: 8px; letter-spacing: 0.5px; }
+    .brieftag b { color: #ff9a5a; }
+    #briefbox h1 { font-family: var(--head); font-size: 40px; font-weight: 900; color: var(--gold); line-height: 1.05; margin-bottom: 4px;
+      text-shadow: 0 3px 0 rgba(0,0,0,0.55); }
+    #briefbox h1 span { color: #ff9a5a; }
+    #briefbox h2 { font-size: 13px; color: var(--muted); font-weight: 700; margin-bottom: 16px; }
+    #briefbox h2 b { color: var(--cream); }
+    #briefbox p { font-size: 14.5px; line-height: 1.6; color: #d8ccb0; margin-bottom: 12px; }
+    #briefbox p b { color: var(--gold); }
+    .objectives { margin: 0 0 20px 0; padding: 11px 16px; list-style: none; font-size: 14px; font-weight: 700; line-height: 1.85; color: var(--cream);
+      background: var(--well); border: 2px solid #3c3122; border-radius: 12px; box-shadow: var(--sunk); }
+    .objectives li::before { content: "◈ "; color: var(--gold); }
+    #opponents { margin-bottom: 20px; }
+    .optlabel { font-family: var(--head); font-size: 16px; font-weight: 800; color: var(--gold); margin: 14px 0 7px; }
+    .optlabel:first-child { margin-top: 0; }
+    #aiopts, #diffopts, .paramrow { display: flex; gap: 9px; }
+    /* option cards: dark plates, the chosen one gets a glowing gold rim */
+    .opt { flex: 1; padding: 10px 6px 9px; text-align: center; cursor: pointer; color: var(--cream);
+      background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 12px;
+      font-family: var(--head); font-size: 20px; font-weight: 800;
+      box-shadow: var(--raised); transition: border-color .15s, box-shadow .15s; }
+    .opt i { display: block; font-style: normal; font-size: 26px; height: 34px; line-height: 34px; margin-bottom: 2px; }
+    .opt span { display: block; font-family: var(--body); font-size: 11.5px; font-weight: 700; font-style: italic; margin-top: 3px; color: var(--muted); }
+    .opt:hover { border-color: var(--edge-hi); }
+    .opt.sel { border-color: var(--gold); color: var(--gold);
+      box-shadow: 0 0 18px rgba(232,198,106,0.5), var(--raised), inset 0 0 18px rgba(232,198,106,0.1); }
+    .opt.sel span { color: #d8ccb0; }
+    .paramrow .opt { font-size: 14px; padding: 9px 4px 8px; }
+    #deploy { position: relative; width: 100%; padding: 15px 0; font-family: var(--head); font-size: 20px; font-weight: 900; letter-spacing: 1px; cursor: pointer;
+      color: #22180a; background: linear-gradient(180deg, var(--gold-hi), #c99a45); border: 2px solid #7a5a26; border-radius: 14px;
+      box-shadow: 0 5px 0 #5a4018, 0 10px 20px rgba(0,0,0,0.4); text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
+    #deploy:hover { background: linear-gradient(180deg, #fff0c0, #dcae58); }
+    #deploy:active { transform: translateY(3px); box-shadow: 0 2px 0 #5a4018; }
 
     /* ---- compact HUD for phones & small windows ---- */
     @media (max-width: 860px), (pointer: coarse) and (max-height: 560px) {
-      #minimap { width: 84px; height: 84px; }
-      #infopanel { width: 150px; }
-      #credits { font-size: 13px; }
-      .bbtn { width: 80px; min-width: 80px; }
+      #minimap { width: 88px; height: 88px; border-width: 3px; }
+      #infopanel { width: 160px; }
+      #credits { font-size: 15px; }
+      .pill { min-height: 32px; padding: 3px 9px; border-radius: 9px; }
+      #powerwrap { min-width: 110px; }
+      #powerhead { font-size: 10px; }
+      #cdlabel { display: none; }
+      .bbtn { width: 82px; min-width: 82px; }
       .bbtn img, .bbtn svg { max-height: 46px; }
-      .htab { padding: 5px 8px 4px; font-size: 9.5px; letter-spacing: 1px; }
-      #selinfo { font-size: 9px; }
-      #toast { bottom: 150px; font-size: 11px; }
-      #briefbox { padding: 18px 16px; margin: 8px; }
-      #briefbox h1 { font-size: 20px; letter-spacing: 3px; }
-      #briefbox p { font-size: 11px; }
-      .objectives { font-size: 10px; }
-      .opt { font-size: 13px; padding: 7px 3px 5px; }
-      .opt span { font-size: 7px; }
-      .radar { display: none; }
+      .bbtn .nm { font-size: 10.5px; }
+      .bbtn .cost { font-size: 10.5px; }
+      .htab { padding: 5px 9px 4px; font-size: 11px; }
+      #selinfo { font-size: 10.5px; }
+      #selinfo b { font-size: 12px; }
+      .actbtn { font-size: 11px; }
+      #toast { bottom: 160px; font-size: 12px; }
+      #briefbox { padding: 20px 16px; margin: 8px; }
+      #briefbox h1 { font-size: 28px; }
+      #briefbox p { font-size: 13px; }
+      .objectives { font-size: 12.5px; }
+      .opt { font-size: 16px; padding: 8px 3px 7px; }
+      .opt i { font-size: 21px; height: 28px; line-height: 28px; }
+      .opt span { font-size: 9.5px; }
+      .paramrow .opt { font-size: 12px; }
     }
 
     /* short landscape viewport (phones especially): reclaim vertical space so the
        battlefield gets most of the screen — this is the intended way to play */
     @media (orientation: landscape) and (max-height: 480px) {
       #minimapwrap { justify-content: flex-end; }
-      #hudrow { gap: 5px; padding: 4px; }
-      #minimap { width: 60px; height: 60px; }
+      #hudrow { gap: 5px; padding: 4px 5px 5px; }
+      #minimap { width: 62px; height: 62px; border-width: 2px; border-radius: 6px; }
       #infopanel { width: 124px; gap: 3px; }
-      #resline { padding: 2px 6px; }
-      #credits { font-size: 12px; }
-      #creditlabel { display: none; }
-      #powerwrap { padding: 2px 6px 3px; }
-      #powerbar { height: 7px; }
-      .bbtn { width: 58px; min-width: 58px; padding: 2px 0; }
+      .pill { min-height: 28px; padding: 2px 8px; gap: 5px; }
+      #credits { font-size: 13px; }
+      #powerwrap { min-width: 90px; }
+      #powerhead { font-size: 9px; }
+      #powerbar { height: 6px; }
+      .bbtn { width: 60px; min-width: 60px; padding: 3px 1px; border-radius: 9px; }
       .bbtn img, .bbtn svg { max-height: 34px; }
-      .bbtn .nm { font-size: 7px; line-height: 1; letter-spacing: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .bbtn .cost { font-size: 8px; }
+      .bbtn .nm { font-size: 8px; line-height: 1; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .bbtn .cost { font-size: 8.5px; }
+      .bbtn .count { font-size: 10px; min-width: 18px; }
       #buildgrid { gap: 4px; }
-      .htab { padding: 3px 7px 3px; font-size: 8.5px; letter-spacing: 1px; }
-      #tabsbar { padding: 0 4px; }
-      #selinfo { padding: 3px 6px; font-size: 8.5px; line-height: 1.3; }
-      #upgbtn, #actbtn { padding: 3px 0; font-size: 9px; letter-spacing: 1px; }
+      .htab { padding: 3px 8px 2px; font-size: 10px; }
+      #tabsbar { padding: 3px 4px 0; }
+      #selinfo { padding: 3px 6px; font-size: 9px; line-height: 1.3; border-radius: 7px; }
+      #selinfo b { font-size: 10.5px; }
+      .actbtn { padding: 3px 0; font-size: 9.5px; border-radius: 7px; }
       #mutebtn { display: none; }
     }
 
     /* ☰ menu button — floats top-right over the map, always available */
-    #menubtn {
-      position: absolute; top: 8px; right: 8px; z-index: 6;
-      width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;
-      font-size: 20px; color: #ffb02e; background: rgba(12,5,3,0.72);
-      border: 1px solid #ff8c3a88; border-radius: 8px; cursor: pointer;
-      -webkit-tap-highlight-color: transparent; user-select: none;
-    }
-    #menubtn:hover { border-color: #ff8c3a; color: #ffe4c8; }
+    .mapbtn { position: absolute; top: 8px; z-index: 6; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+      font-size: 21px; color: var(--gold); background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 12px; cursor: pointer;
+      box-shadow: var(--raised);
+      -webkit-tap-highlight-color: transparent; user-select: none; }
+    .mapbtn:hover { border-color: var(--edge-hi); color: var(--gold-hi); }
+    #menubtn { right: 8px; }
 
-    /* idle-harvester warning button — bottom-left over the map, only when idle */
-    #idlebtn { display: none; position: absolute; left: 8px; top: 60px; z-index: 6;
-      height: 34px; padding: 0 10px; align-items: center; gap: 4px;
-      font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: 700; color: #131313;
-      background: #ffb02e; border: none; border-radius: 7px; cursor: pointer;
-      box-shadow: 0 0 12px rgba(255,176,46,0.5); -webkit-tap-highlight-color: transparent; }
+    /* idle-harvester warning button — under the resource strip, only when idle */
+    #idlebtn { display: none; position: absolute; left: 8px; top: 58px; z-index: 6;
+      height: 36px; padding: 0 12px; align-items: center; gap: 5px;
+      font-size: 14px; font-weight: 900; color: #22180a;
+      background: linear-gradient(180deg, #ffd27a, #e09a2e); border: 2px solid #7a5a26; border-radius: 11px; cursor: pointer;
+      box-shadow: 0 3px 0 #5a4018; -webkit-tap-highlight-color: transparent; }
     #idlebtn.show { display: flex; animation: idlepulse 1.2s ease-in-out infinite; }
-    @keyframes idlepulse { 50% { box-shadow: 0 0 4px rgba(255,176,46,0.3); } }
+    @keyframes idlepulse { 50% { filter: brightness(1.2); } }
 
-    /* enemy orbital-strike dread banner — top-center */
-    #enemysw { display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 7;
-      padding: 6px 18px; font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700; letter-spacing: 2px;
-      color: #ffdad2; background: rgba(40,6,4,0.86); border: 1px solid #ff4030;
-      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-      text-shadow: 0 0 8px rgba(255,64,48,0.7); white-space: nowrap; }
+    /* enemy orbital-strike dread banner — top-center, below the resource strip */
+    #enemysw { display: none; position: absolute; top: 58px; left: 50%; transform: translateX(-50%); z-index: 7;
+      padding: 7px 18px; font-family: var(--head); font-size: 15px; font-weight: 800;
+      color: #ffe2da; background: linear-gradient(180deg, #5a1e16, #3a120c); border: 2px solid var(--bad); border-radius: 12px;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.5); white-space: nowrap; }
     #enemysw.show { display: block; }
     #enemysw.imminent { animation: swflash 0.7s steps(2) infinite; }
-    @keyframes swflash { 50% { background: rgba(90,10,6,0.92); color: #fff; } }
+    @keyframes swflash { 50% { background: #8a2618; color: #fff; } }
 
     #pausemenu { position: fixed; inset: 0; z-index: 15; display: none; align-items: center; justify-content: center;
-      background: rgba(10,4,2,0.82); backdrop-filter: blur(2px);
-      font-family: 'Share Tech Mono', monospace; }
-    #pausebox { display: flex; flex-direction: column; gap: 12px; padding: 30px 40px; min-width: 260px;
-      background: linear-gradient(165deg, rgba(24,11,6,0.96), rgba(12,5,3,0.96)); border: 1px solid #ff8c3a66;
-      clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-      box-shadow: 0 0 40px rgba(255,120,40,0.15); }
-    #pausebox h2 { font-family: 'Orbitron', monospace; text-align: center; color: #ffb02e; letter-spacing: 6px; font-size: 22px; margin-bottom: 6px; }
-    #pausebox button { padding: 12px 0; font-family: inherit; font-size: 13px; letter-spacing: 2px; font-weight: 700; cursor: pointer;
-      color: #ffe4c8; background: linear-gradient(180deg, #2a140a, #1a0c06); border: 1px solid #ff8c3a88; }
-    #pausebox button:hover { background: #33180c; box-shadow: 0 0 12px rgba(255,140,58,0.3); }
+      background: rgba(12,10,8,0.78); backdrop-filter: blur(2px); }
+    #pausebox { display: flex; flex-direction: column; gap: 12px; padding: 30px 36px; min-width: 280px;
+      background: var(--rivets), var(--plates); border: 3px solid var(--edge); border-radius: 18px;
+      box-shadow: 0 0 0 2px #120e0a, 0 18px 40px rgba(0,0,0,0.6); }
+    #pausebox h2 { font-family: var(--head); text-align: center; color: var(--gold); font-size: 30px; font-weight: 900; margin-bottom: 4px;
+      text-shadow: 0 3px 0 rgba(0,0,0,0.55); }
+    #pausebox button { padding: 13px 0; font-size: 16px; font-weight: 800; cursor: pointer; color: var(--cream);
+      background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 12px;
+      box-shadow: var(--raised); }
+    #pausebox button:hover { border-color: var(--gold); color: var(--gold); }
 
     /* ⛶ box-select toggle — floats over the map, touch devices only */
     #selectmode { display: none; }
     @media (pointer: coarse) {
-      #selectmode {
-        display: flex; position: absolute; top: 8px; left: 8px; z-index: 6;
-        width: 46px; height: 46px; align-items: center; justify-content: center;
-        font-size: 22px; color: #ffb02e; background: rgba(12,5,3,0.72);
-        border: 1px solid #ff8c3a88; border-radius: 8px; cursor: pointer;
-        -webkit-tap-highlight-color: transparent; user-select: none;
-      }
-      #selectmode.active { color: #0a0402; background: #ffb02e; box-shadow: 0 0 12px rgba(255,176,46,0.6); }
+      #selectmode { display: flex; left: 8px; }
+      #selectmode.active { color: #22180a; background: linear-gradient(180deg, var(--gold-hi), #c99a45); border-color: #7a5a26; }
+      #topbar { left: 60px; max-width: calc(100% - 118px); }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-BYAuSycP.js"></script>
+  <script type="module" crossorigin src="./assets/index-Dq4ajaA6.js"></script>
 </head>
 <body>
   <div id="app">
     <canvas id="game"></canvas>
-    <button id="selectmode" title="Box-select mode">⛶</button>
-    <button id="menubtn" title="Menu">☰</button>
+    <div id="topbar">
+      <div class="pill" id="resline" title="Flux crystal">
+        <span id="creditlabel">FLUX</span>
+        <span id="credits">◈ 5000</span>
+      </div>
+      <div class="pill" id="powerwrap" title="Power">
+        <div id="powerhead">⚡ <span id="powertext"></span></div>
+        <div id="powerbar"><div id="powerfill"></div></div>
+      </div>
+      <div class="pill" id="countdown"><span id="cdlabel">☀ Supernova</span> <span id="cdtime">--:--</span></div>
+      <button class="pill" id="mutebtn" title="Toggle sound (M)"></button>
+    </div>
+    <button id="selectmode" class="mapbtn" title="Box-select mode">⛶</button>
+    <button id="menubtn" class="mapbtn" title="Menu">☰</button>
     <button id="idlebtn" title="Idle harvester (no crystal)">⚠ <span id="idlecount">0</span></button>
     <div id="enemysw"></div>
     <div id="bottombar">
@@ -323,45 +345,32 @@
           <div id="buildgrid"></div>
         </div>
         <div id="infopanel">
-          <div id="resline">
-            <span id="creditlabel">FLUX</span>
-            <span id="credits">◈ 5000</span>
-            <button id="mutebtn" title="Toggle sound (M)"></button>
-          </div>
-          <div id="powerwrap">POWER <span id="powertext"></span>
-            <div id="powerbar"><div id="powerfill"></div></div>
-          </div>
-          <div id="countdown"><span id="cdlabel">SUPERNOVA IN</span> <span id="cdtime">--:--</span></div>
           <div id="selinfo"></div>
-          <button id="abilbtn"></button>
-          <button id="actbtn"></button>
-          <button id="upgbtn"></button>
+          <button id="abilbtn" class="actbtn"></button>
+          <button id="actbtn" class="actbtn"></button>
+          <button id="upgbtn" class="actbtn"></button>
         </div>
       </div>
     </div>
   </div>
-  <div id="overlay"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><div id="overlaystats"></div><button onclick="location.reload()">PLAY AGAIN</button></div>
+  <div id="overlay"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><div id="overlaystats"></div><button onclick="location.reload()">Play again</button></div>
   <div id="pausemenu">
     <div id="pausebox">
-      <h2>PAUSED</h2>
-      <button id="resumebtn">▶ RESUME</button>
-      <button id="restartbtn">⟲ RESTART MISSION</button>
-      <button id="pausemute">SOUND: ON</button>
+      <h2>Paused</h2>
+      <button id="resumebtn">▶ Resume</button>
+      <button id="restartbtn">⟲ Restart mission</button>
+      <button id="pausemute">Sound: on</button>
     </div>
   </div>
   <div id="toast"></div>
   <div id="briefing">
-    <div class="stars"></div><div class="stars2"></div>
-    <div class="nebula"></div>
-    <div class="gridfloor"></div>
+    <div class="stars"></div>
+    <div class="sun"></div>
     <div id="briefwrap">
     <div id="briefbox">
-      <div class="hudcorner tl"></div><div class="hudcorner tr"></div>
-      <div class="hudcorner bl"></div><div class="hudcorner br"></div>
-      <div class="radar"></div>
-      <div class="brieftag"><span class="livedot"></span>LIVE UPLINK · OPERATION LAST LIGHT · HELIOS SYSTEM · COLLAPSE T−214 DAYS<span class="fill"></span></div>
-      <h1>OMEGA <span>ZERO DAY</span></h1>
-      <h2>ARK FLEET COMMAND &nbsp;//&nbsp; EVACUATION VANGUARD &nbsp;//&nbsp; <b>FINAL TRANSMISSION</b></h2>
+      <div class="brieftag">Operation Last Light · Helios system · collapse in <b>214 days</b></div>
+      <h1>Omega <span>Zero Day</span></h1>
+      <h2>Ark Fleet Command — <b>final transmission</b></h2>
       <p>Commander — the sun is dying. In <b>214 days</b> Helios goes supernova and takes everything
         with it. The ark-fleet in orbit can carry what's left of humanity to Andromeda, but its jump
         drives are dry: they burn <b>flux crystal</b>, and the last fields lie on this scorched world
@@ -375,38 +384,38 @@
         <li>Annihilate every hostile structure to clear the launch corridor</li>
       </ul>
       <div id="opponents">
-        <div id="opplabel">HOSTILE FACTIONS DETECTED</div>
+        <div class="optlabel">Hostile factions</div>
         <div id="aiopts">
-          <button class="opt sel" type="button" data-n="1">1<span>KESSLER COLLECTIVE</span></button>
-          <button class="opt" type="button" data-n="2">2<span>+ VERDANT PACT · 76×76</span></button>
-          <button class="opt" type="button" data-n="3">3<span>+ ASHEN SYNDICATE · 90×90</span></button>
+          <button class="opt sel" type="button" data-n="1">1<span>Kessler Collective</span></button>
+          <button class="opt" type="button" data-n="2">2<span>+ Verdant Pact · 76×76</span></button>
+          <button class="opt" type="button" data-n="3">3<span>+ Ashen Syndicate · 90×90</span></button>
         </div>
-        <div id="opplabel" style="margin-top:10px">THREAT ASSESSMENT</div>
+        <div class="optlabel">Threat level</div>
         <div id="diffopts">
-          <button class="opt" type="button" data-d="easy">EASY<span>SLOW ECONOMY · SMALL WAVES</span></button>
-          <button class="opt sel" type="button" data-d="normal">NORMAL<span>STANDARD DOCTRINE</span></button>
-          <button class="opt" type="button" data-d="hard">HARD<span>COUNTERS YOUR ARMY · RELENTLESS</span></button>
+          <button class="opt" type="button" data-d="easy"><i>🛡️</i>Easy<span>Slow economy, small waves.</span></button>
+          <button class="opt sel" type="button" data-d="normal"><i>⚔️</i>Normal<span>Standard doctrine.</span></button>
+          <button class="opt" type="button" data-d="hard"><i>☠️</i>Hard<span>Counters your army. Relentless.</span></button>
         </div>
-        <div id="opplabel" style="margin-top:10px">STARTING CREDITS</div>
+        <div class="optlabel">Starting flux</div>
         <div class="paramrow" id="creditopts">
-          <button class="opt" type="button" data-v="3000">LEAN</button>
-          <button class="opt sel" type="button" data-v="5000">STANDARD</button>
-          <button class="opt" type="button" data-v="10000">RICH</button>
+          <button class="opt" type="button" data-v="3000">Lean</button>
+          <button class="opt sel" type="button" data-v="5000">Standard</button>
+          <button class="opt" type="button" data-v="10000">Rich</button>
         </div>
-        <div id="opplabel" style="margin-top:10px">CRYSTAL FIELDS</div>
+        <div class="optlabel">Crystal fields</div>
         <div class="paramrow" id="crystalopts">
-          <button class="opt" type="button" data-v="0.7">SPARSE</button>
-          <button class="opt sel" type="button" data-v="1">NORMAL</button>
-          <button class="opt" type="button" data-v="1.6">ABUNDANT</button>
+          <button class="opt" type="button" data-v="0.7">Sparse</button>
+          <button class="opt sel" type="button" data-v="1">Normal</button>
+          <button class="opt" type="button" data-v="1.6">Abundant</button>
         </div>
-        <div id="opplabel" style="margin-top:10px">SUPERNOVA COUNTDOWN</div>
+        <div class="optlabel">Supernova countdown</div>
         <div class="paramrow" id="novaopts">
-          <button class="opt sel" type="button" data-v="0">OFF</button>
-          <button class="opt" type="button" data-v="900">15 MIN</button>
-          <button class="opt" type="button" data-v="1500">25 MIN</button>
+          <button class="opt sel" type="button" data-v="0">Off</button>
+          <button class="opt" type="button" data-v="900">15 min</button>
+          <button class="opt" type="button" data-v="1500">25 min</button>
         </div>
       </div>
-      <button id="deploy" type="button">COMMENCE OPERATION</button>
+      <button id="deploy" type="button">Commence operation ▸</button>
     </div>
     </div>
   </div>
