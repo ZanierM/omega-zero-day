@@ -101,9 +101,12 @@ export function loadSprites(): Promise<void> {
 // ---------------- terrain texture ----------------
 
 let terrainTex: HTMLCanvasElement;
-// the terrain texture is painted at half resolution and blown up without
-// smoothing, so the ground reads as chunky 2×-pixel art like an old RTS map
-export const TEX_SCALE = 2;
+// classic: the terrain texture is painted at half resolution and blown up
+// without smoothing, so the ground reads as chunky 2×-pixel art like an old RTS
+// map. Refined: full resolution, smooth colour, finer clutter.
+let texScale = 2;
+// the decoration layout is seeded per game so a style toggle repaints the same map
+let terrainSeed = -1;
 
 // 2×2 ordered-dither offsets: quantized colour bands break into a checker
 // pattern instead of hard steps, the classic 16-bit shading trick
@@ -116,7 +119,9 @@ const TREE_TEAL: Pal = { out: '#11231c', dk: '#1f4236', mid: '#2f6b55', lt: '#4f
 const TREE_PURPLE: Pal = { out: '#1b1226', dk: '#36234c', mid: '#573a76', lt: '#8460a6', hi: '#c49edc' };
 
 function paintTerrain() {
-  const P = TEX_SCALE;
+  if (terrainSeed < 0) terrainSeed = nseed; else nseed = terrainSeed;
+  const fine = refinedStyle;
+  const P = texScale = fine ? 1 : 2;
   const W = MAP_W * TILE, H = MAP_H * TILE;   // world size
   const TW = W / P, TH = H / P;               // texture size
   const [tex, g] = makeCanvas(TW, TH);
@@ -142,7 +147,7 @@ function paintTerrain() {
     const ax = fx - ix, ay = fy - iy;
     const top = wet(ix, iy) * (1 - ax) + wet(ix + 1, iy) * ax;
     const bot = wet(ix, iy + 1) * (1 - ax) + wet(ix + 1, iy + 1) * ax;
-    return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3 + (noise(x / 5 + 9, y / 5) - 0.5) * 0.035;
+    return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3 + (noise(x / 5 + 9, y / 5) - 0.5) * (refinedStyle ? 0.01 : 0.035);
   };
 
   const img = g.createImageData(TW, TH);
@@ -192,7 +197,11 @@ function paintTerrain() {
         const depth = Math.min(1, (w - 0.5) * 3.2);
         r = 72 - depth * 46; gg = 160 - depth * 84; b = 178 - depth * 50;
         if (noise(x / 16 + 11, y / 3.2) > 0.8) { r += 30; gg += 34; b += 34; } // ripples
-        if (w < 0.54) { r = 220; gg = 230; b = 216; }                          // foam
+        if (fine) {
+          // a soft foam band fading out into the shallows
+          const f = Math.max(0, 1 - (w - 0.5) / 0.06) * 0.9;
+          r = r * (1 - f) + 220 * f; gg = gg * (1 - f) + 230 * f; b = b * (1 - f) + 216 * f;
+        } else if (w < 0.54) { r = 220; gg = 230; b = 216; }                    // foam
       } else if (w > 0.3) {
         const t = (w - 0.3) / 0.2;    // 0 at the dry edge → 1 at the waterline
         r = r * (1 - t) + (214 - t * 54) * t;
@@ -200,11 +209,17 @@ function paintTerrain() {
         b = b * (1 - t) + (128 - t * 36) * t;
       }
 
-      const dth = BAYER[(py & 1) * 2 + (px & 1)];
       const i = (py * TW + px) * 4;
-      d[i] = Math.floor(r / STEP + dth) * STEP;
-      d[i + 1] = Math.floor(gg / STEP + dth) * STEP;
-      d[i + 2] = Math.floor(b / STEP + dth) * STEP;
+      if (fine) {
+        // smooth colour with a fine natural grain instead of stepped, dithered bands
+        const gr = (noise(x / 2.6 + 17, y / 2.6) - 0.5) * 10 + (noise(x / 9 + 5, y / 9 + 3) - 0.5) * 7;
+        d[i] = r + gr; d[i + 1] = gg + gr * 0.92; d[i + 2] = b + gr * 0.8;
+      } else {
+        const dth = BAYER[(py & 1) * 2 + (px & 1)];
+        d[i] = Math.floor(r / STEP + dth) * STEP;
+        d[i + 1] = Math.floor(gg / STEP + dth) * STEP;
+        d[i + 2] = Math.floor(b / STEP + dth) * STEP;
+      }
       d[i + 3] = 255;
     }
   }
@@ -229,7 +244,7 @@ function paintTerrain() {
     grd.addColorStop(1, 'rgba(60,26,12,0)');
     g.fillStyle = grd;
     g.beginPath(); g.ellipse(cx, cy, r, r * 0.8, 0, 0, Math.PI * 2); g.fill();
-    g.lineWidth = 3;
+    g.lineWidth = fine ? 1.6 : 3;
     g.strokeStyle = 'rgba(255,224,170,0.35)';
     g.beginPath(); g.ellipse(cx, cy, r * 0.8, r * 0.64, 0, Math.PI * 0.05, Math.PI * 0.95); g.stroke();
     g.strokeStyle = 'rgba(50,22,10,0.35)';
@@ -238,7 +253,7 @@ function paintTerrain() {
 
   // hairline cracks
   g.strokeStyle = 'rgba(56,24,12,0.38)';
-  g.lineWidth = 2;
+  g.lineWidth = fine ? 1.1 : 2;
   const cracks = Math.floor(MAP_W * MAP_H / 50);
   for (let n = 0; n < cracks; n++) {
     let x = nrand() * W, y = nrand() * H;
@@ -262,9 +277,18 @@ function paintTerrain() {
     const x = Math.floor(nrand() * TW), y = Math.floor(nrand() * TH);
     if (!dry(x * P, y * P)) continue;
     const sz = nrand() < 0.3 ? 2 : 1;
+    const lit = nrand() < 0.5 ? '#d2b892' : '#a98a6a';
+    if (fine) {
+      const r = sz === 2 ? 1.7 : 1.05;
+      g.fillStyle = 'rgba(48,24,12,0.45)';
+      g.beginPath(); g.ellipse(x + 0.5, y + r * 0.55, r * 1.15, r * 0.55, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = lit; g.beginPath(); g.ellipse(x, y, r, r * 0.72, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,245,225,0.45)'; g.fillRect(x - r * 0.5, y - r * 0.5, r * 0.6, r * 0.35);
+      continue;
+    }
     g.fillStyle = 'rgba(48,24,12,0.6)';
     g.fillRect(x, y + 1, sz, 1);
-    g.fillStyle = nrand() < 0.5 ? '#d2b892' : '#a98a6a';
+    g.fillStyle = lit;
     g.fillRect(x, y + 1 - sz, sz, sz);
   }
   const tufts = Math.floor(MAP_W * MAP_H * 0.8);
@@ -273,14 +297,16 @@ function paintTerrain() {
     if (!dry(x * P, y * P)) continue;
     const hue = nrand();
     const blades = 2 + Math.floor(nrand() * 3);
+    // refined: twice the blades at half the width, so a tuft is finer, not bigger
+    const u = fine ? 2 : 1, n = blades * (fine ? 2 : 1), bw = fine ? 0.8 : 1;
     g.fillStyle = 'rgba(40,22,10,0.45)';
-    g.fillRect(x - 1, y, blades + 2, 1);
-    for (let k = 0; k < blades; k++) {
-      const h = 1 + Math.floor(nrand() * 3);
+    g.fillRect(x - u, y, (blades + 2) * u, fine ? 0.8 : 1);
+    for (let k = 0; k < n; k++) {
+      const h = (1 + Math.floor(nrand() * 3)) * u * (fine ? 0.8 : 1);
       g.fillStyle = hue < 0.6 ? '#76762f' : hue < 0.85 ? '#a08e3a' : '#5e5026';
-      g.fillRect(x + k, y - h, 1, h);
+      g.fillRect(x + k * (fine ? 1 : 1), y - h, bw, h);
       g.fillStyle = '#e4d58e';
-      if (nrand() < 0.5) g.fillRect(x + k, y - h, 1, 1);
+      if (nrand() < 0.5) g.fillRect(x + k, y - h, bw, fine ? 0.8 : 1);
     }
   }
 
@@ -391,7 +417,7 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
     }
     g.closePath();
   };
-  g.lineWidth = 3; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
+  g.lineWidth = refinedStyle ? 1.5 : 3; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
   path(); g.stroke(); g.fill();
   g.save(); path(); g.clip();
   g.fillStyle = pal.dk;
@@ -401,7 +427,7 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
   g.fillStyle = pal.hi;
   g.beginPath(); g.ellipse(cx - r * 0.38, by - r * 0.52, r * 0.26, r * 0.15, -0.3, 0, Math.PI * 2); g.fill();
   if (r > 10) {
-    g.strokeStyle = pal.out; g.lineWidth = 2; g.globalAlpha = 0.6;
+    g.strokeStyle = pal.out; g.lineWidth = refinedStyle ? 1 : 2; g.globalAlpha = 0.6;
     g.beginPath(); g.moveTo(cx + r * 0.1, by - r * 0.3); g.lineTo(cx + r * 0.25, by + r * 0.05); g.lineTo(cx + r * 0.15, by + r * 0.35); g.stroke();
     g.globalAlpha = 1;
   }
@@ -421,7 +447,8 @@ function drawTree(g: CanvasRenderingContext2D, cx: number, cy: number, s: number
   }
   puffs.push([cx, cy - s * 1.1, s * 0.55]);
   g.fillStyle = pal.out;
-  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r + 1.5, 0, Math.PI * 2); g.fill(); }
+  const rim = refinedStyle ? 0.8 : 1.5;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r + rim, 0, Math.PI * 2); g.fill(); }
   g.fillStyle = pal.dk;
   for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
   g.fillStyle = pal.mid;
@@ -659,11 +686,11 @@ function turnToward(cur: number, want: number, maxStep: number): number {
   return cur + Math.max(-maxStep, Math.min(maxStep, d));
 }
 const headingIndex = (a: number, n: number) => ((Math.round(a / (Math.PI * 2 / n)) % n) + n) % n;
-function drawVehicle(u: Unit, moving: boolean) {
+function drawVehicle(u: Unit, moving: boolean, lift = 0) {
   const va = VEHICLE_ART[u.def.id]!, n = vehAngles(u.def.id);
   const v = vehViz.get(u.id) ?? { hull: u.facing, tur: u.facing };
   vehViz.set(u.id, v);
-  v.hull = turnToward(v.hull, u.facing, 4 * vizDt);
+  v.hull = turnToward(v.hull, u.facing, (va.turn ?? 4) * vizDt);
   const tid = u.order.type === 'attack' ? u.order.targetId ?? -1 : u.autoTargetId;
   const tgt = tid >= 0 ? byId.get(tid) : undefined;
   let aim = v.hull;
@@ -674,7 +701,7 @@ function drawVehicle(u: Unit, moving: boolean) {
   const bob = va.frames ? 0 : Math.sin(T * 2.4 + u.id) * 0.8;
   for (const part of va.turret ? ['hull', 'turret'] as const : ['hull'] as const) {
     const s = vehiclePart(u.def.id, u.owner, part, headingIndex(part === 'hull' ? v.hull : v.tur, n), part === 'hull' ? frame : 0);
-    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob, s.ww, s.wh);
+    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob - lift, s.ww, s.wh);
   }
 }
 
@@ -805,6 +832,8 @@ export let refinedStyle = new URLSearchParams(location.search).get('style') !== 
 export function setRefinedStyle(v: boolean) {
   refinedStyle = v;
   sprites.clear();
+  crystalCache.clear();
+  if (terrainTex) paintTerrain();
 }
 function drawBld(s: BldSprite, x: number, y: number) {
   const k = s.k ?? 1;
@@ -1255,6 +1284,7 @@ function updateFogTexture() {
 
 export function initRenderer() {
   sprites.clear();
+  terrainSeed = -1;
   paintTerrain();
   [fogCanvas, fogCtx] = makeCanvas(MAP_W, MAP_H);
   fogImg = fogCtx.createImageData(MAP_W, MAP_H);
@@ -1288,7 +1318,7 @@ function drawCrystal(g: CanvasRenderingContext2D, bx: number, by: number, h: num
     for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]);
     g.closePath(); g.fill();
   };
-  g.strokeStyle = CRY.out; g.lineWidth = 3; g.lineJoin = 'round';
+  g.strokeStyle = CRY.out; g.lineWidth = refinedStyle ? 1.4 : 3; g.lineJoin = 'round';
   g.beginPath(); g.moveTo(...BL); g.lineTo(...BC); g.lineTo(...BR); g.lineTo(...SR); g.lineTo(...A); g.lineTo(...SL); g.closePath(); g.stroke();
   poly([BL, BC, SC, SL], CRY.dk);
   poly([BC, BR, SR, SC], CRY.mid);
@@ -1307,9 +1337,11 @@ function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
   if (cached) return cached;
   const hash = (n: number) => { const v = Math.sin(variant * 91.3 + n * 47.1) * 43758.5; return v - Math.floor(v); };
   const scale = 0.5 + size * 0.17;                // depleting fields shrink
-  // drawn at half resolution, then blown up without smoothing
-  const [lo, g] = makeCanvas(CRY_W / 2, CRY_H / 2);
-  g.scale(0.5, 0.5);
+  // classic: drawn at half resolution, then blown up without smoothing;
+  // refined: drawn at 2× and scaled down when drawn
+  const k = refinedStyle ? 2 : 0.5;
+  const [lo, g] = makeCanvas(CRY_W * k, CRY_H * k);
+  g.scale(k, k);
   const ax = CRY_AX, ay = CRY_AY;
   g.fillStyle = 'rgba(24,10,4,0.45)';
   g.beginPath(); g.ellipse(ax + 6, ay + 2, 18 * scale + 4, 5.5, 0, 0, Math.PI * 2); g.fill();
@@ -1333,6 +1365,7 @@ function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
   }
   parts.sort((a, b) => a.by - b.by);
   for (const p of parts) drawCrystal(g, p.bx, p.by, p.h, p.w, p.lean);
+  if (refinedStyle) { g.setTransform(1, 0, 0, 1, 0, 0); gradeWarmCool(lo, 0.5); crystalCache.set(key, lo); return lo; }
   const [c, cg] = makeCanvas(CRY_W, CRY_H);
   cg.imageSmoothingEnabled = false;
   cg.drawImage(lo, 0, 0, CRY_W, CRY_H);
@@ -1477,10 +1510,42 @@ function buildingOverlay(b: Building) {
 // ---------------- frame ----------------
 
 function drawHealthBar(x: number, y: number, w: number, frac: number) {
+  const col = frac > 0.5 ? '#3ddc84' : frac > 0.25 ? '#ffb02e' : '#e5484d';
+  if (refinedStyle) {
+    // slim bar: dark rounded well, lit fill, quarter ticks
+    const hh = 3;
+    ctx.fillStyle = 'rgba(10,8,6,0.62)';
+    rr(ctx, x - 0.5, y - 0.5, w + 1, hh + 1, 1.5); ctx.fill();
+    ctx.fillStyle = col;
+    if (frac > 0) { rr(ctx, x, y, Math.max(1.5, w * frac), hh, 1); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x + 0.5, y + 0.3, Math.max(0, w * frac - 1), 0.8);
+    ctx.fillStyle = 'rgba(10,8,6,0.5)';
+    for (const t of [0.25, 0.5, 0.75]) ctx.fillRect(x + w * t - 0.25, y, 0.5, hh);
+    return;
+  }
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(x, y, w, 4.5);
-  ctx.fillStyle = frac > 0.5 ? '#3ddc84' : frac > 0.25 ? '#ffb02e' : '#e5484d';
+  ctx.fillStyle = col;
   ctx.fillRect(x + 0.5, y + 0.5, (w - 1) * frac, 3.5);
+}
+
+// refined selection: a soft gold ring lying on the ground, four ticks turning
+// slowly round it
+function groundRing(x: number, y: number, rx: number, ry: number) {
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(1, ry / rx);
+  ctx.strokeStyle = 'rgba(232,198,106,0.28)'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,227,154,0.9)'; ctx.lineWidth = 1.3;
+  ctx.beginPath(); ctx.arc(0, 0, rx, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = '#fff4cc'; ctx.lineWidth = 2.2;
+  const spin = T * 0.8;
+  for (let k = 0; k < 4; k++) {
+    const a = spin + k * Math.PI / 2;
+    ctx.beginPath(); ctx.arc(0, 0, rx, a - 0.16, a + 0.16); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function cornersSel(x: number, y: number, w: number, h: number) {
@@ -1517,12 +1582,12 @@ export function render() {
   // when you zoom/scroll past the edge of the map. Edges sit on whole texels so
   // nearest-neighbour sampling doesn't swim while scrolling.
   const mW = MAP_W * TILE, mH = MAP_H * TILE;
-  const texel = (v: number, round: (n: number) => number) => round(v / TEX_SCALE) * TEX_SCALE;
+  const texel = (v: number, round: (n: number) => number) => round(v / texScale) * texScale;
   const bx0 = Math.max(0, texel(camera.x, Math.floor)), by0 = Math.max(0, texel(camera.y, Math.floor));
   const bx1 = Math.min(mW, texel(camera.x + vwz, Math.ceil)), by1 = Math.min(mH, texel(camera.y + vhz, Math.ceil));
   if (bx1 > bx0 && by1 > by0) {
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(terrainTex, bx0 / TEX_SCALE, by0 / TEX_SCALE, (bx1 - bx0) / TEX_SCALE, (by1 - by0) / TEX_SCALE,
+    ctx.drawImage(terrainTex, bx0 / texScale, by0 / texScale, (bx1 - bx0) / texScale, (by1 - by0) / texScale,
       bx0, by0, bx1 - bx0, by1 - by0);
     ctx.imageSmoothingEnabled = true;
   }
@@ -1546,8 +1611,8 @@ export function render() {
       g2Glow(cx, cy + 2, TILE * 0.5 * pulse, `rgba(67,243,236,${0.07 + amt * 0.09})`);
       const spr = bakeCrystal(Math.floor(hash(0) * 8), size);
       const ox = (hash(1) - 0.5) * 18, oy = (hash(2) - 0.5) * 12;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(spr, cx + ox - CRY_AX, cy + oy + 6 - CRY_AY);
+      ctx.imageSmoothingEnabled = refinedStyle;   // refined crystals are baked 2× and scaled down
+      ctx.drawImage(spr, cx + ox - CRY_AX, cy + oy + 6 - CRY_AY, CRY_W, CRY_H);
       ctx.imageSmoothingEnabled = true;
       // a rare four-point glint on the tip
       if (Math.sin(T * 1.3 + x * 3.1 + y * 5.7) > 0.985) {
@@ -1611,20 +1676,24 @@ export function render() {
     const px = b.tx * TILE, py = b.ty * TILE;
     const w = b.def.w * TILE, h = b.def.h * TILE;
     const s = bldSprite(b.def.id, b.owner, b.level);
+    const sel = selection.has(b.id);
+    if (sel && refinedStyle) groundRing(px + w / 2, py + h * 0.55, w * 0.66, h * 0.5);
     drawBld(s, px, py);
     buildingOverlay(b);
-    const sel = selection.has(b.id);
-    if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, py - 9, w - 8, b.hp / b.maxHp);
+    // refined art stands up over the footprint's top edge, so its bars sit
+    // just below the footprint instead of across the building
+    const barY = refinedStyle ? py + h + 2 : py - 9, upY = refinedStyle ? py + h + 7 : py - 15;
+    if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, barY, w - 8, b.hp / b.maxHp);
     if (b.upgrading) {
       // amber upgrade progress bar + wrench glint
       const frac = 1 - b.upgrading.remaining / b.upgrading.total;
       ctx.fillStyle = 'rgba(0,0,0,0.65)';
-      ctx.fillRect(px + 4, py - 15, w - 8, 4.5);
+      ctx.fillRect(px + 4, upY, w - 8, 4.5);
       ctx.fillStyle = '#ffb02e';
-      ctx.fillRect(px + 4.5, py - 14.5, (w - 9) * frac, 3.5);
+      ctx.fillRect(px + 4.5, upY + 0.5, (w - 9) * frac, 3.5);
       if (Math.sin(T * 6) > 0) g2Glow(px + w - 8, py + 6, 3, 'rgba(255,215,110,0.9)');
     }
-    if (sel) cornersSel(px, py, w, h);
+    if (sel && !refinedStyle) cornersSel(px, py, w, h);
   }
 
   // units: 8-direction isometric sprites with 2-frame walk cycles
@@ -1661,6 +1730,8 @@ export function render() {
       ctx.fillStyle = 'rgba(0,0,0,0.28)';
       ctx.beginPath(); ctx.ellipse(u.x + 3, u.y + sh * 0.34, sw * 0.42, sh * 0.12, 0, 0, Math.PI * 2); ctx.fill();
     }
+    const picked = selection.has(u.id);
+    if (picked && refinedStyle) groundRing(u.x, u.y + 1, u.def.radius + 4, (u.def.radius + 4) * 0.55);
     if (va) {
       drawVehicle(u, moving);
     } else if (u.def.harvester) {
@@ -1716,7 +1787,7 @@ export function render() {
       const w = u.def.radius * 2.2;
       drawHealthBar(u.x - w / 2, u.y - u.def.radius - 10, w, u.hp / u.maxHp);
     }
-    if (sel) {
+    if (sel && !refinedStyle) {
       const r = u.def.radius + 5;
       cornersSel(u.x - r, u.y - r, r * 2, r * 2);
     }
@@ -1851,21 +1922,27 @@ export function render() {
     let s = sprites.get(key);
     if (!s) { s = bakeAirSprite(u.def.id, u.owner, refinedStyle); sprites.set(key, s); }
     const bob = Math.sin(T * 2.2 + u.id) * 2;
+    if (refinedStyle && selection.has(u.id)) groundRing(u.x + 4, u.y + 8, u.def.radius + 3, (u.def.radius + 3) * 0.5);
     // ground shadow, offset from the airframe so the altitude reads
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(u.x + 8, u.y + 10, u.def.radius * 0.9, u.def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save();
-    ctx.translate(u.x, u.y - AIR_ALT + bob);
-    ctx.rotate(u.facing);
-    const ak = kOf(s);
-    ctx.drawImage(s, -s.width / ak / 2, -s.height / ak / 2, s.width / ak, s.height / ak);
-    ctx.restore();
+    if (refinedStyle && VEHICLE_ART[u.def.id]) {
+      // baked per heading so the sun stays put as it turns; lifted to altitude
+      drawVehicle(u, false, AIR_ALT - bob);
+    } else {
+      ctx.save();
+      ctx.translate(u.x, u.y - AIR_ALT + bob);
+      ctx.rotate(u.facing);
+      const ak = kOf(s);
+      ctx.drawImage(s, -s.width / ak / 2, -s.height / ak / 2, s.width / ak, s.height / ak);
+      ctx.restore();
+    }
     const sel = selection.has(u.id);
     if (sel || u.hp < u.maxHp) {
       const w2 = u.def.radius * 2.2;
       drawHealthBar(u.x - w2 / 2, u.y - AIR_ALT - u.def.radius - 8 + bob, w2, u.hp / u.maxHp);
     }
-    if (sel) {
+    if (sel && !refinedStyle) {
       const r2 = u.def.radius + 5;
       cornersSel(u.x - r2, u.y - AIR_ALT - r2 + bob, r2 * 2, r2 * 2);
     }
@@ -1890,12 +1967,28 @@ export function render() {
   if (placement) {
     const def = BUILDINGS[placement.defId];
     const ok = canPlace(PLAYER, placement.defId, placement.tx, placement.ty);
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = ok ? '#3ddc84' : '#e5484d';
-    for (let y = 0; y < def.h; y++)
-      for (let x = 0; x < def.w; x++)
-        ctx.fillRect((placement.tx + x) * TILE + 1, (placement.ty + y) * TILE + 1, TILE - 2, TILE - 2);
-    ctx.globalAlpha = 0.85;
+    if (refinedStyle) {
+      // a soft footprint with faint tile seams, then the ghost on top
+      const gx = placement.tx * TILE, gy = placement.ty * TILE, gw = def.w * TILE, gh = def.h * TILE;
+      const col = ok ? '61,220,132' : '229,72,77';
+      ctx.fillStyle = `rgba(${col},0.16)`;
+      rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.fill();
+      ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      for (let x = 1; x < def.w; x++) { ctx.moveTo(gx + x * TILE, gy + 3); ctx.lineTo(gx + x * TILE, gy + gh - 3); }
+      for (let y = 1; y < def.h; y++) { ctx.moveTo(gx + 3, gy + y * TILE); ctx.lineTo(gx + gw - 3, gy + y * TILE); }
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 1.5;
+      rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.stroke();
+      ctx.globalAlpha = ok ? 0.72 : 0.45;
+    } else {
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = ok ? '#3ddc84' : '#e5484d';
+      for (let y = 0; y < def.h; y++)
+        for (let x = 0; x < def.w; x++)
+          ctx.fillRect((placement.tx + x) * TILE + 1, (placement.ty + y) * TILE + 1, TILE - 2, TILE - 2);
+      ctx.globalAlpha = 0.85;
+    }
     const gs = bldSprite(placement.defId, PLAYER, 1);
     drawBld(gs, placement.tx * TILE, placement.ty * TILE);
     ctx.globalAlpha = 1;
@@ -1917,7 +2010,19 @@ export function render() {
     ctx.fillRect(0, 0, vw, vh);
   }
 
-  if (selectBox) {
+  if (selectBox && refinedStyle) {
+    const { x, y, w, h } = selectBox, k = Math.min(10, w / 3, h / 3);
+    ctx.fillStyle = 'rgba(232,198,106,0.08)'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(232,198,106,0.55)'; ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.strokeStyle = '#ffe39a'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + k); ctx.lineTo(x, y); ctx.lineTo(x + k, y);
+    ctx.moveTo(x + w - k, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + k);
+    ctx.moveTo(x + w, y + h - k); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - k, y + h);
+    ctx.moveTo(x + k, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - k);
+    ctx.stroke();
+  } else if (selectBox) {
     ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = 1;
     ctx.strokeRect(selectBox.x, selectBox.y, selectBox.w, selectBox.h);
     ctx.fillStyle = '#ffffff12';
