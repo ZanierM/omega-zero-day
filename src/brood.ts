@@ -3,7 +3,7 @@
 // and throws swarms at whatever is nearest. See BUILDINGS/UNITS in config.ts
 // (nonBuildable entries) and the bloom in game.ts.
 
-import { BROOD, TILE, BUILDINGS, UNITS } from './config';
+import { BROOD, TILE, BUILDINGS, UNITS, hostile } from './config';
 import {
   buildings, units, players, placeBuilding, spawnUnit, issueOrder, buildingCenter, canPlace, onBloom, neutrals,
   centerOfTile, Building, Unit,
@@ -39,7 +39,7 @@ const army = () => units.filter(u => u.owner === BROOD);
 function nearestEnemyBuilding(x: number, y: number): Building | null {
   let best: Building | null = null, bd = Infinity;
   for (const b of buildings) {
-    if (b.owner === BROOD || b.def.isWall) continue;
+    if (!hostile(BROOD, b.owner) || b.def.isWall) continue;
     const c = buildingCenter(b), d = Math.hypot(c.x - x, c.y - y);
     if (d < bd) { bd = d; best = b; }
   }
@@ -175,7 +175,7 @@ function waveStep() {
   n.sort((a, b) => Math.hypot(a.x - hc.x, a.y - hc.y) - Math.hypot(b.x - hc.x, b.y - hc.y));
   const go = n.slice(4);
   // a third of the swarms go for harvesters; the rest for the nearest structure
-  const harv = Math.random() < 0.33 ? units.filter(u => u.owner !== BROOD && u.def.harvester).sort((a, b) => Math.hypot(a.x - hc.x, a.y - hc.y) - Math.hypot(b.x - hc.x, b.y - hc.y))[0] : undefined;
+  const harv = Math.random() < 0.33 ? units.filter(u => hostile(BROOD, u.owner) && u.def.harvester).sort((a, b) => Math.hypot(a.x - hc.x, a.y - hc.y) - Math.hypot(b.x - hc.x, b.y - hc.y))[0] : undefined;
   const tgt = harv ? { x: harv.x, y: harv.y } : (() => { const e = nearestEnemyBuilding(hc.x, hc.y); return e ? buildingCenter(e) : null; })();
   if (!tgt) return;
   for (const u of go) issueOrder(u, { type: 'attackMove', x: tgt.x + (Math.random() - 0.5) * 140, y: tgt.y + (Math.random() - 0.5) * 140 });

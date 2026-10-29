@@ -26,6 +26,8 @@ edits the other's files and branches merge cleanly.
 
 **The Vey brood (Claude, `vey-brood`):** new `src/brood.ts` (its AI) and `src/brood-art.ts`. Cross-file: `index.html` has a "The Vey brood: Dormant / Awake" skirmish option (`#broodopts`); `src/main.ts` seeds the brood at the map's centre in `startGame`; `src/ui.ts` keeps `nonBuildable` structures off the build bar.
 
+**The Keepers (Claude, `keepers`):** new `src/keepers.ts` (their AI) and `src/keeper-art.ts`. Cross-file: `index.html` adds "The Keepers: Absent / Arrive" (`#keeperopts`); `src/main.ts` lands them in `startGame`; `src/ui.ts` shows a mission's `endEliminated` text when the base is wiped out. New portrait `public/portraits/keeper.webp`. `hostile()` in `config.ts` makes the Hollow, the brood and the Keepers allies.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

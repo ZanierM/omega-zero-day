@@ -12,6 +12,7 @@ import {
 import { generateMap, seedMap, startBases, neutralSpots, terrain, occupied, idx, inBounds, MAP_W, MAP_H, nearestTile } from '../map';
 import { initAI } from '../ai';
 import { initBrood } from '../brood';
+import { initKeepers } from '../keepers';
 import { centerCameraOn } from '../input';
 import { MISSIONS, MissionDef } from './missions';
 
@@ -31,7 +32,7 @@ let def: MissionDef | null = null;
 
 // ---------- comms ----------
 export interface CommLine { who: Speaker; text: string }
-export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'reyes' | 'vessa';
+export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'reyes' | 'vessa' | 'keeper';
 // portrait: file in public/portraits (speakers without one get a lettered badge)
 export const SPEAKERS: Record<Speaker, { name: string; role: string; color: string; portrait?: string }> = {
   varga:   { name: 'Adm. Ines Varga',   role: 'Ark-fleet command',    color: '#e8c66a', portrait: 'varga.webp' },
@@ -40,6 +41,7 @@ export const SPEAKERS: Record<Speaker, { name: string; role: string; color: stri
   kessler: { name: 'Marshal Kessler',   role: 'Kessler Collective',   color: '#e58a3a', portrait: 'kessler.webp' },
   reyes:   { name: 'Speaker Ama Reyes', role: 'Verdant Pact',         color: '#57c46a', portrait: 'reyes.webp' },
   vessa:   { name: 'Vessa Kol',         role: 'Ashen Syndicate',      color: '#c2683e', portrait: 'vessa.webp' },
+  keeper:  { name: 'The Keeper',        role: 'the makers of the Vey', color: '#ffd27a', portrait: 'keeper.webp' },
   seren:   { name: 'Unknown signal',    role: 'source: under the crust', color: '#bfeef2', portrait: 'seren.webp' },
 };
 // a line can carry a choice: buttons in the comms box, the default taken if it times out
@@ -224,6 +226,7 @@ export function setupMission(id: string) {
   const c = makeCtx();
   d.setup(c);
   initBrood(false);
+  initKeepers(false);
   initAI(d.enemies, 'normal', d.aiOwners ?? []);
   const hq = buildings.find(b => b.owner === PLAYER);
   if (hq) { const p = buildingCenter(hq); centerCameraOn(p.x, p.y); }

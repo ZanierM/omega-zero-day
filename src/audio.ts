@@ -178,7 +178,7 @@ export function sfx(name: SfxName) {
 export type FieldSound =
   | 'rifle' | 'autocannon' | 'flame' | 'rocket' | 'cannon' | 'artillery' | 'sniper' | 'rail' | 'arc'
   | 'hitMetal' | 'hitStructure' | 'hitSoft' | 'impact' | 'explodeVehicle' | 'explodeBuilding' | 'orbital'
-  | 'bite' | 'spit' | 'squelch';
+  | 'bite' | 'spit' | 'squelch' | 'lance' | 'arrive';
 
 let lx = 0, ly = 0, lHalf = 600;
 /** Where the player is "standing": the camera centre and half the visible width, in world px. */
@@ -188,13 +188,13 @@ export function setListener(x: number, y: number, halfWidth: number) { lx = x; l
 const FIELD_GAP: Partial<Record<FieldSound, number>> = {
   rifle: 0.045, autocannon: 0.05, flame: 0.12, rocket: 0.08, cannon: 0.1, artillery: 0.15, sniper: 0.1, rail: 0.15, arc: 0.08,
   hitMetal: 0.06, hitStructure: 0.09, hitSoft: 0.07, impact: 0.07, explodeVehicle: 0.1, explodeBuilding: 0.2, orbital: 0.5,
-  bite: 0.05, spit: 0.09, squelch: 0.08,
+  bite: 0.05, spit: 0.09, squelch: 0.08, lance: 0.07, arrive: 0.3,
 };
 // how long each sound's own voice lasts (the echo tail rides the shared bus)
 const FIELD_LEN: Partial<Record<FieldSound, number>> = {
   rifle: 0.12, autocannon: 0.2, flame: 0.35, rocket: 0.6, cannon: 0.65, artillery: 1, sniper: 0.22, rail: 0.75, arc: 0.25,
   hitMetal: 0.2, hitStructure: 0.32, hitSoft: 0.1, impact: 0.7, explodeVehicle: 1.2, explodeBuilding: 2.1, orbital: 3.2,
-  bite: 0.14, spit: 0.4, squelch: 0.7,
+  bite: 0.14, spit: 0.4, squelch: 0.7, lance: 0.45, arrive: 1.6,
 };
 const fieldLast = new Map<string, number>();
 let liveVoices = 0;
@@ -342,6 +342,18 @@ export function sfxAt(name: FieldSound, x: number, y: number, loud = 1) {
       noise(t + 0.02, 0.06, 0.3, 4000, 1500, o, 'bandpass', 3);
       osc('sawtooth', 1400 * v, 380, t + 0.04, 0.4, 0.05, o);
       osc('sine', 90 * v, 30, t, 0.3, 0.3, o);
+      break;
+    case 'lance': {     // Keeper light: a bright shimmering tone with a glassy edge, no gunpowder in it
+      const f = 880 * v;
+      osc('sine', f * 2, f, t, 0.22, 0.08, o);
+      osc('triangle', f * 1.5, f * 1.49, t, 0.3, 0.05, o);
+      noise(t, 0.08, 0.18, 9000, 4000, o, 'highpass');
+      ring(o, t + 0.01, 2400 * v, 0.25, 0.02);
+      break;
+    }
+    case 'arrive':      // something arriving down a column of light: a rising open chord
+      for (const [m, d] of [[1, 0], [1.5, 0.08], [2, 0.16], [3, 0.24]]) osc('sine', 330 * m, 330 * m * 1.01, t + d, 1.2, 0.06, o);
+      noise(t, 1.1, 0.12, 3000, 9000, o, 'bandpass', 0.8);
       break;
     case 'orbital':     // the sky tears: a descending shriek, then a blast that shakes everything
       osc('sawtooth', 2400, 300, t, 0.5, 0.06, o);

@@ -1,6 +1,6 @@
-import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES } from './config';
+import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, KEEPERS } from './config';
 import * as telemetry from './telemetry';
-import { setListener } from './audio';
+import { setListener, sfxAt } from './audio';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
@@ -2053,6 +2053,63 @@ function drawHealthBar(x: number, y: number, w: number, frac: number) {
   for (const t of [0.25, 0.5, 0.75]) ctx.fillRect(x + w * t - 0.25, y, 0.5, hh);
 }
 
+// Keeper shields: a thin cyan bar under the health bar, and a shimmer of the
+// shield's surface for a moment after it takes a hit
+function drawShieldBar(x: number, y: number, w: number, frac: number) {
+  ctx.fillStyle = 'rgba(6,14,20,0.6)'; ctx.fillRect(x - 0.5, y - 0.5, w + 1, 2.6);
+  ctx.fillStyle = '#7ff2ff'; ctx.fillRect(x, y, w * Math.max(0, frac), 1.6);
+}
+function shieldShimmer(x: number, y: number, r: number, e: { shT?: number; sh?: number }) {
+  const t = e.shT ?? 99;
+  if (t > 0.6 || !(e.sh ?? 0)) return;
+  const k = 1 - t / 0.6;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const gr = ctx.createRadialGradient(x, y, r * 0.55, x, y, r);
+  gr.addColorStop(0, 'rgba(140,240,255,0)'); gr.addColorStop(0.85, `rgba(140,240,255,${0.35 * k})`); gr.addColorStop(1, `rgba(220,255,255,${0.6 * k})`);
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.85, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// Keepers arrive in a column of light: anything of theirs that appears gets one
+const arrivedAt = new Map<number, number>();
+let arrivalsReady = false;
+function drawArrivals() {
+  for (const e of [...units, ...buildings]) {
+    if (e.owner !== KEEPERS || arrivedAt.has(e.id)) continue;
+    arrivedAt.set(e.id, arrivalsReady ? T : -9);
+    if (arrivalsReady) { const p = game.entityPos(e); sfxAt('arrive', p.x, p.y); }
+  }
+  arrivalsReady = true;
+  // translocations: units of theirs vanishing from one place and arriving in another
+  for (let i = game.lightColumns.length - 1; i >= 0; i--) {
+    const c = game.lightColumns[i], k = (game.stats.time - c.born) / 1.1;
+    if (k > 1) { game.lightColumns.splice(i, 1); continue; }
+    if (k < 0 || !visible[idx(game.tileOf(c.x), game.tileOf(c.y))]) continue;
+    const a = Math.sin(k * Math.PI);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const lg = ctx.createLinearGradient(c.x, c.y - 420, c.x, c.y);
+    lg.addColorStop(0, 'rgba(255,240,200,0)'); lg.addColorStop(1, `rgba(255,250,230,${0.8 * a})`);
+    ctx.fillStyle = lg; ctx.fillRect(c.x - 9, c.y - 420, 18, 420);
+    ctx.restore();
+  }
+  for (const [id, t0] of arrivedAt) {
+    const e = byId.get(id);
+    if (!e) { arrivedAt.delete(id); continue; }
+    const k = (T - t0) / 1.1;
+    if (k > 1 || k < 0) continue;
+    if (e.owner !== PLAYER && !visible[idx(game.tileOf(game.entityPos(e).x), game.tileOf(game.entityPos(e).y))]) continue;
+    const p = game.entityPos(e), w = e.kind === 'building' ? e.def.w * TILE * 0.6 : 14;
+    const a = Math.sin(k * Math.PI);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const lg = ctx.createLinearGradient(p.x, p.y - 420, p.x, p.y);
+    lg.addColorStop(0, 'rgba(255,240,200,0)'); lg.addColorStop(0.7, `rgba(255,240,200,${0.45 * a})`); lg.addColorStop(1, `rgba(255,255,240,${0.9 * a})`);
+    ctx.fillStyle = lg; ctx.fillRect(p.x - w / 2, p.y - 420, w, 420);
+    ctx.strokeStyle = `rgba(255,230,160,${a})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, w * (0.6 + k), w * (0.3 + k * 0.5), 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // refined selection: a soft gold ring lying on the ground, four ticks turning
 // slowly round it
 function groundRing(x: number, y: number, rx: number, ry: number) {
@@ -2251,7 +2308,11 @@ export function render() {
     // the art stands up over the footprint's top edge, so its bars sit
     // just below the footprint instead of across the building
     const barY = py + h + 2, upY = py + h + 7;
-    if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, barY, w - 8, b.hp / b.maxHp);
+    if (sel || b.hp < b.maxHp || (b.def.shield && (b.sh ?? 0) < b.def.shield)) {
+      drawHealthBar(px + 4, barY, w - 8, b.hp / b.maxHp);
+      if (b.def.shield) drawShieldBar(px + 4, barY + 4.5, w - 8, (b.sh ?? 0) / b.def.shield);
+    }
+    if (b.def.shield) shieldShimmer(px + w / 2, py + h * 0.3, Math.max(w, h) * 0.8, b);
     if (b.upgrading) {
       // amber upgrade progress bar + wrench glint
       const frac = 1 - b.upgrading.remaining / b.upgrading.total;
@@ -2346,10 +2407,12 @@ export function render() {
       }
     }
     const sel = selection.has(u.id);
-    if (sel || u.hp < u.maxHp) {
+    if (sel || u.hp < u.maxHp || (u.def.shield && (u.sh ?? 0) < u.def.shield)) {
       const w = u.def.radius * 2.2;
       drawHealthBar(u.x - w / 2, u.y - u.def.radius - 10, w, u.hp / u.maxHp);
+      if (u.def.shield) drawShieldBar(u.x - w / 2, u.y - u.def.radius - 13.5, w, (u.sh ?? 0) / u.def.shield);
     }
+    if (u.def.shield) shieldShimmer(u.x, u.y - u.def.radius * 0.6, u.def.radius * 1.5, u);
   }
 
   // projectiles: shells arc high, rockets fly flat with a flame trail
@@ -2421,6 +2484,7 @@ export function render() {
 
   drawParticles();
   drawStorms();
+  drawArrivals();
 
   // incoming orbital strikes: pulsing target reticle → searing beam at impact
   for (const s of strikes) {
