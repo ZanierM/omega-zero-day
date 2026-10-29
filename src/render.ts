@@ -3,7 +3,7 @@ import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
-import { BUILDING_ART, nexusBeacon, extractorLights } from './art';
+import { BUILDING_ART, nexusBeacon, extractorLights, fusionCore, spireLight, labLight } from './art';
 
 // Renderer v4 — Kenney sprite assets on a pre-rendered noise terrain.
 //  * terrain painted once into a big offscreen texture (per-pixel noise, craters, boulders)
@@ -1156,13 +1156,22 @@ function buildingOverlay(b: Building) {
       break;
     }
     case 'lab': {
-      if (Math.sin(T * 5) > 0.2) g2Glow(cx, cy, 5, 'rgba(140,255,170,0.5)');
+      // status lamp on the exhaust stack
+      const ll = labLight(w);
+      if (Math.sin(T * 5) > 0.2) g2Glow(px + ll[0], py + ll[1], 4, 'rgba(140,255,170,0.7)');
+      break;
+    }
+    case 'fusion': {
+      // the caged star breathes
+      const fc = fusionCore(w);
+      g2Glow(px + fc[0], py + fc[1], 9 + Math.sin(T * 3.2 + b.id) * 2, `rgba(255,200,110,${0.35 + Math.sin(T * 3.2 + b.id) * 0.15})`);
       break;
     }
     case 'spire': {
-      // tower warning light, high above the plot
+      // warning light on the spike tip, high above the plot
       const on = Math.sin(T * 2.6) > 0;
-      g2Glow(cx, py - h * 1.1, on ? 3.5 : 1.5, on ? 'rgba(255,80,80,0.9)' : 'rgba(120,40,50,0.5)');
+      const sl = spireLight(w);
+      g2Glow(px + sl[0], py + sl[1], on ? 3.5 : 1.5, on ? 'rgba(255,80,80,0.9)' : 'rgba(120,40,50,0.5)');
       break;
     }
     case 'sensor': {

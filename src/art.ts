@@ -411,6 +411,190 @@ export function drawFabricator(g: Ctx, w: number, _h: number, level: number, tea
   g.restore();
 }
 
+// ---------------- Fusion Reactor ----------------
+
+const COPPER = '#c8783a';
+
+// centre of the caged star, for the live pulse overlay
+export function fusionCore(w: number): Pt {
+  const s = w / 64;
+  return [32 * s, (38 - 30) * s];
+}
+
+// magnetic coil pylon standing on the containment drum
+function coilPylon(g: Ctx, x: number, y: number, level: number, team: string) {
+  prism(g, [[x - 2, y - 2], [x + 2, y - 2], [x + 2, y + 2], [x - 2, y + 2]], 18, 42, '#6a6d78', HULL);
+  for (const z of [24, 30, 36]) quad(g, [x - 3, y + 2 - z - 2], [x + 3, y + 2 - z - 2], [x + 3, y + 2 - z + 1], [x - 3, y + 2 - z + 1], COPPER);
+  if (level >= 3) lamp(g, x, y - 44, team);
+  else { g.fillStyle = OUT; g.fillRect(x - 2, y - 46, 4, 4); g.fillStyle = STEEL; g.fillRect(x - 1, y - 45, 2, 2); }
+}
+
+export function drawFusion(g: Ctx, w: number, _h: number, level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 4, CONCRETE_TOP, CONCRETE);
+
+  // LV2+: radiator fin bank along the back edge
+  if (level >= 2) {
+    for (let x = 22; x <= 40; x += 4) prism(g, [[x, 8], [x + 2, 8], [x + 2, 16], [x, 16]], 4, 22, '#8a8e9a', '#5a5e6a');
+  }
+  // coolant tanks in the back corners, piped into the drum
+  for (const tx of [11, 53]) {
+    cylinder(g, tx, 14, 7, 4, 22, '#9aa0ac', '#6c717e');
+    dome(g, tx, 14, 7, 22, '#9aa0ac');
+    quad(g, [tx - 7, 14 - 16], [tx + 7, 14 - 16], [tx + 7, 14 - 13], [tx - 7, 14 - 13], team, false);
+  }
+  for (const [x0, x1] of [[16, 22], [42, 48]]) { g.fillStyle = OUT; g.fillRect(x0, 22 - 12, x1 - x0, 5); g.fillStyle = '#8a8e9a'; g.fillRect(x0, 22 - 11, x1 - x0, 3); }
+
+  // containment drum: hull, team band, cap
+  cylinder(g, 32, 38, 20, 4, 12, HULL_TOP, HULL);
+  cylinder(g, 32, 38, 20, 12, 15, team, level >= 3 ? GOLD : team);
+  cylinder(g, 32, 38, 20, 15, 18, HULL_TOP, HULL);
+  // vent slots on the drum face
+  for (const x of [18, 26, 34, 42]) quad(g, [x, 58 - 10], [x + 4, 58 - 10], [x + 4, 58 - 6], [x, 58 - 6], '#1e1f24', false);
+  // emitter ring on the drum top
+  g.beginPath(); g.arc(32, 38 - 18, 12, 0, Math.PI * 2);
+  g.fillStyle = '#3a3c44'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+
+  // back coil pylons, the caged star, front coil pylons
+  coilPylon(g, 15, 30, level, team);
+  coilPylon(g, 49, 30, level, team);
+  const [sx, sy] = [32, 38 - 30];
+  glow(g, sx, sy, 22, 'rgba(255,190,90,0.5)');
+  const sg = g.createRadialGradient(sx - 3, sy - 4, 1, sx, sy, 11);
+  sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.35, '#ffe9a8'); sg.addColorStop(0.8, '#ffb43c'); sg.addColorStop(1, '#e0702a');
+  g.fillStyle = sg; g.beginPath(); g.arc(sx, sy, 11, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  // containment straps across the star
+  g.strokeStyle = OUT; g.lineWidth = 2;
+  g.beginPath(); g.ellipse(sx, sy, 11, 4, 0, 0, Math.PI); g.stroke();
+  g.beginPath(); g.ellipse(sx, sy, 4, 11, 0, -Math.PI / 2, Math.PI / 2); g.stroke();
+  g.strokeStyle = STEEL; g.lineWidth = 1;
+  g.beginPath(); g.ellipse(sx, sy, 11, 4, 0, 0.3, Math.PI - 0.3); g.stroke();
+  coilPylon(g, 15, 46, level, team);
+  coilPylon(g, 49, 46, level, team);
+  g.restore();
+}
+
+// ---------------- Research Spire ----------------
+
+// warning light on the spike tip, for the live blink overlay
+export function spireLight(w: number): Pt {
+  const s = w / 64;
+  return [32 * s, (34 - 84) * s];
+}
+
+export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 4, CONCRETE_TOP, CONCRETE);
+
+  // base block with a team band
+  const base = chamfer(10, 14, 54, 56, 8);
+  prism(g, base, 4, 15, null, '#5d6170');
+  prism(g, base, 15, 18, null, team);
+  prism(g, base, 18, 20, HULL_TOP, HULL);
+  // entrance and base windows
+  quad(g, [26, 56 - 15], [38, 56 - 15], [38, 56 - 4], [26, 56 - 4], '#14110e');
+  hazard(g, 25, 56 - 18, 14, 2.5, GOLD);
+  for (const x of [15, 43]) {
+    quad(g, [x, 56 - 13], [x + 6, 56 - 13], [x + 6, 56 - 9], [x, 56 - 9], GLASS_DK);
+    g.fillStyle = GLASS; g.fillRect(x + 1, 56 - 12, 4, 1);
+  }
+  // sensor dish on the base roof
+  cylinder(g, 48, 24, 3, 20, 26, '#6a6d78', HULL);
+  g.save(); g.translate(48, 24 - 29); g.rotate(0.45);
+  g.beginPath(); g.ellipse(0, 0, 7, 3.5, 0, 0, Math.PI * 2);
+  g.fillStyle = '#c4c8d2'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  g.fillStyle = '#7a7f8c'; g.beginPath(); g.ellipse(1, 1, 4, 1.8, 0, 0, Math.PI * 2); g.fill();
+  g.restore();
+
+  // shaft with a lit window column and side buttress fins
+  const shaft = chamfer(21, 24, 43, 44, 5);
+  prism(g, shaft, 20, 52, null, '#5d6170');
+  for (let z = 26; z <= 46; z += 6) {
+    quad(g, [29, 44 - z - 3], [35, 44 - z - 3], [35, 44 - z], [29, 44 - z], GLASS_DK, false);
+    g.fillStyle = GLASS; g.fillRect(30, 44 - z - 2, 4, 1.2);
+  }
+  poly(g, [[21, 40 - 46], [21, 40 - 20], [14, 40 - 20]], shade('#5d6170', 1.15));
+  poly(g, [[43, 40 - 46], [43, 40 - 20], [50, 40 - 20]], shade('#5d6170', 0.78));
+
+  // observation deck: team band, glazed ring, cap
+  const deck = chamfer(18, 21, 46, 47, 7);
+  prism(g, deck, 52, 55, null, team);
+  prism(g, deck, 55, 61, null, HULL);
+  for (let x = 23; x <= 37; x += 7) {
+    quad(g, [x, 47 - 60], [x + 4, 47 - 60], [x + 4, 47 - 56], [x, 47 - 56], GLASS_DK, false);
+    g.fillStyle = GLASS; g.fillRect(x + 0.5, 47 - 59, 3, 1.2);
+  }
+  prism(g, deck, 61, 62, HULL_TOP, HULL);
+
+  // upper needle and spike
+  prism(g, chamfer(26, 29, 38, 39, 3), 62, 74, '#7e8290', '#5d6170');
+  poly(g, [[29, 34 - 74], [35, 34 - 74], [32, 34 - 84]], STEEL);
+  g.fillStyle = OUT; g.beginPath(); g.arc(32, 34 - 84, 2.6, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#ff6a5a'; g.beginPath(); g.arc(32, 34 - 84, 1.6, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+
+// ---------------- Laboratory ----------------
+
+const BIO = '#7dff9a', BIO_DK = '#1f4a34';
+
+// status lamp on the exhaust stack, for the live flicker overlay
+export function labLight(w: number): Pt {
+  const s = w / 64;
+  return [12 * s, (18 - 38) * s];
+}
+
+export function drawLab(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 6), 0, 3, CONCRETE_TOP, CONCRETE);
+
+  // exhaust stack at the back of the lab block
+  cylinder(g, 12, 18, 4, 3, 36, '#6a6d78', '#5a5e6a');
+  quad(g, [8, 18 - 30], [16, 18 - 30], [16, 18 - 28], [8, 18 - 28], team, false);
+  g.fillStyle = '#1a1612'; g.beginPath(); g.arc(12, 18 - 36, 2.5, 0, Math.PI * 2); g.fill();
+
+  // lab block: walls, team band, cap, roof vents
+  const block = chamfer(6, 10, 34, 50, 4);
+  prism(g, block, 3, 18, null, '#5d6170');
+  prism(g, block, 18, 20, null, team);
+  prism(g, block, 20, 22, HULL_TOP, HULL);
+  for (const vy of [18, 32]) prism(g, [[20, vy], [29, vy], [29, vy + 6], [20, vy + 6]], 22, 25, '#3a3c44', HULL);
+  // airlock door with a hazard header, and a lit window
+  hazard(g, 9, 50 - 17, 12, 2.5, GOLD);
+  quad(g, [10, 50 - 14], [20, 50 - 14], [20, 50 - 3], [10, 50 - 3], '#14110e');
+  g.fillStyle = BIO; g.fillRect(14, 50 - 11, 2, 2);
+  quad(g, [24, 50 - 15], [31, 50 - 15], [31, 50 - 9], [24, 50 - 9], GLASS_DK);
+  g.fillStyle = BIO; g.fillRect(25, 50 - 12, 5, 2);
+
+  // greenhouse dome on a hull ring, specimens visible through the glass
+  cylinder(g, 47, 30, 12, 3, 8, HULL_TOP, HULL);
+  dome(g, 47, 30, 11, 8, '#4a9c8c');
+  g.save();
+  g.beginPath(); g.ellipse(47, 30 - 8, 11, 10.4, 0, Math.PI, 0); g.arc(47, 30 - 8, 11, 0, Math.PI); g.clip();
+  g.fillStyle = 'rgba(40,110,60,0.8)';
+  for (const [lx, ly, lr] of [[42, 30 - 10, 4], [50, 30 - 12, 5], [46, 30 - 15, 3.5], [53, 30 - 9, 3]])
+    { g.beginPath(); g.arc(lx, ly, lr, 0, Math.PI * 2); g.fill(); }
+  g.strokeStyle = 'rgba(26,18,12,0.5)'; g.lineWidth = 1;
+  for (const rx of [4, 8]) { g.beginPath(); g.ellipse(47, 30 - 8, rx, 10.4, 0, Math.PI, 0); g.stroke(); }
+  g.beginPath(); g.moveTo(36, 30 - 13); g.lineTo(58, 30 - 13); g.stroke();
+  g.fillStyle = 'rgba(220,255,250,0.45)';
+  g.beginPath(); g.ellipse(43, 30 - 15, 2.5, 4, -0.5, 0, Math.PI * 2); g.fill();
+  g.restore();
+
+  // specimen vats in front of the dome, glowing culture fluid
+  for (const vx of [40, 52]) {
+    cylinder(g, vx, 52, 4.5, 3, 16, '#9aa0ac', BIO_DK);
+    quad(g, [vx - 3, 52 - 13], [vx + 3, 52 - 13], [vx + 3, 52 - 6], [vx - 3, 52 - 6], BIO, false);
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.fillRect(vx - 2, 52 - 12, 1, 5);
+    glow(g, vx, 52 - 10, 7, 'rgba(125,255,154,0.35)');
+  }
+  g.restore();
+}
+
 // custom art by building id; anything not listed keeps the pack sprite
 export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number, level: number, team: string) => void>> = {
   nexus: drawNexus,
@@ -419,4 +603,7 @@ export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number,
   extractor: drawExtractor,
   barracks: drawBarracks,
   fab: drawFabricator,
+  fusion: drawFusion,
+  spire: drawSpire,
+  lab: drawLab,
 };

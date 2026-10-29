@@ -19,10 +19,10 @@
   <style>
     /* ---- theme: riveted gunmetal plates, bronze trim, gold lettering ---- */
     :root {
-      --ink: #0f0d0b;          /* recessed wells */
-      --well: #1a1714;
-      --plate: #2e2a25;
-      --plate-dk: #221f1b;
+      --ink: #0c0d0f;          /* recessed wells */
+      --well: #16181b;
+      --plate: #34383e;
+      --plate-dk: #25282d;
       --edge: #5a4830;         /* bronze trim */
       --edge-hi: #9c7a44;
       --gold: #e8c66a;
@@ -34,17 +34,19 @@
       --bad: #e0614f;
       --head: 'Exo 2', 'Nunito', system-ui, sans-serif;
       --body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
-      /* brushed metal plates with vertical seams — the sci-fi cousin of wooden planks */
+      /* cool gunmetal: fine horizontal brushing, wide plates joined by a riveted seam */
       --plates:
-        linear-gradient(180deg, rgba(255,240,210,0.07), transparent 30%, transparent 70%, rgba(0,0,0,0.25)),
-        repeating-linear-gradient(90deg, transparent 0 46px, rgba(0,0,0,0.45) 46px 48px, rgba(255,240,210,0.07) 48px 49px,
-          rgba(0,0,0,0.07) 49px 95px, rgba(0,0,0,0.45) 95px 97px, rgba(255,240,210,0.07) 97px 98px, rgba(255,240,210,0.03) 98px 142px),
-        repeating-linear-gradient(0deg, rgba(255,240,210,0.02) 0 1px, transparent 1px 3px),
-        linear-gradient(180deg, #3a342c, #27231e);
+        linear-gradient(180deg, rgba(220,232,255,0.08), transparent 28%, transparent 72%, rgba(0,0,0,0.28)),
+        radial-gradient(circle at 60px 231px, #8a919b 0 1.3px, #1c1e22 1.9px, transparent 2.5px) 0 0 / 120px 240px repeat,
+        repeating-linear-gradient(180deg, transparent 0 236px, rgba(0,0,0,0.34) 236px 238px, rgba(220,232,255,0.07) 238px 239px, transparent 239px 240px),
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 2px, rgba(0,0,0,0.035) 2px 3px, transparent 3px 5px),
+        repeating-linear-gradient(180deg, rgba(220,232,255,0.025) 0 9px, transparent 9px 23px, rgba(0,0,0,0.04) 23px 31px, transparent 31px 47px),
+        linear-gradient(180deg, #43474e, #2b2e33);
       --plates-dk:
-        linear-gradient(180deg, rgba(255,240,210,0.06), transparent 35%, rgba(0,0,0,0.22)),
-        repeating-linear-gradient(90deg, transparent 0 30px, rgba(0,0,0,0.38) 30px 32px, rgba(255,240,210,0.05) 32px 33px, rgba(0,0,0,0.06) 33px 63px, rgba(0,0,0,0.38) 63px 65px, rgba(255,240,210,0.05) 65px 66px),
-        linear-gradient(180deg, #2e2a24, #1d1a16);
+        linear-gradient(180deg, rgba(220,232,255,0.07), transparent 35%, rgba(0,0,0,0.25)),
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 2px, rgba(0,0,0,0.03) 2px 3px, transparent 3px 5px),
+        repeating-linear-gradient(180deg, rgba(220,232,255,0.02) 0 7px, transparent 7px 19px, rgba(0,0,0,0.035) 19px 26px, transparent 26px 37px),
+        linear-gradient(180deg, #363a40, #23262a);
       /* raised plate: lit top lip, dark bottom lip, drop shadow */
       --raised: inset 0 2px 0 rgba(255,236,200,0.13), inset 0 -3px 0 rgba(0,0,0,0.38), 0 4px 0 rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3);
       --sunk: inset 0 3px 6px rgba(0,0,0,0.65), inset 0 -1px 0 rgba(255,236,200,0.06);
@@ -58,6 +60,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #14110e; font-family: var(--body); user-select: none; color: var(--cream); }
     button { font-family: inherit; }
+    * { scrollbar-color: var(--edge) var(--ink); scrollbar-width: thin; }
     #app { display: flex; flex-direction: column; width: 100%; height: 100%; position: relative; }
     #game { flex: 1; display: block; cursor: crosshair; min-height: 0; touch-action: none; }
 
