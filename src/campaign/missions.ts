@@ -3,8 +3,9 @@
 
 import type { Ctx } from './runner';
 import type { GameEvent } from '../game';
-import { PLAYER } from '../config';
-import { ventsHeld, neutrals, buildingCenter, issueOrder, units, burrowUnit, players, resCell, RES_TREMOR, RES_STORM, addResonance, byId, resonance } from '../game';
+import { PLAYER, KEEPERS } from '../config';
+import { seedKeepers, initKeepers, clearSpot } from '../keepers';
+import { ventsHeld, neutrals, buildingCenter, issueOrder, units, burrowUnit, players, resCell, RES_TREMOR, RES_STORM, addResonance, byId, resonance, ensureFaction } from '../game';
 
 export interface Objective {
   id: string;
@@ -34,6 +35,7 @@ export interface MissionDef {
   lose?(c: Ctx): boolean;
   endWin: { title: string; text: string };
   endLose: { title: string; text: string };
+  endEliminated?: { title: string; text: string };   // base wiped out, if different from endLose
 }
 
 const KESSLER = 1, VERDANT = 2, ASHEN = 3, HOLLOW = 4;
@@ -512,13 +514,14 @@ const resonanceM: MissionDef = {
   id: 'act2-6', act: 2, code: 'II-6', title: 'Resonance', tagline: 'Destroy Kessler\'s Orbital Uplink before it charges',
   briefing: [
     'Lantern, Varga. Kessler is charging an Orbital Uplink. When it fires, he can hold the ark-fleet hostage, every sleeper aboard.',
-    'Fleet Command has cleared you for the Orbital Protocol and your own Uplink. You have eleven minutes. Destroy his.',
+    'Fleet Command has cleared you for the Orbital Protocol and your own Uplink. You have eleven minutes. Destroy his. And Lantern: deep-space arrays picked up something on approach to Cinder last night. Not ours. Not Kessler\'s.',
   ],
-  goals: ['Destroy the three relay pylons that shield the Uplink', 'Destroy the Kessler Orbital Uplink before it charges (11:00)', 'Watch the crystal fields: the ground is unstable'],
+  goals: ['Destroy the three relay pylons that shield the Uplink', 'Destroy the Kessler Orbital Uplink before it charges (11:00)', 'Watch the crystal fields, and the sky'],
   seed: 66301, enemies: 1, size: 64, credits: 5000, resonance: true,
   startUpgrades: ['wpn1', 'wpn2', 'wpn3', 'orbital'],
   allowed: [...ACT2_TECH, 'spire', 'artillery', 'railgun', 'arctower', 'dominator', 'skyport', 'gunship', 'uplink', 'fusion', 'arm2', 'def2', 'bastion', 'juggernaut', 'sniper'],
   setup(c) {
+    ensureFaction(KEEPERS);
     act2Base(c, ['fab', 'lab']);
     const b = c.base(PLAYER);
     c.place('spire', PLAYER, b.tx - 4, b.ty + 6);
@@ -595,12 +598,39 @@ const resonanceM: MissionDef = {
       c.say('okoye', 'Did you know?');
     } },
     { id: 'silence', when: c => c.t >= 230, run: c => c.say('okoye', 'Fleet\'s not answering. Varga\'s gone dark on us. Of course she has.') },
-    { id: 'warn', when: c => c.t >= UPLINK_DEADLINE - 120, run: c => c.say('kessler', 'Two minutes, Lantern. Then the fleet hears my terms, and so does every sleeper on it.') },
+    { id: 'warn', when: c => c.t >= UPLINK_DEADLINE - 120, run: c => {
+      c.say('kessler', 'Two minutes, Lantern. Then the fleet hears my terms, and so does every sleeper on it.');
+      if (c.run.fired.includes('keepers')) c.say('keeper', 'Your machines argue over who will leave. None of you asked who will stay.');
+    } },
+    // the Vey's makers come down between the two human camps
+    // ...at 2:30, or sooner if the second relay falls (the uplink is close to breaking)
+    { id: 'keepers', when: c => c.t >= 150 || ((c.run.vars.relays ?? 3) - (c.run.vars.relaysLeft ?? 3)) >= 2, run: c => {
+      // the open ground furthest from both camps and every relay, so nobody is standing on them when they land
+      const keep = [c.base(PLAYER), c.base(KESSLER), ...c.buildingsOf(KESSLER, 'fusion').map(f => ({ tx: f.tx, ty: f.ty }))];
+      let mid = { x: 0, y: 0 }, best = -1;
+      for (let y = 8; y < 56; y += 4) for (let x = 8; x < 56; x += 4) {
+        const dmin = Math.min(...keep.map(k => Math.hypot(k.tx - x, k.ty - y)));
+        if (dmin > best) { best = dmin; mid = { x, y }; }
+      }
+      const at = clearSpot('beacon', mid, 10);
+      if (at) {
+        seedKeepers(at, 2600);
+        c.place('obelisk', KEEPERS, at.x - 2, at.y + 1); c.place('obelisk', KEEPERS, at.x + 4, at.y + 1);
+      }
+      initKeepers(true, 0.7);
+      if (at) { c.ping(at.x + 1, at.y + 1, '#ffd27a'); c.reveal(at.x + 1, at.y + 1, 8); }
+      c.say('keeper', 'Small ones. You were given a garden that held your star in its place. You have cut it to the root.');
+      c.say('lind', 'Lantern... the patterns on their hulls. They\'re the signal maps from Reyes\'s labs. They made it. The crystal is theirs.');
+      c.say('kessler', 'What in God\'s name is that?');
+      c.say('keeper', 'The one who cuts the most will answer first.');
+      c.say('okoye', 'They\'re going for the harvesters, ours and Kessler\'s. Keep yours close, and keep pushing those relays.');
+    } },
   ],
   onEvent: harvesterWarning,
   win: c => !byId.has(c.run.vars.uplink),
   lose: c => c.t >= UPLINK_DEADLINE && byId.has(c.run.vars.uplink),
-  endWin: { title: 'The uplink falls', text: 'Okoye, quietly, over the wreckage: "Uplink\'s down." A long pause. "I asked you a question, Lantern." · Act II complete.' },
+  endWin: { title: 'The uplink falls', text: 'The Keeper, as the uplink burns: "One machine less. It changes nothing you have done." Okoye, quietly: "I asked you a question, Lantern." · Act II complete.' },
+  endEliminated: { title: 'Caught between them', text: 'Kessler\'s guns on one side, the Keepers\' light on the other. Depot Six goes dark, and the uplink keeps charging.' },
   endLose: { title: 'The uplink fires', text: 'Kessler\'s uplink locks onto the ark-fleet. On every channel his terms begin, and the first of them is the Resonance Report, read aloud.' },
 };
 

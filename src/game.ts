@@ -4,7 +4,7 @@ import {
   WPN_BONUS, ARM_BONUS, DEF_BONUS, BLD_UPGRADE_COST, BLD_UPGRADE_HP, BLD_UPGRADE_DMG,
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
-  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES, BROOD,
+  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES, BROOD, KEEPERS, hostile,
   VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
 import * as telemetry from './telemetry';
@@ -23,6 +23,7 @@ export interface Order {
 export interface Unit {
   id: number;
   kind: 'unit';
+  sh?: number; shT?: number;     // Keeper energy shield: current points, seconds since last hit
   def: UnitDef;
   owner: number;
   x: number; y: number;          // pixel position (center)
@@ -62,6 +63,7 @@ export interface Building {
   repairing: boolean;
   charge: number;                // superweapon: seconds until the strike is ready (0 = ready)
   shielded?: boolean;            // campaign: takes no damage while its relays stand
+  sh?: number; shT?: number;     // Keeper energy shield: current points, seconds since last hit
   cooldown: number;              // turret reload
   rallyX: number; rallyY: number;
   facing: number;                // turret barrel angle
@@ -178,6 +180,9 @@ const bloomNeighbour = (x: number, y: number) =>
   [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inBounds(x + dx, y + dy) && bloom[idx(x + dx, y + dy)] >= BLOOM_SOLID)
   || buildings.some(b => b.owner === BROOD && x >= b.tx - 1 && x <= b.tx + b.def.w && y >= b.ty - 1 && y <= b.ty + b.def.h);
 
+// columns of light where the Keepers translocate something (drawn by render.ts)
+export const lightColumns: { x: number; y: number; born: number }[] = [];
+
 // tunnel mouths the Hollow come up through (campaign)
 export interface Tunnel { id: number; tx: number; ty: number; born: number }
 export const tunnels: Tunnel[] = [];
@@ -245,6 +250,7 @@ export function initGame(numEnemies: number) {
   resonance = new Float32Array(resCols * resRows); tremorAt.clear(); quake = 0;
   tunnels.length = 0;
   bloom = new Uint8Array(MAP_W * MAP_H); bloomTick = 0;
+  lightColumns.length = 0;
   resetStats();
   telemetry.startMatch(numPlayers);
 }
@@ -361,6 +367,7 @@ export function spawnUnit(defId: string, owner: number, px: number, py: number):
     autoTargetId: -1, repathTimer: 0, facing: 0, starved: false,
     toggled: false, abilityCd: 0, abilityTimer: 0, xp: 0, rank: 0,
     guardX: px, guardY: py, leashX: px, leashY: py, returning: false, ignoreId: -1, ignoreTimer: 0,
+    sh: def.shield ?? 0, shT: 99,
   };
   units.push(u);
   byId.set(u.id, u);
@@ -437,10 +444,10 @@ export function activateAbility(u: Unit): boolean {
     if (audible(u.x, u.y)) sfxAt('impact', u.x, u.y, 1.4);
     for (const t of [...units]) {
       if (t.def.air) continue; // a ground slam can't touch aircraft
-      if (t.owner !== u.owner && Math.hypot(t.x - u.x, t.y - u.y) <= r + t.def.radius * 0.5) damage(t, a.aoeDmg);
+      if (hostile(t.owner, u.owner) && Math.hypot(t.x - u.x, t.y - u.y) <= r + t.def.radius * 0.5) damage(t, a.aoeDmg);
     }
     for (const t of [...buildings]) {
-      if (t.owner === u.owner) continue;
+      if (!hostile(t.owner, u.owner)) continue;
       const c = buildingCenter(t);
       if (Math.hypot(c.x - u.x, c.y - u.y) <= r + entityRadius(t) * 0.6) damage(t, a.aoeDmg);
     }
@@ -482,7 +489,7 @@ export function canPlace(owner: number, defId: string, tx: number, ty: number, r
 export function placeBuilding(defId: string, owner: number, tx: number, ty: number): Building {
   const def = BUILDINGS[defId];
   const b: Building = {
-    id: nextId++, kind: 'building', def, owner, tx, ty, hp: def.hp, maxHp: def.hp, level: 1, upgrading: null, repairing: false,
+    id: nextId++, kind: 'building', def, owner, tx, ty, hp: def.hp, maxHp: def.hp, level: 1, upgrading: null, repairing: false, sh: def.shield ?? 0, shT: 99,
     charge: def.superweapon ? def.superweapon.charge : 0, cooldown: 0,
     rallyX: (tx + def.w / 2) * TILE, rallyY: (ty + def.h + 1) * TILE, facing: Math.PI / 2,
   };
@@ -577,6 +584,12 @@ export function burrowUnit(u: Unit) {
 
 export function damage(target: Entity, amount: number, attacker?: Unit) {
   if (target.kind === 'building' && target.shielded) return;   // the shield takes it
+  // a Keeper's energy shield soaks the hit first; any hit resets its recharge
+  if (target.def.shield) {
+    target.shT = 0;
+    const sh = target.sh ?? 0;
+    if (sh > 0) { const took = Math.min(sh, amount); target.sh = sh - took; amount -= took; if (amount <= 0) return; }
+  }
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;
   if (attacker) telemetry.fight(attacker.owner, target.owner);
@@ -808,8 +821,9 @@ const UNIT_SOUND: Record<string, FieldSound> = {
   hovertank: 'cannon', dominator: 'cannon', colossus: 'cannon', bomber: 'cannon', artillery: 'artillery',
   shardkin: 'hitMetal', burrower: 'impact', choir: 'arc',   // crystal on crystal: a ringing clink, a crunch, a hum
   skitter: 'bite', spitter: 'spit', carapace: 'bite', moth: 'spit', behemoth: 'artillery',
+  acolyte: 'lance', lancer: 'lance', luminar: 'lance', monolith: 'rail',
 };
-const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit' };
+const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance' };
 const weaponSound = (e: Unit | Building): FieldSound =>
   (e.kind === 'unit' ? UNIT_SOUND[e.def.id] : TURRET_SOUND[e.def.id]) ?? 'rifle';
 // the sound of a round landing on this target
@@ -912,7 +926,7 @@ function findEnemyInRange(e: Entity, rangeTiles: number): Entity | null {
   const rangePx = rangeTiles * TILE;
   let best: Entity | null = null, bestD = Infinity;
   const check = (t: Entity) => {
-    if (t.owner === e.owner) return;
+    if (!hostile(t.owner, e.owner)) return;
     // don't auto-acquire walls; they're only attacked on explicit orders or when blocking
     if (t.kind === 'building' && t.def.isWall && e.kind === 'unit' && e.order.type !== 'attack') return;
     if (!canHit(e, t)) return;
@@ -1205,7 +1219,7 @@ function step(dt: number) {
       const attacker = firer?.kind === 'unit' ? firer : undefined;
       for (const t of [...units]) {
         if (t.def.air) continue; // ground blasts don't reach aircraft
-        if (t.owner !== s.owner && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
+        if (hostile(t.owner, s.owner) && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
       }
       for (const t of [...buildings]) {
         if (t.owner === s.owner) continue;
@@ -1252,6 +1266,21 @@ function step(dt: number) {
         if (Math.hypot(u.x - c.x, u.y - c.y) <= 5 * TILE) {
           u.hp = Math.min(u.maxHp, u.hp + rate * 0.5);
         }
+      }
+    }
+    // Keeper shields recharge after three quiet seconds; a Luminar pours light into those around it
+    const recharge = (e: Unit | Building) => {
+      const max = e.def.shield; if (!max) return;
+      e.shT = (e.shT ?? 99) + 0.5;
+      if (e.shT >= 3 && (e.sh ?? 0) < max) e.sh = Math.min(max, (e.sh ?? 0) + max * 0.06);
+    };
+    for (const u of units) recharge(u);
+    for (const b of buildings) recharge(b);
+    for (const u of units) {
+      const sa = u.def.shieldAura; if (!sa) continue;
+      for (const v of units) {
+        if (v.owner !== u.owner || !v.def.shield || (v.sh ?? 0) >= v.def.shield) continue;
+        if (Math.hypot(v.x - u.x, v.y - u.y) <= sa.radius * TILE) v.sh = Math.min(v.def.shield, (v.sh ?? 0) + sa.rate * 0.5);
       }
     }
     // the Hollow mend standing near crystal; a Choir's song heals the kin around it
@@ -1398,7 +1427,7 @@ function updateCorridor(dt: number) {
   const need = ventsNeeded();
   let leader = -1;
   // only factions with a fleet can ride the corridor: the brood and the Hollow just hold the ground
-  for (let o = 0; o < numPlayers; o++) if (o !== BROOD && o !== 4 && ventsHeld(o) >= need) leader = o;
+  for (let o = 0; o < numPlayers; o++) if (o !== BROOD && o !== KEEPERS && o !== 4 && ventsHeld(o) >= need) leader = o;
   if (leader !== corridor.owner) {
     const was = corridor.owner;
     corridor.owner = leader; corridor.held = 0;

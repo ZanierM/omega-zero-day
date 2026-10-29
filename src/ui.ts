@@ -585,7 +585,7 @@ export function updateUI() {
       : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.';
     const m = campaign.activeMission();
     if (m) {
-      const end = gameOver === 'win' ? m.endWin : m.endLose;
+      const end = gameOver === 'win' ? m.endWin : (endReason === 'eliminated' && m.endEliminated) || m.endLose;
       overlayTitle.textContent = end.title;
       overlaySub.textContent = end.text;
       const last = gameOver === 'win' && campaign.isLastMission();

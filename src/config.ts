@@ -44,6 +44,8 @@ export interface UnitDef {
   nonBuildable?: boolean;   // campaign-only (the Hollow): never on a build bar
   crystalRegen?: number;    // hp/s healed while standing within 2 tiles of crystal
   healAura?: { radius: number; rate: number };   // heals friendly units around it (hp/s; doubled near crystal)
+  shield?: number;          // the Keepers: an energy shield that soaks damage first and recharges
+  shieldAura?: { radius: number; rate: number };  // restores allies' shields (per second)
 }
 
 // active/toggle unit abilities, fully data-driven
@@ -103,6 +105,7 @@ export interface BuildingDef {
   limit?: number;      // max this faction may own (e.g. 1 for the superweapon)
   nonBuildable?: boolean;   // the Vey brood's living structures: never on a build bar
   bloom?: number;           // radius (tiles) of living ground it spreads around itself
+  shield?: number;          // the Keepers: an energy shield that soaks damage first and recharges
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -144,6 +147,15 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'A soldier in a walking bunker. Requires Armor II.' },
   colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2, ability: ABILITIES.stomp,
                desc: 'Superheavy siege platform. The ground remembers where it walked. Requires Weapons II.' },
+  // ---- the Keepers: the Vey's makers, come back to judge (AI only) ----
+  acolyte:   { id: 'acolyte',   name: 'Acolyte',        tab: 'inf', cost: 300,  buildTime: 1,  hp: 130,  speed: 2.4, damage: 17,  range: 5.5, reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 3, spriteH: 28, nonBuildable: true, shield: 90, antiAir: true,
+               desc: 'Tall, unhurried, wrapped in light. Its rifle is a thread of the sun.' },
+  lancer:    { id: 'lancer',    name: 'Lancer',         tab: 'veh', cost: 650,  buildTime: 1,  hp: 260,  speed: 4.6, damage: 46,  range: 3.2, reload: 1.5, vision: 7, radius: 13, model: 'car', mstep: 3, spriteH: 32, nonBuildable: true, shield: 160,
+               desc: 'A gold skimmer that runs down armour and pins it with a lance of light.' },
+  luminar:   { id: 'luminar',   name: 'Luminar',        tab: 'veh', cost: 550,  buildTime: 1,  hp: 180,  speed: 3.2, damage: 8,   range: 4,   reload: 1.0, vision: 9, radius: 11, model: 'drone', mstep: 3, spriteH: 28, nonBuildable: true, air: true, antiAir: true, shield: 140, shieldAura: { radius: 4.5, rate: 18 },
+               desc: 'A floating orb in a cage of rings. It pours light back into the shields around it.' },
+  monolith:  { id: 'monolith',  name: 'Monolith',       tab: 'veh', cost: 1600, buildTime: 1,  hp: 900,  speed: 1.2, damage: 95,  range: 9,   reload: 3.2, vision: 9, radius: 18, model: 'mech', mstep: 3, spriteH: 56, nonBuildable: true, shield: 700,
+               desc: 'A walking obelisk. When it opens, the light it fires can cut a building in half.' },
   // ---- the Vey brood: crystal grown through flesh (AI only) ----
   skitter:   { id: 'skitter',   name: 'Skitter',        tab: 'inf', cost: 110,  buildTime: 1,  hp: 95,   speed: 3.6, damage: 9,   range: 1.4, reload: 0.45, vision: 6, radius: 7,  model: 'soldier', mstep: 2, spriteH: 18, nonBuildable: true, crystalRegen: 3,
                desc: 'Six legs, a crystal spine, too many of them. They pour out of the pods.' },
@@ -209,6 +221,16 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'Rapid-discharge lightning emitter. Requires Defence Grid I.' },
   bastion:   { id: 'bastion',   name: 'Bastion Battery', tab: 'def',  cost: 3500, buildTime: 18, hp: 1400, power: -60,  w: 2, h: 2, vision: 10, prereq: 'railgun', prereqUp: 'def2', turret: { damage: 150, range: 9, reload: 3.0 }, sprite: 'bld_silo', upgradable: true,
                desc: 'Quad-cannon fortress emplacement. Requires Defence Grid II.' },
+  // ---- the Keepers: arrive in light, never built (AI only) ----
+  beacon:    { id: 'beacon',    name: 'Keeper Beacon',  tab: 'build', cost: 0,    buildTime: 1,  hp: 2200, power: 0,    w: 3, h: 3, vision: 10, nonBuildable: true, shield: 1400,
+               desc: 'A spire of pale gold that sings at the sky. Whatever the Keepers send comes down its light.' },
+  sanctum:   { id: 'sanctum',   name: 'Sanctum',        tab: 'build', cost: 700,  buildTime: 1,  hp: 900,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 600,
+               desc: 'A ring of floating stones around a held breath of light. Arrivals come faster while it stands.' },
+  shrine:    { id: 'shrine',    name: 'Shrine',         tab: 'build', cost: 450,  buildTime: 1,  hp: 700,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 400,
+               desc: 'It listens to the crystal and is fed by it. Gently.' },
+  obelisk:   { id: 'obelisk',   name: 'Ward Obelisk',   tab: 'def',   cost: 500,  buildTime: 1,  hp: 650,  power: 0,    w: 1, h: 1, vision: 9,  nonBuildable: true, shield: 450,
+               turret: { damage: 42, range: 7.5, reload: 1.4, antiAir: true },
+               desc: 'A floating blade of gold that turns its light on intruders.' },
   // ---- the Vey brood: grown, not built (AI only) ----
   heart:     { id: 'heart',     name: 'Brood Heart',    tab: 'build', cost: 0,    buildTime: 1,  hp: 3200, power: 0,    w: 3, h: 3, vision: 9,  nonBuildable: true, bloom: 8,
                desc: 'A mound of flesh and crystal the size of a bunker, beating. Everything the brood is grows out from it.' },
@@ -284,6 +306,7 @@ export const UNIT_ARMOR: Record<string, ArmorClass> = {
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
   shardkin: 'infantry', burrower: 'light', choir: 'infantry',
   skitter: 'light', spitter: 'light', carapace: 'heavy', moth: 'light', behemoth: 'heavy',
+  acolyte: 'infantry', lancer: 'light', luminar: 'light', monolith: 'heavy',
 };
 export const UNIT_DMGTYPE: Record<string, DmgType> = {
   trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun', gunship: 'gun', bomber: 'cannon',
@@ -291,9 +314,10 @@ export const UNIT_DMGTYPE: Record<string, DmgType> = {
   hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
   shardkin: 'flame', burrower: 'cannon', choir: 'gun',   // shard claws tear soft targets; a burrower crushes
   skitter: 'flame', spitter: 'rocket', carapace: 'cannon', moth: 'gun', behemoth: 'cannon',
+  acolyte: 'sniper', lancer: 'rocket', luminar: 'gun', monolith: 'cannon',
 };
 export const TURRET_DMGTYPE: Record<string, DmgType> = {
-  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun',
+  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun', obelisk: 'cannon',
 };
 // multiplier[weapon dmgType][target armor class]
 export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
@@ -306,6 +330,9 @@ export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
 
 export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes
-export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2', '#b46cff'];   // 4 = the Hollow (campaign), 5 = the Vey brood
-export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow', 'The Vey Brood'];
-export const BROOD = 5;
+export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2', '#b46cff', '#ffd27a'];   // 4 = the Hollow (campaign), 5 = the Vey brood, 6 = the Keepers
+export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow', 'The Vey Brood', 'The Keepers'];
+export const BROOD = 5, KEEPERS = 6;
+/** The Vey's own (the Hollow, the brood, the Keepers who made it) never fight each other. */
+export const isVey = (o: number) => o === 4 || o === BROOD || o === KEEPERS;
+export const hostile = (a: number, b: number) => a !== b && !(isVey(a) && isVey(b));
