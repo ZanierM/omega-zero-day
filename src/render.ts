@@ -1457,9 +1457,9 @@ function drawObjectiveStatus(n: game.Neutral, cx: number, cy: number) {
   ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
 }
 
-// ---- launch-corridor tracker (screen space, top centre under the HUD) ----
+// ---- launch-corridor tracker (screen space, under the top-left HUD) ----
 
-let hudTop = 56, hudTopCheck = 0;
+let hudTop = 56, hudLeft = 8, hudTopCheck = 0;
 function drawCorridorStrip(vw: number) {
   const vents = game.neutrals.filter(n => n.kind === 'vent');
   if (!vents.length) return;
@@ -1469,21 +1469,30 @@ function drawCorridorStrip(vw: number) {
     const tb = document.getElementById('topbar')?.getBoundingClientRect();
     const cv = canvas.getBoundingClientRect();
     hudTop = tb ? Math.max(8, tb.bottom - cv.top + 6) : 56;
+    hudLeft = tb ? Math.max(8, tb.left - cv.left) : 8;
   }
   const { owner, held } = game.corridor, need = game.ventsNeeded();
   const mine = game.ventsHeld(PLAYER);
   const left = Math.max(0, game.CORRIDOR_HOLD - held);
   const clock = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
-  const status = owner === PLAYER ? `LAUNCH IN ${clock}`
+  let status = owner === PLAYER ? `LAUNCH IN ${clock}`
     : owner >= 0 ? `${FACTION_NAMES[owner].split(' ')[0].toUpperCase()} LAUNCHES IN ${clock}`
     : `HOLD ${need} OF ${vents.length} VENTS · YOU HOLD ${mine}`;
   const danger = owner > 0;
   ctx.font = '800 10px system-ui, sans-serif';
-  const label = 'LAUNCH CORRIDOR';
+  const pipW = vents.length * 14, room = vw - hudLeft - 8;
+  let label = 'LAUNCH CORRIDOR';
+  // narrow screens (Fold cover) get the short wording rather than clipped text
+  if (ctx.measureText(label + status).width + pipW + 44 > room) {
+    label = 'CORRIDOR';
+    status = owner === PLAYER ? `LAUNCH ${clock}`
+      : owner >= 0 ? `${FACTION_NAMES[owner].split(' ')[0].toUpperCase()} ${clock}`
+      : `${need} OF ${vents.length} · YOU ${mine}`;
+  }
   const lw = ctx.measureText(label).width, sw = ctx.measureText(status).width;
-  const pipW = vents.length * 14;
-  const w = Math.min(vw - 24, lw + sw + pipW + 44), h = 24;
-  const x = Math.round(vw / 2 - w / 2), y = Math.round(hudTop);
+  const w = Math.min(room, lw + sw + pipW + 44), h = 24;
+  // tucked under the resource pills, top left
+  const x = Math.round(hudLeft), y = Math.round(hudTop);
   ctx.fillStyle = 'rgba(14,20,36,0.86)';
   ctx.beginPath(); ctx.roundRect(x, y, w, h, 6); ctx.fill();
   ctx.strokeStyle = danger ? `rgba(255,90,74,${0.55 + 0.35 * Math.sin(T * 5)})` : owner === PLAYER ? '#3ddc84' : 'rgba(201,160,82,0.7)';
