@@ -838,6 +838,7 @@ export function setRefinedStyle(v: boolean) {
   sprites.clear();
   crystalCache.clear();
   if (terrainTex) paintTerrain();
+  warmIcons();
   for (const fn of styleListeners) fn();
 }
 function drawBld(s: BldSprite, x: number, y: number) {
@@ -1255,10 +1256,42 @@ function iconUrl(c: HTMLCanvasElement): string {
   return o.toDataURL();
 }
 
+// Icons take 10–30 ms each to bake, which stalled the first visit to each
+// build tab. Bakes are remembered, and every build-bar icon is baked one per
+// idle slot (during the briefing, and again after a style flip), so opening a
+// tab only ever reads finished icons.
+const iconMemo = new Map<string, string | null>();
+function memoIcon(key: string, make: () => string | null): string | null {
+  let v = iconMemo.get(key);
+  if (v === undefined) { v = make(); iconMemo.set(key, v); }
+  return v;
+}
+const whenIdle: (fn: () => void) => void = 'requestIdleCallback' in window
+  ? fn => requestIdleCallback(fn, { timeout: 400 })
+  : fn => setTimeout(fn, 30);
+let warmGen = 0;
+function warmIcons() {
+  const gen = ++warmGen;               // a newer warm-up (style flip) supersedes this one
+  const queue: (() => void)[] = [
+    ...Object.keys(BUILDINGS).map(id => () => { artIconUrl(id); }),
+    ...Object.keys(UNITS).map(id => () => { unitIconUrl(id); }),
+  ];
+  const step = () => {
+    if (gen !== warmGen) return;
+    queue.shift()?.();
+    if (queue.length) whenIdle(step);
+  };
+  whenIdle(step);
+}
+setTimeout(warmIcons, 300);
+
 // build-bar icon for a structure with hand-drawn art (null if it has none);
 // defences show their turret head, aimed toward the viewer
 const ICON_AIM = 0.6;
 export function artIconUrl(defId: string, owner = PLAYER, level = 1): string | null {
+  return memoIcon(`a:${refinedStyle}:${defId}:${owner}:${level}`, () => bakeArtIcon(defId, owner, level));
+}
+function bakeArtIcon(defId: string, owner: number, level: number): string | null {
   const art = BUILDING_ART[defId];
   if (!art) return null;
   const def = BUILDINGS[defId];
@@ -1290,6 +1323,9 @@ export function artIconUrl(defId: string, owner = PLAYER, level = 1): string | n
 // three-quarter view facing the viewer; null if it has no code-drawn art, and in
 // the classic style, whose units are the pack sprites
 export function unitIconUrl(defId: string, owner = PLAYER): string | null {
+  return memoIcon(`u:${refinedStyle}:${defId}:${owner}`, () => bakeUnitIcon(defId, owner));
+}
+function bakeUnitIcon(defId: string, owner: number): string | null {
   const va = VEHICLE_ART[defId];
   if (!va || !refinedStyle) return null;
   const k = 3, ww = va.reach * 2 + 4, wh = ww + va.height;
