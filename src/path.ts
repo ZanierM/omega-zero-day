@@ -23,20 +23,18 @@ export function findPath(sx: number, sy: number, tx: number, ty: number): { x: n
   const closed = new Uint8Array(size);
   const start = sy * MAP_W + sx, goal = ty * MAP_W + tx;
 
-  // simple binary-ish open list: array of [f, idx], we scan for min (grid is small)
-  const open: number[] = [start];
+  // open list: binary min-heap on f; a node re-pushed with a better f leaves a
+  // stale entry behind, which is skipped once the node is closed
   const f = new Float32Array(size).fill(Infinity);
   g[start] = 0;
   f[start] = Math.hypot(tx - sx, ty - sy);
+  const open = new MinHeap(f);
+  open.push(start);
 
   let guard = 0;
-  while (open.length > 0 && guard++ < 20000) {
-    // pop node with lowest f
-    let bi = 0;
-    for (let i = 1; i < open.length; i++) if (f[open[i]] < f[open[bi]]) bi = i;
-    const cur = open[bi];
-    open[bi] = open[open.length - 1];
-    open.pop();
+  while (open.size > 0 && guard++ < 20000) {
+    const cur = open.pop();
+    if (closed[cur]) continue;
     if (cur === goal) {
       const path: { x: number, y: number }[] = [];
       let n = cur;
@@ -61,9 +59,45 @@ export function findPath(sx: number, sy: number, tx: number, ty: number): { x: n
         g[ni] = ng;
         f[ni] = ng + Math.hypot(tx - nx, ty - ny);
         parent[ni] = cur;
-        if (!open.includes(ni)) open.push(ni);
+        open.push(ni);
       }
     }
   }
   return null;
+}
+
+// min-heap of node indices; each entry keeps the f[] value it was pushed with
+class MinHeap {
+  private a: number[] = [];
+  private k: number[] = [];
+  constructor(private f: Float32Array) {}
+  get size() { return this.a.length; }
+  push(n: number) {
+    const a = this.a, k = this.k, key = this.f[n];
+    let i = a.length;
+    a.push(n); k.push(key);
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (k[p] <= key) break;
+      a[i] = a[p]; k[i] = k[p]; i = p;
+    }
+    a[i] = n; k[i] = key;
+  }
+  pop(): number {
+    const a = this.a, k = this.k, top = a[0];
+    const n = a.pop()!, key = k.pop()!;
+    if (a.length > 0) {
+      let i = 0;
+      for (;;) {
+        const l = i * 2 + 1, r = l + 1;
+        let m = i, mk = key;
+        if (l < a.length && k[l] < mk) { m = l; mk = k[l]; }
+        if (r < a.length && k[r] < mk) { m = r; mk = k[r]; }
+        if (m === i) break;
+        a[i] = a[m]; k[i] = k[m]; i = m;
+      }
+      a[i] = n; k[i] = key;
+    }
+    return top;
+  }
 }

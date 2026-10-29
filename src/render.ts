@@ -3,7 +3,7 @@ import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
-import { BUILDING_ART, nexusBeacon, extractorLights } from './art';
+import { BUILDING_ART, VEHICLE_ART, setFineArt, nexusBeacon, extractorLights, fusionCore, spireLight, labLight } from './art';
 
 // Renderer v4 — Kenney sprite assets on a pre-rendered noise terrain.
 //  * terrain painted once into a big offscreen texture (per-pixel noise, craters, boulders)
@@ -15,9 +15,19 @@ const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 let T = 0;
 
+let lastViewW = 0, lastViewH = 0;
 export function resize() {
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
+  const vw = canvas.clientWidth, vh = canvas.clientHeight;
+  // keep the middle of the view fixed, so folding/unfolding or rotating
+  // doesn't slide the battlefield off to one side
+  if (lastViewW && lastViewH) {
+    camera.x += (lastViewW - vw) / 2 / camera.zoom;
+    camera.y += (lastViewH - vh) / 2 / camera.zoom;
+  }
+  lastViewW = vw; lastViewH = vh;
+  // Samsung foldables report fractional ratios (e.g. 2.625 on the cover screen)
+  canvas.width = Math.round(vw * devicePixelRatio);
+  canvas.height = Math.round(vh * devicePixelRatio);
 }
 export function viewSize() {
   return { w: canvas.clientWidth, h: canvas.clientHeight };
@@ -540,11 +550,12 @@ function bakeGrime(g: CanvasRenderingContext2D, w: number, h: number, n: number)
 // frame 0 = idle pose, frames 1/2 = walk cycle (falls back to idle art)
 // procedurally-drawn aircraft (faces east, rotated freely at draw time —
 // smooth rotation reads naturally for flight, unlike ground walkers)
-export function bakeAirSprite(defId: string, owner: number): HTMLCanvasElement {
+export function bakeAirSprite(defId: string, owner: number, refined = false): HTMLCanvasElement {
   const def = UNITS[defId];
   const team = TEAM_COLORS[owner];
-  const S = def.radius * 3;
-  const [c, g] = makeCanvas(S, S);
+  const S = def.radius * 3, k = refined ? 3 : 1;
+  const [c, g] = makeCanvas(S * k, S * k);
+  g.scale(k, k);
   g.translate(S / 2, S / 2);
   const heavy = defId === 'bomber';
   const L = def.radius * 1.35;             // nose length
@@ -585,7 +596,109 @@ export function bakeAirSprite(defId: string, owner: number): HTMLCanvasElement {
   g.fillStyle = team; g.globalAlpha = 0.85;
   g.fillRect(-L * 0.3, -1.6, L * 0.5, 3.2);
   g.globalAlpha = 1;
+  if (refined) {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    gradeWarmCool(c, 0.7);
+    outline(c, 'rgba(16,10,8,0.6)', 2);
+    (c as Scaled).k = k;
+  }
   return c;
+}
+
+// a sprite baked k× larger than world size (refined style), drawn back down
+type Scaled = HTMLCanvasElement & { k?: number };
+const kOf = (s: HTMLCanvasElement) => (s as Scaled).k ?? 1;
+
+// refined-style vehicles: hull and turret baked separately at VEH_ANGLES
+// headings, so hulls turn smoothly and turrets aim on their own
+const VEH_ANGLES = 48;
+type VehPart = Scaled & { ox: number; oy: number; ww: number; wh: number };
+// walkers bake fewer headings (each has several gait frames)
+const vehAngles = (defId: string) => VEHICLE_ART[defId]!.frames ? 24 : VEH_ANGLES;
+function vehiclePart(defId: string, owner: number, part: 'hull' | 'turret', i: number, frame = 0): VehPart {
+  const key = `v:${defId}:${owner}:${part}:${i}:${frame}`;
+  let s = sprites.get(key) as VehPart | undefined;
+  if (!s) {
+    const va = VEHICLE_ART[defId]!, k = 3;
+    const ww = va.reach * 2 + 4, wh = ww + va.height;
+    const [c, g] = makeCanvas(ww * k, wh * k);
+    g.scale(k, k); g.translate(ww / 2, ww / 2 + va.height);
+    setFineArt(true);
+    const ang = (i / vehAngles(defId)) * Math.PI * 2;
+    if (part === 'hull') va.hull(g, ang, TEAM_COLORS[owner], frame / (va.frames ?? 1));
+    else va.turret?.(g, ang, TEAM_COLORS[owner]);
+    setFineArt(false);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    gradeWarmCool(c, 0.7);
+    outline(c, 'rgba(16,10,8,0.6)', 2);
+    s = c as VehPart; s.k = k; s.ox = ww / 2; s.oy = ww / 2 + va.height; s.ww = ww; s.wh = wh;
+    sprites.set(key, s);
+  }
+  return s;
+}
+const vehViz = new Map<number, { hull: number, tur: number }>();
+let vizT = 0, vizDt = 0;
+// rotate cur toward want by at most maxStep, the short way round
+function turnToward(cur: number, want: number, maxStep: number): number {
+  const d = ((want - cur) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+  return cur + Math.max(-maxStep, Math.min(maxStep, d));
+}
+const headingIndex = (a: number, n: number) => ((Math.round(a / (Math.PI * 2 / n)) % n) + n) % n;
+function drawVehicle(u: Unit, moving: boolean) {
+  const va = VEHICLE_ART[u.def.id]!, n = vehAngles(u.def.id);
+  const v = vehViz.get(u.id) ?? { hull: u.facing, tur: u.facing };
+  vehViz.set(u.id, v);
+  v.hull = turnToward(v.hull, u.facing, 4 * vizDt);
+  const tid = u.order.type === 'attack' ? u.order.targetId ?? -1 : u.autoTargetId;
+  const tgt = tid >= 0 ? byId.get(tid) : undefined;
+  let aim = v.hull;
+  if (tgt) { const p = game.entityPos(tgt); aim = Math.atan2(p.y - u.y, p.x - u.x); }
+  v.tur = turnToward(v.tur, aim, 5 * vizDt);
+  // walkers stride instead of hovering; the gait speeds up with the unit
+  const frame = va.frames && moving ? Math.floor(T * u.def.speed * 2.2 + u.id * 0.37) % va.frames : 0;
+  const bob = va.frames ? 0 : Math.sin(T * 2.4 + u.id) * 0.8;
+  for (const part of va.turret ? ['hull', 'turret'] as const : ['hull'] as const) {
+    const s = vehiclePart(u.def.id, u.owner, part, headingIndex(part === 'hull' ? v.hull : v.tur, n), part === 'hull' ? frame : 0);
+    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob, s.ww, s.wh);
+  }
+}
+
+// warm key light from the dying sun in the north-west and a cool sky fill in
+// the shadows, applied through the sprite's own alpha so its edges stay clean
+function gradeWarmCool(c: HTMLCanvasElement, amount: number) {
+  const [t, tg] = makeCanvas(c.width, c.height);
+  tg.drawImage(c, 0, 0);
+  tg.globalCompositeOperation = 'soft-light';
+  const lg = tg.createLinearGradient(0, 0, c.width, c.height);
+  lg.addColorStop(0, `rgba(255,168,92,${0.55 * amount})`);
+  lg.addColorStop(0.5, 'rgba(128,128,128,0)');
+  lg.addColorStop(1, `rgba(56,88,168,${0.6 * amount})`);
+  tg.fillStyle = lg; tg.fillRect(0, 0, c.width, c.height);
+  tg.globalCompositeOperation = 'destination-in';
+  tg.drawImage(c, 0, 0);
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, c.width, c.height);
+  g.drawImage(t, 0, 0);
+}
+
+// refined style: the pack art baked at 3× from its full-size source (it's
+// 3-4× larger than drawn), a light team wash, warm/cool grade, thin edge
+function bakeUnitSpriteRefined(img: HTMLImageElement, def: typeof UNITS[string], owner: number): Scaled {
+  const k = 3, scale = def.spriteH / img.height;
+  const dw = Math.ceil(img.width * scale * k), dh = Math.ceil(img.height * scale * k);
+  const [c, g] = makeCanvas(dw + 4, dh + 4);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(img, 2, 2, dw, dh);
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = TEAM_COLORS[owner];
+  g.globalAlpha = owner === PLAYER ? 0.06 : 0.16;   // team reads from the ground glow instead
+  g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  gradeWarmCool(c, 0.8);
+  punch(g, c, 0.12);
+  outline(c, 'rgba(16,10,8,0.6)', 2);               // two of 3× pixels: under one world pixel
+  const s = c as Scaled; s.k = k;
+  return s;
 }
 
 function bakeUnitSprite(defId: string, owner: number, variant: number): HTMLCanvasElement {
@@ -599,6 +712,7 @@ function bakeUnitSprite(defId: string, owner: number, variant: number): HTMLCanv
     g.beginPath(); g.arc(def.radius, def.radius, def.radius, 0, Math.PI * 2); g.fill();
     return c;
   }
+  if (refinedStyle) return bakeUnitSpriteRefined(img, def, owner);
   const scale = def.spriteH / img.height;
   const dw = Math.ceil(img.width * scale), dh = Math.ceil(img.height * scale);
   const [c, g] = makeCanvas(dw, dh);
@@ -667,7 +781,19 @@ function punch(g: CanvasRenderingContext2D, c: HTMLCanvasElement, amount: number
 }
 
 // baked building canvases carry the offset of the footprint's top-left corner
-export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number }
+// k: the sprite is baked k× larger than world size (refined style) and drawn back down
+export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number; k?: number }
+
+// refined render style (prototype): ?style=refined in the URL, or V in game
+export let refinedStyle = new URLSearchParams(location.search).get('style') === 'refined';
+export function setRefinedStyle(v: boolean) {
+  refinedStyle = v;
+  sprites.clear();
+}
+function drawBld(s: BldSprite, x: number, y: number) {
+  const k = s.k ?? 1;
+  ctx.drawImage(s, x - s.ox, y - s.oy, s.width / k, s.height / k);
+}
 
 // dark pixel-art outline around everything already drawn on the canvas
 function outline(c: HTMLCanvasElement, color: string, px: number) {
@@ -737,6 +863,7 @@ function bakeBuildingSprite(defId: string, owner: number, level: number): BldSpr
   // the structure on its own canvas, overflowing the plot upward; baseY is the
   // canvas row that sits on the plot's south edge
   const art = BUILDING_ART[defId];
+  if (art && refinedStyle) return bakeRefinedSprite(defId, owner, level);
   const img = def.sprite ? images.get(`${def.sprite}_${level}`) : undefined;
   let st: HTMLCanvasElement | null = null, baseY = 0;
   if (art) {
@@ -795,6 +922,69 @@ function bakeBuildingSprite(defId: string, owner: number, level: number): BldSpr
     return s;
   }
   return bakeProceduralBuilding(defId, owner);
+}
+
+// refined style: hand-drawn art baked at 2× with no pixelation, thin tinted
+// edges, a soft blurred shadow and a quiet pad
+function bakeRefinedSprite(defId: string, owner: number, level: number): BldSprite {
+  const def = BUILDINGS[defId], art = BUILDING_ART[defId]!;
+  const w = def.w * TILE, h = def.h * TILE, k = 2;
+  const head = Math.ceil(w * 0.75), m = 6;
+  const sw = w + m * 2, baseY = m + head + h;          // structure canvas, world units
+  const [st, sg] = makeCanvas(sw * k, (h + head + m * 2) * k);
+  sg.scale(k, k); sg.translate(m, m + head);
+  setFineArt(true);
+  art(sg, w, h, level, TEAM_COLORS[owner]);
+  setFineArt(false);
+  sg.setTransform(1, 0, 0, 1, 0, 0);
+  gradeWarmCool(st, 0.7);
+  outline(st, 'rgba(20,12,8,0.55)', 1);                 // one device pixel, not two world pixels
+
+  const reachX = Math.ceil(baseY * 0.42), reachY = Math.ceil(baseY * 0.16);
+  const cw = Math.max(w, sw) + 16 + reachX * 2;
+  const ch = h + Math.max(0, baseY - h) + 16 + reachY;
+  const [c, g] = makeCanvas(cw * k, ch * k);
+  g.scale(k, k);
+  const ox = (cw - w) / 2, oy = ch - h - 6 - reachY;
+  g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore();
+  const bx = cw / 2, by = oy + h;
+  // long low-sun shadow, blurred so it reads as light rather than a decal
+  g.save();
+  g.filter = 'blur(2.5px)';
+  g.translate(bx, by);
+  g.transform(1, 0, -0.42, -0.16, 0, 0);
+  g.globalAlpha = 0.3;
+  g.drawImage(silhouetteOf(st), -sw / 2, -baseY, sw, st.height / k);
+  g.restore();
+  // soft contact shadow where it meets the ground
+  const cs = g.createRadialGradient(bx + 2, by - 2, 0, bx + 2, by - 2, sw * 0.46);
+  cs.addColorStop(0, 'rgba(16,8,4,0.32)'); cs.addColorStop(1, 'rgba(16,8,4,0)');
+  g.save(); g.scale(1, 0.22); g.fillStyle = cs;
+  g.beginPath(); g.arc(bx + 2, (by - 2) / 0.22, sw * 0.46, 0, Math.PI * 2); g.fill(); g.restore();
+  g.drawImage(st, bx - sw / 2, by - baseY, sw, st.height / k);
+  const s = c as BldSprite; s.ox = ox; s.oy = oy; s.k = k;
+  return s;
+}
+
+// a low concrete slab: soft trampled ground, a faint bevel, and team colour
+// only as a thin lip along the front edge
+function drawPadRefined(g: CanvasRenderingContext2D, w: number, h: number, team: string) {
+  const dg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.72);
+  dg.addColorStop(0, 'rgba(40,22,12,0.32)'); dg.addColorStop(1, 'rgba(40,22,12,0)');
+  g.fillStyle = dg; g.fillRect(-14, -14, w + 28, h + 28);
+  const pg = g.createLinearGradient(0, 0, w * 0.5, h);
+  pg.addColorStop(0, '#6c665e'); pg.addColorStop(1, '#4c4741');
+  rr(g, 3, 3, w - 6, h - 6, 5);
+  g.fillStyle = pg; g.fill();
+  g.lineWidth = 1; g.strokeStyle = 'rgba(30,22,16,0.7)'; g.stroke();
+  g.strokeStyle = 'rgba(0,0,0,0.14)'; g.lineWidth = 0.5;
+  for (let x = 32; x < w - 4; x += 32) { g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - 4); g.stroke(); }
+  for (let y = 32; y < h - 4; y += 32) { g.beginPath(); g.moveTo(4, y); g.lineTo(w - 4, y); g.stroke(); }
+  g.strokeStyle = 'rgba(255,240,215,0.16)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(4.5, h - 5); g.lineTo(4.5, 4.5); g.lineTo(w - 5, 4.5); g.stroke();
+  g.fillStyle = team; g.globalAlpha = 0.85;
+  g.fillRect(8, h - 6, w - 16, 1.5);
+  g.globalAlpha = 1;
 }
 
 // walls, the pulse turret, and any missing art
@@ -1143,7 +1333,7 @@ function buildingOverlay(b: Building) {
     case 'outpost': {
       // beacon on the tip of the antenna mast (sprite overflows above the plot)
       const on = Math.sin(T * 4) > 0;
-      const bc = nexusBeacon(w, b.level);
+      const bc = nexusBeacon(w, b.level, refinedStyle);
       g2Glow(px + bc.x, py + bc.y, on ? 4 : 2, on ? 'rgba(255,90,90,0.9)' : 'rgba(120,40,50,0.6)');
       break;
     }
@@ -1156,13 +1346,22 @@ function buildingOverlay(b: Building) {
       break;
     }
     case 'lab': {
-      if (Math.sin(T * 5) > 0.2) g2Glow(cx, cy, 5, 'rgba(140,255,170,0.5)');
+      // status lamp on the exhaust stack
+      const ll = labLight(w);
+      if (Math.sin(T * 5) > 0.2) g2Glow(px + ll[0], py + ll[1], 4, 'rgba(140,255,170,0.7)');
+      break;
+    }
+    case 'fusion': {
+      // the caged star breathes
+      const fc = fusionCore(w);
+      g2Glow(px + fc[0], py + fc[1], 9 + Math.sin(T * 3.2 + b.id) * 2, `rgba(255,200,110,${0.35 + Math.sin(T * 3.2 + b.id) * 0.15})`);
       break;
     }
     case 'spire': {
-      // tower warning light, high above the plot
+      // warning light on the spike tip, high above the plot
       const on = Math.sin(T * 2.6) > 0;
-      g2Glow(cx, py - h * 1.1, on ? 3.5 : 1.5, on ? 'rgba(255,80,80,0.9)' : 'rgba(120,40,50,0.5)');
+      const sl = spireLight(w);
+      g2Glow(px + sl[0], py + sl[1], on ? 3.5 : 1.5, on ? 'rgba(255,80,80,0.9)' : 'rgba(120,40,50,0.5)');
       break;
     }
     case 'sensor': {
@@ -1273,6 +1472,8 @@ function cornersSel(x: number, y: number, w: number, h: number) {
 export function render() {
   if (!terrainTex) return; // not initialized yet (briefing screen)
   T = performance.now() / 1000;
+  vizDt = Math.min(0.1, Math.max(0, T - vizT)); vizT = T;
+  if (vehViz.size > units.length + 64) for (const id of [...vehViz.keys()]) if (!byId.has(id)) vehViz.delete(id);
   const vw = canvas.clientWidth, vh = canvas.clientHeight;
   const z = camera.zoom;
   const vwz = vw / z, vhz = vh / z; // visible world size at this zoom
@@ -1281,14 +1482,19 @@ export function render() {
   ctx.fillRect(0, 0, vw, vh);
   ctx.save();
   ctx.scale(z, z);
-  ctx.translate(-camera.x, -camera.y);
+  // snap the scroll to whole device pixels: pixel art drawn at fractional
+  // offsets shimmers and judders as the camera moves
+  const px = 1 / (z * devicePixelRatio);
+  ctx.translate(-Math.round(camera.x / px) * px, -Math.round(camera.y / px) * px);
 
   // blit only the part of the terrain texture that actually exists — clamping to
   // the map bounds prevents the browser from edge-smearing the last row/column
-  // when you zoom/scroll past the edge of the map
+  // when you zoom/scroll past the edge of the map. Edges sit on whole texels so
+  // nearest-neighbour sampling doesn't swim while scrolling.
   const mW = MAP_W * TILE, mH = MAP_H * TILE;
-  const bx0 = Math.max(0, camera.x), by0 = Math.max(0, camera.y);
-  const bx1 = Math.min(mW, camera.x + vwz), by1 = Math.min(mH, camera.y + vhz);
+  const texel = (v: number, round: (n: number) => number) => round(v / TEX_SCALE) * TEX_SCALE;
+  const bx0 = Math.max(0, texel(camera.x, Math.floor)), by0 = Math.max(0, texel(camera.y, Math.floor));
+  const bx1 = Math.min(mW, texel(camera.x + vwz, Math.ceil)), by1 = Math.min(mH, texel(camera.y + vhz, Math.ceil));
   if (bx1 > bx0 && by1 > by0) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(terrainTex, bx0 / TEX_SCALE, by0 / TEX_SCALE, (bx1 - bx0) / TEX_SCALE, (by1 - by0) / TEX_SCALE,
@@ -1380,7 +1586,7 @@ export function render() {
     const px = b.tx * TILE, py = b.ty * TILE;
     const w = b.def.w * TILE, h = b.def.h * TILE;
     const s = bldSprite(b.def.id, b.owner, b.level);
-    ctx.drawImage(s, px - s.ox, py - s.oy);
+    drawBld(s, px, py);
     buildingOverlay(b);
     const sel = selection.has(b.id);
     if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, py - 9, w - 8, b.hp / b.maxHp);
@@ -1403,16 +1609,42 @@ export function render() {
     const moving = !!u.path && u.path.length > 0;
     const frame = moving ? 1 + (Math.floor(T * 6 + u.id) % 2) : 0;
     const s = sprite('u', u.def.id, u.owner, dirIndex(u.facing) * 3 + frame);
-    // flat sliver of shadow at the feet — offset SE like the buildings
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    ctx.beginPath(); ctx.ellipse(u.x + 3, u.y + s.height * 0.34, s.width * 0.42, s.height * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-    if (u.def.harvester) {
+    const sw = s.width / kOf(s), sh = s.height / kOf(s);
+    const va = refinedStyle ? VEHICLE_ART[u.def.id] : undefined;
+    if (va) {
+      // soft shadow and team glow pooled under the hull
+      const tr = va.reach * 0.9;
+      const tg = ctx.createRadialGradient(u.x, u.y, 0, u.x, u.y, tr);
+      tg.addColorStop(0, TEAM_COLORS[u.owner] + '90'); tg.addColorStop(0.6, TEAM_COLORS[u.owner] + '40'); tg.addColorStop(1, TEAM_COLORS[u.owner] + '00');
+      ctx.save(); ctx.translate(0, u.y); ctx.scale(1, 0.55); ctx.translate(0, -u.y);
+      ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(u.x, u.y, tr, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = 'rgba(0,0,0,0.24)';
+      ctx.beginPath(); ctx.ellipse(u.x + 4, u.y + 3, va.reach * 0.62, va.reach * 0.36, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (refinedStyle) {
+      // team identity as a soft glow on the ground, under a softer shadow
+      const tr = sw * 0.55;
+      const tg = ctx.createRadialGradient(u.x, u.y + sh * 0.3, 0, u.x, u.y + sh * 0.3, tr);
+      tg.addColorStop(0, TEAM_COLORS[u.owner] + 'b0'); tg.addColorStop(0.55, TEAM_COLORS[u.owner] + '55'); tg.addColorStop(1, TEAM_COLORS[u.owner] + '00');
+      ctx.save(); ctx.translate(0, u.y + sh * 0.3); ctx.scale(1, 0.38); ctx.translate(0, -(u.y + sh * 0.3));
+      ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(u.x, u.y + sh * 0.3, tr, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath(); ctx.ellipse(u.x + 2, u.y + sh * 0.32, sw * 0.32, sh * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // flat sliver of shadow at the feet — offset SE like the buildings
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath(); ctx.ellipse(u.x + 3, u.y + sh * 0.34, sw * 0.42, sh * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    if (va) {
+      drawVehicle(u, moving);
+    } else if (u.def.harvester) {
       // hover drone: floats with a soft downdraft glow
       const bob = Math.sin(T * 3 + u.id) * 2;
       g2Glow(u.x, u.y + 6, 7, 'rgba(120,200,255,0.25)');
-      ctx.drawImage(s, u.x - s.width / 2, u.y - s.height / 2 - 6 + bob);
+      ctx.drawImage(s, u.x - sw / 2, u.y - sh / 2 - 6 + bob, sw, sh);
     } else {
-      ctx.drawImage(s, u.x - s.width / 2, u.y - s.height * 0.62);
+      ctx.drawImage(s, u.x - sw / 2, u.y - sh * 0.62, sw, sh);
     }
     if (u.def.harvester && u.cargo > 10) {
       g2Glow(u.x, u.y, 5 + (u.cargo / 500) * 5, `rgba(67,243,236,${0.25 + (u.cargo / 500) * 0.45})`);
@@ -1592,7 +1824,7 @@ export function render() {
     if (u.owner !== PLAYER && !visible[idx(tileOf(u.x), tileOf(u.y))]) continue;
     const key = `a:${u.def.id}:${u.owner}`;
     let s = sprites.get(key);
-    if (!s) { s = bakeAirSprite(u.def.id, u.owner); sprites.set(key, s); }
+    if (!s) { s = bakeAirSprite(u.def.id, u.owner, refinedStyle); sprites.set(key, s); }
     const bob = Math.sin(T * 2.2 + u.id) * 2;
     // ground shadow, offset from the airframe so the altitude reads
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
@@ -1600,7 +1832,8 @@ export function render() {
     ctx.save();
     ctx.translate(u.x, u.y - AIR_ALT + bob);
     ctx.rotate(u.facing);
-    ctx.drawImage(s, -s.width / 2, -s.height / 2);
+    const ak = kOf(s);
+    ctx.drawImage(s, -s.width / ak / 2, -s.height / ak / 2, s.width / ak, s.height / ak);
     ctx.restore();
     const sel = selection.has(u.id);
     if (sel || u.hp < u.maxHp) {
@@ -1639,7 +1872,7 @@ export function render() {
         ctx.fillRect((placement.tx + x) * TILE + 1, (placement.ty + y) * TILE + 1, TILE - 2, TILE - 2);
     ctx.globalAlpha = 0.85;
     const gs = bldSprite(placement.defId, PLAYER, 1);
-    ctx.drawImage(gs, placement.tx * TILE - gs.ox, placement.ty * TILE - gs.oy);
+    drawBld(gs, placement.tx * TILE, placement.ty * TILE);
     ctx.globalAlpha = 1;
   }
 

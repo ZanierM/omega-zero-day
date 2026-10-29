@@ -61,8 +61,17 @@ function upgradeSvg(defId: string): string {
     <text x="42" y="46" font-size="13" font-weight="bold" fill="${stroke}" text-anchor="end">${tier}</text></svg>`;
 }
 
-// icon markup for a def
+// icon markup for a def, baked once: a freshly baked data-URL image stalls the
+// next frame for up to a second while it decodes, so tab switches reuse them
+const iconCache = new Map<string, string>();
 function iconHtml(tab: Tab, defId: string): string {
+  const key = tab + ':' + defId;
+  let html = iconCache.get(key);
+  if (html === undefined) { html = bakeIconHtml(tab, defId); iconCache.set(key, html); }
+  return html;
+}
+
+function bakeIconHtml(tab: Tab, defId: string): string {
   if (tab === 'ups') return upgradeSvg(defId);
   if (tab === 'inf' || tab === 'veh') {
     const d = UNITS[defId];
