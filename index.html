@@ -474,6 +474,7 @@
       #pausebox h2 { font-size: 22px; margin-bottom: 0; }
     }
     @media (prefers-reduced-motion: reduce) {
+      #comms.seren #commsbadge { animation: none; }
       #countdown.warn, #idlebtn.show, #enemysw.imminent { animation: none; }
       #powerfill, #toast, .bbtn, .opt { transition: none; }
     }
@@ -488,11 +489,17 @@
     #missionlist .opt span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 600; }
     #missionlist .opt:disabled { opacity: .45; cursor: not-allowed; }
     #missionbrief p { font-size: 14px; }
-    #comms { position: fixed; z-index: 7; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: min(520px, calc(100vw - 24px));
+    /* top right on wide screens so it never sits over the toast (bottom centre); above the deck in portrait, where the toast moves to the top */
+    #comms { position: fixed; z-index: 7; right: calc(62px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); max-width: min(460px, calc(100vw - 420px));
       display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px 10px 10px; background: var(--brief-glass); border: 1px solid var(--edge-hi); border-radius: 6px;
       box-shadow: 0 0 0 3px var(--plate-dk), 0 0 0 4px var(--edge), 0 10px 24px var(--frame-shadow); pointer-events: auto; cursor: pointer; }
     #comms[hidden] { display: none; }
-    #commsbadge { flex: none; width: 40px; height: 40px; border-radius: 4px; display: grid; place-items: center; font-family: var(--head); font-weight: 900; font-size: 17px; color: var(--ink); }
+    #commsbadge { flex: none; width: 64px; height: 64px; border-radius: 4px; border: 1px solid; overflow: hidden; display: grid; place-items: center; font-family: var(--head); font-weight: 900; font-size: 22px; color: var(--ink); }
+    #commsbadge img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.92) contrast(1.04); }
+    #comms.seren #commsbadge { animation: signal 1.6s steps(2) infinite; }
+    @keyframes signal { 50% { opacity: .55; } }
+    #missionbrief .transmission { display: flex; gap: 12px; align-items: flex-start; }
+    #missionbrief .transmission img { flex: none; width: 72px; height: 72px; border-radius: 4px; border: 1px solid var(--edge-hi); object-fit: cover; }
     #commswho { font-family: var(--head); font-size: var(--type-xs); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     #commswho small { color: var(--muted); font-weight: 600; letter-spacing: .04em; margin-left: 6px; text-transform: none; }
     #commstext { font-size: var(--type-sm); line-height: 1.45; color: var(--cream); margin-top: 2px; }
@@ -506,9 +513,10 @@
     #objlist li::before { content: "◇ "; color: var(--gold); }
     #objlist li.done { color: var(--muted); text-decoration: line-through; }
     #objlist li.done::before { content: "◆ "; color: var(--good); }
-    @media (max-height: 500px) { #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
+    @media (orientation: portrait), (max-width: 760px) { #comms { top: auto; right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: calc(100vw - 24px); } }
+    @media (max-height: 500px) { #commsbadge { width: 44px; height: 44px; } #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
   </style>
-  <script type="module" crossorigin src="./assets/index-CMlyjsIv.js"></script>
+  <script type="module" crossorigin src="./assets/index-CXOqN6pS.js"></script>
 </head>
 <body>
   <div id="app" inert>
