@@ -36,12 +36,18 @@
       --body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
       /* brushed metal plates with vertical seams — the sci-fi cousin of wooden planks */
       --plates:
-        repeating-linear-gradient(90deg, transparent 0 46px, rgba(0,0,0,0.38) 46px 48px, rgba(255,240,210,0.05) 48px 49px),
-        repeating-linear-gradient(0deg, rgba(255,240,210,0.018) 0 1px, transparent 1px 3px),
-        linear-gradient(180deg, #353029, #27231f);
+        linear-gradient(180deg, rgba(255,240,210,0.07), transparent 30%, transparent 70%, rgba(0,0,0,0.25)),
+        repeating-linear-gradient(90deg, transparent 0 46px, rgba(0,0,0,0.45) 46px 48px, rgba(255,240,210,0.07) 48px 49px,
+          rgba(0,0,0,0.07) 49px 95px, rgba(0,0,0,0.45) 95px 97px, rgba(255,240,210,0.07) 97px 98px, rgba(255,240,210,0.03) 98px 142px),
+        repeating-linear-gradient(0deg, rgba(255,240,210,0.02) 0 1px, transparent 1px 3px),
+        linear-gradient(180deg, #3a342c, #27231e);
       --plates-dk:
-        repeating-linear-gradient(90deg, transparent 0 30px, rgba(0,0,0,0.32) 30px 32px, rgba(255,240,210,0.04) 32px 33px),
-        linear-gradient(180deg, #2a2621, #1e1b17);
+        linear-gradient(180deg, rgba(255,240,210,0.06), transparent 35%, rgba(0,0,0,0.22)),
+        repeating-linear-gradient(90deg, transparent 0 30px, rgba(0,0,0,0.38) 30px 32px, rgba(255,240,210,0.05) 32px 33px, rgba(0,0,0,0.06) 33px 63px, rgba(0,0,0,0.38) 63px 65px, rgba(255,240,210,0.05) 65px 66px),
+        linear-gradient(180deg, #2e2a24, #1d1a16);
+      /* raised plate: lit top lip, dark bottom lip, drop shadow */
+      --raised: inset 0 2px 0 rgba(255,236,200,0.13), inset 0 -3px 0 rgba(0,0,0,0.38), 0 4px 0 rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3);
+      --sunk: inset 0 3px 6px rgba(0,0,0,0.65), inset 0 -1px 0 rgba(255,236,200,0.06);
       --rivets:
         radial-gradient(circle at 9px 9px, #b39a70 0 1.6px, #3a3024 2.2px, transparent 3px),
         radial-gradient(circle at calc(100% - 9px) 9px, #b39a70 0 1.6px, #3a3024 2.2px, transparent 3px),
@@ -59,9 +65,9 @@
     #topbar { position: absolute; top: 8px; left: 8px; z-index: 6; display: flex; gap: 6px; align-items: stretch;
       max-width: calc(100% - 66px); pointer-events: none; }
     #topbar > * { pointer-events: auto; }
-    .pill { display: flex; align-items: center; gap: 7px; padding: 5px 12px; min-height: 38px;
+    .pill { border-top-color: var(--edge-hi) !important; display: flex; align-items: center; gap: 7px; padding: 5px 12px; min-height: 38px;
       background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 11px;
-      box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,240,210,0.08); white-space: nowrap; }
+      box-shadow: var(--raised); white-space: nowrap; }
     #credits { font-family: var(--head); font-size: 19px; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums;
       text-shadow: 0 2px 0 rgba(0,0,0,0.5); }
     #creditlabel { display: none; }
@@ -82,8 +88,8 @@
 
     /* ---- bottom command deck: plated console ---- */
     #bottombar { display: flex; flex-direction: column; position: relative;
-      background: var(--plates); border-top: 3px solid var(--edge);
-      box-shadow: 0 -4px 14px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,240,210,0.08); }
+      background: var(--plates); border-top: 4px solid var(--edge-hi);
+      box-shadow: 0 -6px 16px rgba(0,0,0,0.55), inset 0 2px 0 #3a2c18, inset 0 3px 0 rgba(255,236,200,0.1); }
 
     /* category tabs: rounded folder tabs sitting on the deck */
     #tabsbar { display: flex; gap: 4px; padding: 6px 10px 0; border-bottom: 2px solid rgba(0,0,0,0.35); overflow-x: auto; }
@@ -96,16 +102,17 @@
     #hudrow { display: flex; align-items: stretch; gap: 10px; padding: 9px 10px 10px; min-height: 0; }
     #minimapwrap { display: flex; flex-direction: column; gap: 4px; }
     #minimap { display: block; width: 140px; height: 140px; cursor: pointer; image-rendering: pixelated;
-      border: 4px solid var(--edge); border-radius: 9px; background: #000;
-      box-shadow: 0 0 0 2px #1a140d, inset 0 0 0 1px #000, 0 3px 0 rgba(0,0,0,0.45); }
+      border: 4px solid var(--edge); border-top-color: var(--edge-hi); border-bottom-color: #3a2c18; border-radius: 9px; background: #000;
+      box-shadow: 0 0 0 2px #1a140d, 0 4px 0 rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3); }
 
     #buildpanel { flex: 1; display: flex; min-width: 0; }
     #buildgrid { flex: 1; display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 2px 2px 4px; align-items: stretch; }
     .bbtn { position: relative; width: 102px; min-width: 102px; cursor: pointer; overflow: hidden;
       display: flex; flex-direction: column; align-items: center; padding: 6px 2px 5px; gap: 1px;
       background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 12px;
-      box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,240,210,0.07); transition: border-color .12s, box-shadow .12s; }
-    .bbtn:hover { border-color: var(--gold); box-shadow: 0 0 12px rgba(232,198,106,0.35), 0 3px 0 rgba(0,0,0,0.45); }
+      box-shadow: var(--raised); transition: border-color .12s, box-shadow .12s; }
+    .bbtn, .actbtn, .opt, .mapbtn, #pausebox button { border-top-color: #6a5638; border-bottom-color: #2a2118; }
+    .bbtn:hover { border-color: var(--gold); box-shadow: 0 0 14px rgba(232,198,106,0.4), var(--raised); }
     .bbtn:active { transform: translateY(1px); }
     /* icon fills the space above the labels and is centered by object-fit */
     .bbtn img, .bbtn svg { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 88px; max-height: 62px; object-fit: contain; image-rendering: pixelated; pointer-events: none;
@@ -125,11 +132,11 @@
     /* right console: selection readout + action buttons */
     #infopanel { width: 270px; display: flex; flex-direction: column; gap: 6px; }
     #selinfo { flex: 1; min-height: 0; padding: 7px 11px; background: var(--well); border: 2px solid #3c3122; border-radius: 10px;
-      box-shadow: inset 0 2px 5px rgba(0,0,0,0.6); font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; }
+      box-shadow: var(--sunk); font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; }
     #selinfo b { color: var(--cream); font-family: var(--head); font-size: 14px; font-weight: 800; }
     .actbtn { visibility: hidden; flex-shrink: 0; padding: 6px 4px; font-size: 13px; font-weight: 800; cursor: pointer;
       color: var(--cream); background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 10px;
-      box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,240,210,0.07); }
+      box-shadow: var(--raised); }
     .actbtn:hover { border-color: var(--gold); }
     .actbtn:active { transform: translateY(1px); }
     .actbtn:disabled { opacity: 0.55; cursor: default; border-color: #4a3d2c; transform: none; }
@@ -185,7 +192,7 @@
     #briefbox p { font-size: 14.5px; line-height: 1.6; color: #d8ccb0; margin-bottom: 12px; }
     #briefbox p b { color: var(--gold); }
     .objectives { margin: 0 0 20px 0; padding: 11px 16px; list-style: none; font-size: 14px; font-weight: 700; line-height: 1.85; color: var(--cream);
-      background: var(--well); border: 2px solid #3c3122; border-radius: 12px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.55); }
+      background: var(--well); border: 2px solid #3c3122; border-radius: 12px; box-shadow: var(--sunk); }
     .objectives li::before { content: "◈ "; color: var(--gold); }
     #opponents { margin-bottom: 20px; }
     .optlabel { font-family: var(--head); font-size: 16px; font-weight: 800; color: var(--gold); margin: 14px 0 7px; }
@@ -195,12 +202,12 @@
     .opt { flex: 1; padding: 10px 6px 9px; text-align: center; cursor: pointer; color: var(--cream);
       background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 12px;
       font-family: var(--head); font-size: 20px; font-weight: 800;
-      box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,240,210,0.07); transition: border-color .15s, box-shadow .15s; }
+      box-shadow: var(--raised); transition: border-color .15s, box-shadow .15s; }
     .opt i { display: block; font-style: normal; font-size: 26px; height: 34px; line-height: 34px; margin-bottom: 2px; }
     .opt span { display: block; font-family: var(--body); font-size: 11.5px; font-weight: 700; font-style: italic; margin-top: 3px; color: var(--muted); }
     .opt:hover { border-color: var(--edge-hi); }
     .opt.sel { border-color: var(--gold); color: var(--gold);
-      box-shadow: 0 0 16px rgba(232,198,106,0.45), 0 3px 0 rgba(0,0,0,0.45), inset 0 0 18px rgba(232,198,106,0.08); }
+      box-shadow: 0 0 18px rgba(232,198,106,0.5), var(--raised), inset 0 0 18px rgba(232,198,106,0.1); }
     .opt.sel span { color: #d8ccb0; }
     .paramrow .opt { font-size: 14px; padding: 9px 4px 8px; }
     #deploy { position: relative; width: 100%; padding: 15px 0; font-family: var(--head); font-size: 20px; font-weight: 900; letter-spacing: 1px; cursor: pointer;
@@ -266,7 +273,7 @@
     /* ☰ menu button — floats top-right over the map, always available */
     .mapbtn { position: absolute; top: 8px; z-index: 6; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
       font-size: 21px; color: var(--gold); background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 12px; cursor: pointer;
-      box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,240,210,0.08);
+      box-shadow: var(--raised);
       -webkit-tap-highlight-color: transparent; user-select: none; }
     .mapbtn:hover { border-color: var(--edge-hi); color: var(--gold-hi); }
     #menubtn { right: 8px; }
@@ -298,7 +305,7 @@
       text-shadow: 0 3px 0 rgba(0,0,0,0.55); }
     #pausebox button { padding: 13px 0; font-size: 16px; font-weight: 800; cursor: pointer; color: var(--cream);
       background: var(--plates-dk); border: 2px solid #4a3d2c; border-radius: 12px;
-      box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,240,210,0.07); }
+      box-shadow: var(--raised); }
     #pausebox button:hover { border-color: var(--gold); color: var(--gold); }
 
     /* ⛶ box-select toggle — floats over the map, touch devices only */

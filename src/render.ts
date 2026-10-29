@@ -51,7 +51,6 @@ function makeCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingCo
 
 const images = new Map<string, HTMLImageElement>();
 
-const ROCK_SPRITES = ['env_09', 'env_10', 'env_11', 'env_12', 'env_13', 'env_03', 'env_04'];
 const FLORA_SPRITES = ['env_16', 'env_17', 'env_18', 'env_19', 'env_14', 'env_15'];
 
 // compass directions, indexed by round(facing / 45°): 0 = east, going clockwise
@@ -62,7 +61,7 @@ export function dirIndex(facing: number): number {
 }
 
 function neededFiles(): string[] {
-  const files = new Set<string>([...ROCK_SPRITES, ...FLORA_SPRITES, 'env_05']);
+  const files = new Set<string>([...FLORA_SPRITES, 'env_05']);
   for (const def of Object.values(BUILDINGS)) {
     if (!def.sprite) continue;
     for (const lvl of [1, 2, 3]) files.add(`${def.sprite}_${lvl}`);
@@ -91,10 +90,25 @@ export function loadSprites(): Promise<void> {
 // ---------------- terrain texture ----------------
 
 let terrainTex: HTMLCanvasElement;
+// the terrain texture is painted at half resolution and blown up without
+// smoothing, so the ground reads as chunky 2×-pixel art like an old RTS map
+export const TEX_SCALE = 2;
+
+// 2×2 ordered-dither offsets: quantized colour bands break into a checker
+// pattern instead of hard steps, the classic 16-bit shading trick
+const BAYER = [0, 0.5, 0.75, 0.25];
+
+interface Pal { out: string, dk: string, mid: string, lt: string, hi: string }
+const ROCK_GREY: Pal = { out: '#2a201d', dk: '#5a4c46', mid: '#85776e', lt: '#ad9f92', hi: '#d8ccbc' };
+const ROCK_RED: Pal = { out: '#2c170f', dk: '#683724', mid: '#93553a', lt: '#bb7b52', hi: '#e6ab7a' };
+const TREE_TEAL: Pal = { out: '#11231c', dk: '#1f4236', mid: '#2f6b55', lt: '#4f9a72', hi: '#93cf8c' };
+const TREE_PURPLE: Pal = { out: '#1b1226', dk: '#36234c', mid: '#573a76', lt: '#8460a6', hi: '#c49edc' };
 
 function paintTerrain() {
-  const W = MAP_W * TILE, H = MAP_H * TILE;
-  const [tex, g] = makeCanvas(W, H);
+  const P = TEX_SCALE;
+  const W = MAP_W * TILE, H = MAP_H * TILE;   // world size
+  const TW = W / P, TH = H / P;               // texture size
+  const [tex, g] = makeCanvas(TW, TH);
 
   // water mask, bilinearly sampled per pixel and wobbled with noise so lake
   // shores come out organic instead of following the tile grid
@@ -120,89 +134,101 @@ function paintTerrain() {
     return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3 + (noise(x / 5 + 9, y / 5) - 0.5) * 0.035;
   };
 
-  const img = g.createImageData(W, H);
+  const img = g.createImageData(TW, TH);
   const d = img.data;
   // slope lighting: compare each pixel's height with its NW neighbours so the
   // noise reads as actual relief lit from the north-west
-  const prevRow = new Float32Array(W);
+  const prevRow = new Float32Array(TW);
   let left = 0;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const n = fbm(x / 90, y / 90);              // large dunes
+  const STEP = 9;
+  for (let py = 0; py < TH; py++) {
+    for (let px = 0; px < TW; px++) {
+      const x = px * P, y = py * P;
+      const n = fbm(x / 110, y / 110);            // broad basins and plateaus
       const detail = fbm(x / 34 + 300, y / 34);   // small bumps
-      const hgt = n * 0.78 + detail * 0.22;
-      const grain = noise(x / 3.1, y / 3.1);
+      const hgt = n * 0.75 + detail * 0.25;
+      const grain = noise(x / 5, y / 5);
       const m = hgt * 0.8 + grain * 0.2;
 
       // sunlit ochre desert under a swollen red sun: warm sand, cooler ash
-      // flats and olive scrub — saturated like a hand-painted 2000s RTS map
-      let r = 128 + m * 70, gg = 80 + m * 44, b = 46 + m * 24;
-      const ashMix = Math.max(0, (noise(x / 140 + 40, y / 140) - 0.55) * 2.2);
-      r = r * (1 - ashMix) + (118 + m * 46) * ashMix;
-      gg = gg * (1 - ashMix) + (96 + m * 38) * ashMix;
-      b = b * (1 - ashMix) + (82 + m * 30) * ashMix;
-      const veg = Math.min(0.85, Math.max(0, (noise(x / 60 + 200, y / 60 + 90) - 0.58) * 2.6) * (0.5 + grain));
-      r = r * (1 - veg) + (92 + m * 36) * veg;
-      gg = gg * (1 - veg) + (98 + m * 34) * veg;
-      b = b * (1 - veg) + (44 + m * 16) * veg;
-      // dune crests catch the light
-      const crest = Math.max(0, n - 0.62) * 90;
-      r += crest; gg += crest * 0.8; b += crest * 0.5;
+      // flats and olive scrub, each in crisp-edged patches
+      let r = 132 + m * 74, gg = 82 + m * 46, b = 46 + m * 24;
+      const ashMix = Math.min(1, Math.max(0, (noise(x / 140 + 40, y / 140) - 0.56) * 6));
+      r = r * (1 - ashMix) + (124 + m * 48) * ashMix;
+      gg = gg * (1 - ashMix) + (100 + m * 40) * ashMix;
+      b = b * (1 - ashMix) + (86 + m * 32) * ashMix;
+      const veg = Math.min(0.9, Math.max(0, (noise(x / 70 + 200, y / 70 + 90) - 0.57) * 5)) * (0.75 + grain * 0.35);
+      r = r * (1 - veg) + (88 + m * 40) * veg;
+      gg = gg * (1 - veg) + (104 + m * 40) * veg;
+      b = b * (1 - veg) + (42 + m * 18) * veg;
+
+      // big-picture depth: low basins sink into shadow, high ground brightens
+      const lift = 0.72 + n * 0.5;
+      r *= lift; gg *= lift; b *= lift;
 
       // relief shading from height difference vs W and N neighbours
-      if (x > 0 && y > 0) {
-        const slope = (hgt - left) + (hgt - prevRow[x]);
-        const lit = Math.max(-18, Math.min(20, slope * 1200));
-        r += lit; gg += lit; b += lit * 0.9;
+      if (px > 0 && py > 0) {
+        const slope = (hgt - left) + (hgt - prevRow[px]);
+        const lit = Math.max(-24, Math.min(26, slope * 700));
+        r += lit; gg += lit * 0.95; b += lit * 0.8;
       }
       left = hgt;
-      prevRow[x] = hgt;
+      prevRow[px] = hgt;
 
       // lakes: deep blue centre, teal shallows, a foam line and a sandy beach
       const w = waterAt(x, y);
       if (w > 0.5) {
         const depth = Math.min(1, (w - 0.5) * 3.2);
-        r = 70 - depth * 40; gg = 158 - depth * 76; b = 176 - depth * 46;
-        if (noise(x / 16 + 11, y / 3.2) > 0.8) { r += 26; gg += 30; b += 30; } // ripples
-        if (w < 0.54) { r = 214; gg = 226; b = 214; }                          // foam
+        r = 72 - depth * 46; gg = 160 - depth * 84; b = 178 - depth * 50;
+        if (noise(x / 16 + 11, y / 3.2) > 0.8) { r += 30; gg += 34; b += 34; } // ripples
+        if (w < 0.54) { r = 220; gg = 230; b = 216; }                          // foam
       } else if (w > 0.3) {
         const t = (w - 0.3) / 0.2;    // 0 at the dry edge → 1 at the waterline
-        r = r * (1 - t) + (206 - t * 40) * t;
-        gg = gg * (1 - t) + (176 - t * 40) * t;
-        b = b * (1 - t) + (124 - t * 28) * t;
+        r = r * (1 - t) + (214 - t * 54) * t;
+        gg = gg * (1 - t) + (182 - t * 52) * t;
+        b = b * (1 - t) + (128 - t * 36) * t;
       }
 
-      const i = (y * W + x) * 4;
-      d[i] = r; d[i + 1] = gg; d[i + 2] = b; d[i + 3] = 255;
+      const dth = BAYER[(py & 1) * 2 + (px & 1)];
+      const i = (py * TW + px) * 4;
+      d[i] = Math.floor(r / STEP + dth) * STEP;
+      d[i + 1] = Math.floor(gg / STEP + dth) * STEP;
+      d[i + 2] = Math.floor(b / STEP + dth) * STEP;
+      d[i + 3] = 255;
     }
   }
   g.putImageData(img, 0, 0);
 
-  const dry = (px: number, py: number) => {
-    const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
-    return tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H && terrain[idx(tx, ty)] === 0 && waterAt(px, py) < 0.26;
+  const dry = (x: number, y: number) => {
+    const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+    return tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H && terrain[idx(tx, ty)] === 0 && waterAt(x, y) < 0.26;
   };
 
-  // impact craters
-  const craters = Math.floor(MAP_W * MAP_H / 90);
+  // from here on draw in world coordinates
+  g.setTransform(1 / P, 0, 0, 1 / P, 0, 0);
+
+  // impact craters: dark bowl, lit far rim, shadowed near rim
+  const craters = Math.floor(MAP_W * MAP_H / 110);
   for (let n = 0; n < craters; n++) {
-    const cx = nrand() * W, cy = nrand() * H, r = 8 + nrand() * 26;
+    const cx = nrand() * W, cy = nrand() * H, r = 10 + nrand() * 24;
     if (!dry(cx, cy)) continue;
-    const grd = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
-    grd.addColorStop(0, 'rgba(70,32,16,0.42)');
-    grd.addColorStop(0.7, 'rgba(70,32,16,0.15)');
-    grd.addColorStop(1, 'rgba(70,32,16,0)');
+    const grd = g.createRadialGradient(cx + r * 0.15, cy + r * 0.1, r * 0.1, cx, cy, r);
+    grd.addColorStop(0, 'rgba(60,26,12,0.5)');
+    grd.addColorStop(0.75, 'rgba(60,26,12,0.22)');
+    grd.addColorStop(1, 'rgba(60,26,12,0)');
     g.fillStyle = grd;
-    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
-    g.strokeStyle = 'rgba(255,226,170,0.22)';
-    g.lineWidth = 2;
-    g.beginPath(); g.arc(cx, cy, r * 0.75, Math.PI * 0.6, Math.PI * 1.4); g.stroke();
+    g.beginPath(); g.ellipse(cx, cy, r, r * 0.8, 0, 0, Math.PI * 2); g.fill();
+    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(255,224,170,0.35)';
+    g.beginPath(); g.ellipse(cx, cy, r * 0.8, r * 0.64, 0, Math.PI * 0.05, Math.PI * 0.95); g.stroke();
+    g.strokeStyle = 'rgba(50,22,10,0.35)';
+    g.beginPath(); g.ellipse(cx, cy, r * 0.8, r * 0.64, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
   }
 
   // hairline cracks
-  g.strokeStyle = 'rgba(60,28,14,0.32)';
-  g.lineWidth = 1;
-  const cracks = Math.floor(MAP_W * MAP_H / 40);
+  g.strokeStyle = 'rgba(56,24,12,0.38)';
+  g.lineWidth = 2;
+  const cracks = Math.floor(MAP_W * MAP_H / 50);
   for (let n = 0; n < cracks; n++) {
     let x = nrand() * W, y = nrand() * H;
     if (!dry(x, y)) continue;
@@ -217,34 +243,48 @@ function paintTerrain() {
     g.stroke();
   }
 
-  // pixel-scale clutter, the detail that makes old isometric maps feel busy:
-  // pebbles with a lit top and a dark underside, and tufts of dry scrub
-  const pebbles = MAP_W * MAP_H * 3;
+  // pixel-scale clutter, the detail that makes old maps feel busy: pebbles with
+  // a lit top and a dark underside, and tufts of dry scrub (texture pixels)
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const pebbles = MAP_W * MAP_H * 2;
   for (let n = 0; n < pebbles; n++) {
-    const x = Math.floor(nrand() * W), y = Math.floor(nrand() * H);
-    if (!dry(x, y)) continue;
-    const big = nrand() < 0.25;
-    const sz = big ? 3 : 2;
-    g.fillStyle = 'rgba(52,30,18,0.55)';
-    g.fillRect(x, y + 1, sz, sz);
-    g.fillStyle = nrand() < 0.5 ? '#c9b08a' : '#a8876a';
-    g.fillRect(x, y, sz, sz - 1);
+    const x = Math.floor(nrand() * TW), y = Math.floor(nrand() * TH);
+    if (!dry(x * P, y * P)) continue;
+    const sz = nrand() < 0.3 ? 2 : 1;
+    g.fillStyle = 'rgba(48,24,12,0.6)';
+    g.fillRect(x, y + 1, sz, 1);
+    g.fillStyle = nrand() < 0.5 ? '#d2b892' : '#a98a6a';
+    g.fillRect(x, y + 1 - sz, sz, sz);
   }
-  const tufts = Math.floor(MAP_W * MAP_H * 0.9);
+  const tufts = Math.floor(MAP_W * MAP_H * 0.8);
   for (let n = 0; n < tufts; n++) {
-    const x = Math.floor(nrand() * W), y = Math.floor(nrand() * H);
-    if (!dry(x, y)) continue;
+    const x = Math.floor(nrand() * TW), y = Math.floor(nrand() * TH);
+    if (!dry(x * P, y * P)) continue;
     const hue = nrand();
-    const blades = 3 + Math.floor(nrand() * 3);
+    const blades = 2 + Math.floor(nrand() * 3);
+    g.fillStyle = 'rgba(40,22,10,0.45)';
+    g.fillRect(x - 1, y, blades + 2, 1);
     for (let k = 0; k < blades; k++) {
-      const bx = x + k * 2 - blades, h = 2 + Math.floor(nrand() * 4);
-      g.fillStyle = hue < 0.6 ? '#7d7a36' : hue < 0.85 ? '#9a8a3e' : '#6a5a2a';
-      g.fillRect(bx, y - h, 1, h);
-      g.fillStyle = 'rgba(240,226,150,0.55)';
-      g.fillRect(bx, y - h, 1, 1);
+      const h = 1 + Math.floor(nrand() * 3);
+      g.fillStyle = hue < 0.6 ? '#76762f' : hue < 0.85 ? '#a08e3a' : '#5e5026';
+      g.fillRect(x + k, y - h, 1, h);
+      g.fillStyle = '#e4d58e';
+      if (nrand() < 0.5) g.fillRect(x + k, y - h, 1, 1);
     }
-    g.fillStyle = 'rgba(40,24,12,0.35)';
-    g.fillRect(x - blades, y, blades * 2, 1);
+  }
+
+  g.setTransform(1 / P, 0, 0, 1 / P, 0, 0);
+
+  // drifting cloud shadows: huge soft dark patches give the plain a sense of
+  // scale and break up the even lighting
+  const clouds = Math.max(3, Math.floor(W * H / (520 * 520)));
+  for (let n = 0; n < clouds; n++) {
+    const cx = nrand() * W, cy = nrand() * H, r = 160 + nrand() * 220;
+    const grd = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
+    grd.addColorStop(0, 'rgba(36,16,10,0.2)');
+    grd.addColorStop(1, 'rgba(36,16,10,0)');
+    g.fillStyle = grd;
+    g.beginPath(); g.ellipse(cx, cy, r * 1.4, r, 0, 0, Math.PI * 2); g.fill();
   }
 
   // helper: stamp a prop sprite with a soft cast shadow
@@ -253,30 +293,11 @@ function paintTerrain() {
     if (!im) return;
     const s = size / Math.max(im.width, im.height);
     const dw = im.width * s, dh = im.height * s;
-    g.fillStyle = 'rgba(0,0,0,0.35)';
-    g.beginPath(); g.ellipse(cx + 3, cy + dh * 0.36, dw * 0.42, dh * 0.2, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(30,12,6,0.4)';
+    g.beginPath(); g.ellipse(cx + 4, cy + dh * 0.36, dw * 0.46, dh * 0.2, 0, 0, Math.PI * 2); g.fill();
     g.imageSmoothingEnabled = true;
     g.drawImage(im, cx - dw / 2, cy - dh / 2, dw, dh);
   };
-
-  // rock formations: darkened base + Kenney rock sprites
-  for (let ty = 0; ty < MAP_H; ty++)
-    for (let tx = 0; tx < MAP_W; tx++) {
-      if (terrain[idx(tx, ty)] !== 1) continue;
-      const px = tx * TILE, py = ty * TILE;
-      const grd = g.createRadialGradient(px + 16, py + 16, 4, px + 16, py + 16, 26);
-      grd.addColorStop(0, 'rgba(48,30,22,0.6)');
-      grd.addColorStop(1, 'rgba(48,30,22,0)');
-      g.fillStyle = grd;
-      g.fillRect(px - 6, py - 6, TILE + 12, TILE + 12);
-    }
-  for (let ty = 0; ty < MAP_H; ty++)
-    for (let tx = 0; tx < MAP_W; tx++) {
-      if (terrain[idx(tx, ty)] !== 1) continue;
-      const px = tx * TILE + TILE / 2, py = ty * TILE + TILE / 2;
-      stamp(ROCK_SPRITES[Math.floor(nrand() * ROCK_SPRITES.length)],
-        px + (nrand() - 0.5) * 8, py + (nrand() - 0.5) * 8, 34 + nrand() * 14);
-    }
 
   // scattered alien flora on open ground (purely decorative)
   const props = Math.floor(MAP_W * MAP_H / 60);
@@ -291,7 +312,113 @@ function paintTerrain() {
       tall ? 30 + nrand() * 16 : 18 + nrand() * 10);
   }
 
+  // ---- impassable features: boulder masses and alien forest ----
+  // every boulder and tree is queued first, then all cast shadows are drawn,
+  // then the bodies back-to-front, so overlapping pieces stack like a mountain
+  type Piece = { x: number, y: number, r: number, pal: Pal, tree: boolean, seed: number };
+  const pieces: Piece[] = [];
+  for (let ty = 0; ty < MAP_H; ty++)
+    for (let tx = 0; tx < MAP_W; tx++) {
+      const t = terrain[idx(tx, ty)];
+      if (t !== 1 && t !== 3) continue;
+      const cx = tx * TILE + TILE / 2, cy = ty * TILE + TILE / 2;
+      // ground beneath the feature goes dark: ambient occlusion
+      const grd = g.createRadialGradient(cx, cy, 4, cx, cy, 30);
+      grd.addColorStop(0, t === 1 ? 'rgba(40,22,14,0.55)' : 'rgba(18,30,18,0.6)');
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grd;
+      g.fillRect(cx - 30, cy - 30, 60, 60);
+      if (t === 1) {
+        const pal = noise(tx / 6 + 50, ty / 6) > 0.55 ? ROCK_RED : ROCK_GREY;
+        // tiles deep inside a formation get the biggest boulders so outcrops
+        // build up into a mound instead of a grid of equal stones
+        let inner = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
+          if (terrain[idx(Math.min(MAP_W - 1, Math.max(0, tx + dx)), Math.min(MAP_H - 1, Math.max(0, ty + dy)))] === 1) inner++;
+        const big = 10 + inner * 1.4 + nrand() * 6;
+        pieces.push({ x: cx + (nrand() - 0.5) * 22, y: cy + (nrand() - 0.5) * 18, r: big, pal, tree: false, seed: nrand() });
+        const extra = Math.floor(nrand() * 3);
+        for (let k = 0; k < extra; k++)
+          pieces.push({ x: cx + (nrand() - 0.5) * 34, y: cy + (nrand() - 0.5) * 28, r: 5 + nrand() * 6, pal, tree: false, seed: nrand() });
+      } else {
+        const pal = noise(tx / 7 + 9, ty / 7 + 30) > 0.62 ? TREE_PURPLE : TREE_TEAL;
+        const trees = 2 + (nrand() < 0.4 ? 1 : 0);
+        for (let k = 0; k < trees; k++)
+          pieces.push({ x: cx + (nrand() - 0.5) * 28, y: cy + (nrand() - 0.5) * 24, r: 9 + nrand() * 9, pal, tree: true, seed: nrand() });
+      }
+    }
+  pieces.sort((a, b) => a.y - b.y);
+  g.fillStyle = 'rgba(28,12,6,0.42)';
+  for (const p of pieces) {
+    g.beginPath();
+    if (p.tree) g.ellipse(p.x + p.r * 0.5, p.y + p.r * 0.35, p.r * 1.1, p.r * 0.5, 0, 0, Math.PI * 2);
+    else g.ellipse(p.x + p.r * 0.45, p.y + p.r * 0.4, p.r * 1.15, p.r * 0.55, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  for (const p of pieces) p.tree ? drawTree(g, p.x, p.y, p.r, p.pal, p.seed) : drawBoulder(g, p.x, p.y, p.r, p.pal, p.seed);
+
+  g.setTransform(1, 0, 0, 1, 0, 0);
   terrainTex = tex;
+}
+
+// a rounded boulder: dark outline, shadowed lower-right, lit upper-left lobe,
+// a bright highlight and a crack — reads as a 3D rock at any size
+function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, pal: Pal, seed: number) {
+  const pts: [number, number][] = [];
+  const by = cy - r * 0.25;
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2;
+    const rr = r * (0.84 + Math.abs(Math.sin(seed * 97 + k * 2.3)) * 0.26);
+    pts.push([cx + Math.cos(a) * rr, by + Math.sin(a) * rr * (Math.sin(a) > 0 ? 0.62 : 0.85)]);
+  }
+  const path = () => {
+    g.beginPath();
+    g.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) {
+      const [x0, y0] = pts[k - 1], [x1, y1] = pts[k];
+      g.quadraticCurveTo(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2);
+    }
+    g.closePath();
+  };
+  g.lineWidth = 3; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
+  path(); g.stroke(); g.fill();
+  g.save(); path(); g.clip();
+  g.fillStyle = pal.dk;
+  g.beginPath(); g.ellipse(cx + r * 0.45, by + r * 0.4, r * 0.95, r * 0.6, -0.3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = pal.lt;
+  g.beginPath(); g.ellipse(cx - r * 0.25, by - r * 0.4, r * 0.7, r * 0.45, -0.2, 0, Math.PI * 2); g.fill();
+  g.fillStyle = pal.hi;
+  g.beginPath(); g.ellipse(cx - r * 0.38, by - r * 0.52, r * 0.26, r * 0.15, -0.3, 0, Math.PI * 2); g.fill();
+  if (r > 10) {
+    g.strokeStyle = pal.out; g.lineWidth = 2; g.globalAlpha = 0.6;
+    g.beginPath(); g.moveTo(cx + r * 0.1, by - r * 0.3); g.lineTo(cx + r * 0.25, by + r * 0.05); g.lineTo(cx + r * 0.15, by + r * 0.35); g.stroke();
+    g.globalAlpha = 1;
+  }
+  g.restore();
+}
+
+// an alien tree: short trunk under a cluster of round canopy puffs, each
+// shaded from dark underside to lit crown
+function drawTree(g: CanvasRenderingContext2D, cx: number, cy: number, s: number, pal: Pal, seed: number) {
+  g.fillStyle = '#2a1a10';
+  g.fillRect(cx - 2, cy - s * 0.5, 4, s * 0.55);
+  const puffs: [number, number, number][] = [];
+  const n = 4 + Math.floor(seed * 2);
+  for (let k = 0; k < n; k++) {
+    const a = seed * 40 + k * (Math.PI * 2 / n);
+    puffs.push([cx + Math.cos(a) * s * 0.42, cy - s * 0.95 + Math.sin(a) * s * 0.3, s * (0.48 + ((k * 37 + seed * 100) % 10) / 50)]);
+  }
+  puffs.push([cx, cy - s * 1.1, s * 0.55]);
+  g.fillStyle = pal.out;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r + 1.5, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = pal.dk;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = pal.mid;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x - r * 0.12, y - r * 0.15, r * 0.8, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = pal.lt;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x - r * 0.28, y - r * 0.32, r * 0.45, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = pal.hi;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x - r * 0.36, y - r * 0.42, r * 0.16, 0, Math.PI * 2); g.fill(); }
 }
 
 // ---------------- baked sprites ----------------
@@ -1008,7 +1135,10 @@ export function render() {
   const bx0 = Math.max(0, camera.x), by0 = Math.max(0, camera.y);
   const bx1 = Math.min(mW, camera.x + vwz), by1 = Math.min(mH, camera.y + vhz);
   if (bx1 > bx0 && by1 > by0) {
-    ctx.drawImage(terrainTex, bx0, by0, bx1 - bx0, by1 - by0, bx0, by0, bx1 - bx0, by1 - by0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(terrainTex, bx0 / TEX_SCALE, by0 / TEX_SCALE, (bx1 - bx0) / TEX_SCALE, (by1 - by0) / TEX_SCALE,
+      bx0, by0, bx1 - bx0, by1 - by0);
+    ctx.imageSmoothingEnabled = true;
   }
 
   const tx0 = Math.max(0, Math.floor(camera.x / TILE));
@@ -1363,9 +1493,9 @@ export function render() {
   ctx.restore();
 
   // vignette
-  const vg = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.45, vw / 2, vh / 2, Math.max(vw, vh) * 0.78);
+  const vg = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.3, vw / 2, vh / 2, Math.max(vw, vh) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(20,10,4,0.32)');
+  vg.addColorStop(1, 'rgba(18,8,4,0.5)');
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, vw, vh);
 
