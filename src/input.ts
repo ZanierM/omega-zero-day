@@ -184,6 +184,8 @@ export function initInput() {
   });
 
   window.addEventListener('keydown', e => {
+    const target = e.target as HTMLElement;
+    if (target.closest('[role="dialog"]') || (e.key === ' ' && target.closest('button'))) return;
     keys.add(e.key);
     if (e.key === 'Escape') { placement = null; attackMovePending = false; strikeTargeting = null; canvas.style.cursor = 'crosshair'; }
     // A = attack-move mode (next left-click orders the attack)

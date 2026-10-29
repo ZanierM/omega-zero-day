@@ -3,13 +3,14 @@
 
 let ac: AudioContext | null = null;
 let master: GainNode, sfxBus: GainNode, musicBus: GainNode;
-let muted = localStorage.getItem('nova-muted') === '1';
+let muted = false;
+try { muted = localStorage.getItem('nova-muted') === '1'; } catch { /* storage may be unavailable */ }
 
 export function isMuted() { return muted; }
 
 export function toggleMute(): boolean {
   muted = !muted;
-  localStorage.setItem('nova-muted', muted ? '1' : '0');
+  try { localStorage.setItem('nova-muted', muted ? '1' : '0'); } catch { /* storage may be unavailable */ }
   if (master && ac) master.gain.setTargetAtTime(muted ? 0 : 1, ac.currentTime, 0.02);
   return muted;
 }

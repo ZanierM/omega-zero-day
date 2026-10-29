@@ -1,6 +1,6 @@
-// Low-resolution canvas keeps the horizon's pixels crisp at every Fold size.
+// Fine pixel steps keep the sky legible beside the briefing's metal frame.
 export function drawBriefingScene(canvas: HTMLCanvasElement) {
-  const scale = 3;
+  const scale = 2;
   const w = canvas.width = Math.ceil(innerWidth / scale);
   const h = canvas.height = Math.ceil(innerHeight / scale);
   const ctx = canvas.getContext('2d')!;
@@ -18,8 +18,8 @@ export function drawBriefingScene(canvas: HTMLCanvasElement) {
     const x = random() * w, y = random() * h * .69;
     rect(x, y, random() > .94 ? 2 : 1, 1, random() > .75 ? '#9b9baa' : '#4e5665');
   }
-  const horizon = h * .74;
-  const sunX = w * .72, sunY = horizon - h * .03, radius = Math.max(15, Math.min(w, h) * .075);
+  const horizon = h * .67;
+  const sunX = w * .89, sunY = horizon - h * .025, radius = Math.max(15, Math.min(w, h) * .09);
   rect(sunX - radius * 1.45, sunY - radius * .5, radius * 2.9, radius * 1.5, '#6b3430');
   for (let yy = -radius; yy <= radius; yy += 2) {
     const half = Math.sqrt(Math.max(0, radius * radius - yy * yy));
@@ -40,7 +40,7 @@ export function drawBriefingScene(canvas: HTMLCanvasElement) {
   };
   ridge(horizon + 8, h * .035, '#222430', 37);
   ridge(horizon + h * .06, h * .045, '#191e28', 170);
-  const ox = w * .18, oy = horizon + h * .035;
+  const ox = w * .14, oy = horizon + h * .035;
   // The far outpost sits between two ridges, with tiny lit windows and an aerial.
   rect(ox - 12, oy - 4, 36, 13, '#111923');
   rect(ox - 5, oy - 12, 19, 8, '#172332');
