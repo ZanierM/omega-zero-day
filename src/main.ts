@@ -6,7 +6,7 @@ import { updateAI, initAI } from './ai';
 import { initInput, updateCamera, centerCameraOn } from './input';
 import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle, setRefinedStyle } from './render';
 import { initUI, updateUI } from './ui';
-import { initAudio, toggleMute, isMuted } from './audio';
+import { initAudio, toggleMute, isMuted, audioStats } from './audio';
 import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
 import * as campaign from './campaign/runner';
 
@@ -238,6 +238,17 @@ missionList.addEventListener('click', e => {
   renderMissions();
 });
 try { if (localStorage.getItem(modeKey) === 'campaign') setMode('campaign'); } catch { /* storage may be unavailable */ }
+// arriving from "Next mission" / "Retry mission": go straight in
+const queuedMission = campaign.takeQueuedMission();
+if (queuedMission) {
+  setMode('campaign');
+  selectedMission = queuedMission;
+  renderMissions();
+  // audio needs a user gesture; the first tap or key in the mission wakes it
+  const wake = () => { initAudio(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
+  addEventListener('pointerdown', wake); addEventListener('keydown', wake);
+  queueMicrotask(() => deployBtn.click());
+}
 
 const resumeSaveBtn = document.getElementById('resumesave') as HTMLButtonElement;
 const pendingSave = readSave();
@@ -313,6 +324,7 @@ import * as configMod from './config';
 (window as any).novaInput = inputMod;
 (window as any).novaMap = mapMod;
 (window as any).novaCfg = configMod;
+(window as any).novaAudio = audioStats;
 
 // Fast-forward the simulation by N seconds (e.g. novaStep(30) in the console)
 (window as any).novaStep = (seconds: number) => {

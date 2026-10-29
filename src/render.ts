@@ -1,5 +1,6 @@
 import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES } from './config';
 import * as telemetry from './telemetry';
+import { setListener } from './audio';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
@@ -2051,6 +2052,7 @@ export function render() {
   const vw = canvas.clientWidth, vh = canvas.clientHeight;
   const z = camera.zoom;
   const vwz = vw / z, vhz = vh / z; // visible world size at this zoom
+  setListener(camera.x + vwz / 2, camera.y + vhz / 2, vwz / 2);   // battle sounds pan and fade around the view
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.fillStyle = '#100c0a';
   ctx.fillRect(0, 0, vw, vh);

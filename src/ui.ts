@@ -589,7 +589,9 @@ export function updateUI() {
       const end = gameOver === 'win' ? m.endWin : m.endLose;
       overlayTitle.textContent = end.title;
       overlaySub.textContent = end.text;
-      againBtn.textContent = gameOver === 'win' ? 'Continue campaign' : 'Retry mission';
+      const last = gameOver === 'win' && campaign.isLastMission();
+      againBtn.textContent = last ? 'Back to the campaign' : gameOver === 'win' ? 'Next mission ▸' : 'Retry mission';
+      againBtn.onclick = () => { campaign.queueMission(gameOver === 'win'); location.reload(); };
     }
     if (!overlayStats.childElementCount) {
       const rows: [string, string][] = [
