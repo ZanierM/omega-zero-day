@@ -784,8 +784,9 @@ function punch(g: CanvasRenderingContext2D, c: HTMLCanvasElement, amount: number
 // k: the sprite is baked k× larger than world size (refined style) and drawn back down
 export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number; k?: number }
 
-// refined render style (prototype): ?style=refined in the URL, or V in game
-export let refinedStyle = new URLSearchParams(location.search).get('style') === 'refined';
+// refined render style is the default; ?style=classic (or V in game) shows the
+// original chunky pixelated look for comparison
+export let refinedStyle = new URLSearchParams(location.search).get('style') !== 'classic';
 export function setRefinedStyle(v: boolean) {
   refinedStyle = v;
   sprites.clear();
