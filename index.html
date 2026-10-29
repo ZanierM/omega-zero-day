@@ -388,7 +388,6 @@
     #pausebox #restartbtn, #upgbtn:not(:disabled), #abilbtn:not(:disabled) { color: var(--steel-hi); background: linear-gradient(180deg, var(--steel-dk), var(--plate-dk)); border: 2px solid var(--steel); }
     #pausebox #restartbtn:hover, #upgbtn:not(:disabled):hover, #abilbtn:not(:disabled):hover { border-color: var(--steel-hi); color: var(--cream); }
     #pausebox #pausemute, .actbtn:disabled { color: var(--cream); background: var(--plates-dk); border: 2px solid var(--edge); }
-    #pausebox #graphicsbtn { color: var(--cream); background: var(--plates-dk); border: 2px solid var(--edge); }
     #pausebox button, .actbtn { min-height: 40px; text-transform: uppercase; font-size: var(--type-sm); }
     .actbtn[style*="hidden"] { display: none; }
     #pausebox h2, #overlay h1, #briefbox h1 { text-transform: uppercase; letter-spacing: .09em; }
@@ -450,9 +449,6 @@
     #selectiondetails b { color: var(--gold); font-family: var(--head); }
     #selectiondetails i { color: var(--muted); }
     #detailsclose { float: right; min-width: 40px; min-height: 40px; margin: -7px -9px 2px 8px; border: 0; background: transparent; color: var(--gold); font: 800 var(--type-sm) var(--head); cursor: pointer; }
-    #ordermarker { position: fixed; z-index: 8; width: 32px; height: 32px; margin: -16px 0 0 -16px; border: 2px solid var(--steel-hi); border-radius: 50%; pointer-events: none; opacity: 0; box-shadow: 0 0 0 2px var(--space-well); }
-    #ordermarker.attack { border-color: var(--bad); }
-    #ordermarker.advance { border-color: var(--gold); }
     /* On a Fold cover in landscape the minimap yields space to the battlefield. */
     @media (orientation: landscape) and (max-width: 920px) and (max-height: 480px) {
       #minimapwrap { display: none; }
@@ -516,7 +512,7 @@
     @media (orientation: portrait), (max-width: 760px) { #comms { top: auto; right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: calc(100vw - 24px); } }
     @media (max-height: 500px) { #commsbadge { width: 44px; height: 44px; } #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
   </style>
-  <script type="module" crossorigin src="./assets/index-Ck9HkR_A.js"></script>
+  <script type="module" crossorigin src="./assets/index-DWjnHxhw.js"></script>
 </head>
 <body>
   <div id="app" inert>
@@ -536,7 +532,6 @@
     <button id="selectmode" class="mapbtn" title="Box-select mode" aria-pressed="false">⛶</button>
     <button id="menubtn" class="mapbtn" title="Menu">☰</button>
     <div id="groupbar" role="group" aria-label="Control groups"></div>
-    <div id="ordermarker" aria-hidden="true"></div>
     <button id="idlebtn" title="Idle harvester (no crystal)">⚠ <span id="idlecount">0</span></button>
     <div id="enemysw"></div>
     <div id="bottombar">
@@ -563,7 +558,6 @@
       <h2 id="pausetitle">Paused</h2>
       <button id="resumebtn">▶ Resume</button>
       <button id="restartbtn">⟲ Restart mission</button>
-      <button id="graphicsbtn" type="button" aria-label="Graphics: Refined">Graphics: Refined</button>
       <button id="pausemute">Sound: on</button>
     </div>
   </div>
