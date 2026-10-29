@@ -829,11 +829,16 @@ export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number; k
 // refined render style is the default; ?style=classic (or V in game) shows the
 // original chunky pixelated look for comparison
 export let refinedStyle = new URLSearchParams(location.search).get('style') !== 'classic';
+// listeners told when the render style flips (e.g. the UI's baked icons)
+const styleListeners: (() => void)[] = [];
+export function onStyleChange(fn: () => void) { styleListeners.push(fn); }
 export function setRefinedStyle(v: boolean) {
+  if (v === refinedStyle) return;
   refinedStyle = v;
   sprites.clear();
   crystalCache.clear();
   if (terrainTex) paintTerrain();
+  for (const fn of styleListeners) fn();
 }
 function drawBld(s: BldSprite, x: number, y: number) {
   const k = s.k ?? 1;
@@ -1253,7 +1258,7 @@ function iconUrl(c: HTMLCanvasElement): string {
 // build-bar icon for a structure with hand-drawn art (null if it has none);
 // defences show their turret head, aimed toward the viewer
 const ICON_AIM = 0.6;
-export function artIconUrl(defId: string): string | null {
+export function artIconUrl(defId: string, owner = PLAYER, level = 1): string | null {
   const art = BUILDING_ART[defId];
   if (!art) return null;
   const def = BUILDINGS[defId];
@@ -1263,9 +1268,9 @@ export function artIconUrl(defId: string): string | null {
     const [c, g] = makeCanvas((w + m * 2) * k, (h + head + m * 2) * k);
     g.scale(k, k); g.translate(m, m + head);
     setFineArt(true);
-    art(g, w, h, 1, TEAM_COLORS[PLAYER]);
+    art(g, w, h, level, TEAM_COLORS[owner]);
     const ta = TURRET_ART[defId];
-    if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[PLAYER]); g.restore(); }
+    if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[owner]); g.restore(); }
     setFineArt(false);
     g.setTransform(1, 0, 0, 1, 0, 0);
     gradeWarmCool(c, 0.7);
@@ -1274,7 +1279,7 @@ export function artIconUrl(defId: string): string | null {
   }
   const [c, g] = makeCanvas(w + m * 2, h + head + m * 2);
   g.translate(m, m + head);
-  art(g, w, h, 1, TEAM_COLORS[PLAYER]);
+  art(g, w, h, level, TEAM_COLORS[owner]);
   g.setTransform(1, 0, 0, 1, 0, 0);
   outline(c, '#1a120c', 2);
   pixelate(c);
@@ -1282,16 +1287,17 @@ export function artIconUrl(defId: string): string | null {
 }
 
 // build-bar icon for a unit drawn in code (infantry, vehicles, aircraft),
-// three-quarter view facing the viewer; null if it has no code-drawn art
-export function unitIconUrl(defId: string): string | null {
+// three-quarter view facing the viewer; null if it has no code-drawn art, and in
+// the classic style, whose units are the pack sprites
+export function unitIconUrl(defId: string, owner = PLAYER): string | null {
   const va = VEHICLE_ART[defId];
-  if (!va) return null;
+  if (!va || !refinedStyle) return null;
   const k = 3, ww = va.reach * 2 + 4, wh = ww + va.height;
   const [c, g] = makeCanvas(ww * k, wh * k);
   g.scale(k, k); g.translate(ww / 2, ww / 2 + va.height);
   setFineArt(true);
-  va.hull(g, ICON_AIM, TEAM_COLORS[PLAYER], 0);
-  va.turret?.(g, ICON_AIM, TEAM_COLORS[PLAYER]);
+  va.hull(g, ICON_AIM, TEAM_COLORS[owner], 0);
+  va.turret?.(g, ICON_AIM, TEAM_COLORS[owner]);
   setFineArt(false);
   g.setTransform(1, 0, 0, 1, 0, 0);
   gradeWarmCool(c, 0.7);
@@ -1568,7 +1574,7 @@ function buildingOverlay(b: Building) {
 // spotted as they appear and spawn flashes, sparks, debris, smoke, trails and
 // scorch marks that live and die here.
 
-interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; kind: 'spark' | 'smoke' | 'debris' | 'flash' }
+interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; kind: 'spark' | 'smoke' | 'debris' | 'flash' | 'steam' | 'mote'; col?: string; ambient?: boolean }
 const particles: Particle[] = [];
 const scorches: { x: number; y: number; r: number; life: number; max: number }[] = [];
 const seenFx = new WeakSet<object>();
@@ -1577,8 +1583,80 @@ const MAX_PARTICLES = 420, MAX_SCORCHES = 70;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
 function addParticle(p: Particle) {
-  if (particles.length >= MAX_PARTICLES) particles.shift();
+  if (particles.length >= MAX_PARTICLES && particles.shift()?.ambient) ambientCount--;
   particles.push(p);
+}
+
+// ---- ambient life: stack smoke, vent steam, crystal motes, forest spores and
+// drifting dust. Only spawned on screen and over explored ground, under its own
+// budget so it never crowds out battle effects. (Flora and trees are baked into
+// the ground texture, so the forests shed spores rather than sway.)
+const WIND = { x: 9, y: 2.5 };          // world px/s, a light easterly
+const MAX_AMBIENT = 150;
+let ambientCount = 0;
+const ambientTimers = new Map<number, number>();   // per building / vent: time to next puff
+function addAmbient(p: Particle) {
+  if (ambientCount >= MAX_AMBIENT) return;
+  p.ambient = true; ambientCount++;
+  addParticle(p);
+}
+// every `every` seconds per source, with a little jitter
+function due(id: number, dt: number, every: number) {
+  const t = (ambientTimers.get(id) ?? Math.random() * every) - dt;
+  if (t > 0) { ambientTimers.set(id, t); return false; }
+  ambientTimers.set(id, every * rnd(0.7, 1.3));
+  return true;
+}
+
+// live particle counts by kind (dev console: novaFx())
+export function fxStats() {
+  const by: Record<string, number> = {};
+  for (const p of particles) by[p.kind] = (by[p.kind] ?? 0) + 1;
+  return { total: particles.length, ambient: ambientCount, scorches: scorches.length, ...by };
+}
+(window as unknown as { novaFx: typeof fxStats }).novaFx = fxStats;
+
+function spawnAmbient(dt: number) {
+  if (dt <= 0) return;
+  const z = camera.zoom, vx0 = camera.x, vy0 = camera.y;
+  const vx1 = vx0 + canvas.clientWidth / z, vy1 = vy0 + canvas.clientHeight / z;
+  const inView = (x: number, y: number, pad = 40) => x > vx0 - pad && x < vx1 + pad && y > vy0 - pad && y < vy1 + pad;
+  const seen = (x: number, y: number) => { const tx = tileOf(x), ty = tileOf(y); return tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H && explored[idx(tx, ty)] === 1; };
+
+  // stacks: extractors puff smoke, labs breathe a faint green-tinged vapour
+  for (const b of buildings) {
+    if (b.def.id !== 'extractor' && b.def.id !== 'lab') continue;
+    const px = b.tx * TILE, py = b.ty * TILE, w = b.def.w * TILE;
+    if (!inView(px + w / 2, py) || !seen(px + w / 2, py + w / 2)) continue;
+    const lab = b.def.id === 'lab';
+    if (!due(b.id, dt, lab ? 0.9 : 0.32)) continue;
+    const [sx, sy] = lab ? labLight(w) : extractorLights(w).lamp;
+    addAmbient({ x: px + sx, y: py + sy - 2, z: 0, vx: WIND.x + rnd(-3, 3), vy: WIND.y + rnd(-2, 2), vz: rnd(10, 16),
+      life: rnd(2.4, 3.4), max: 3.4, size: lab ? 3.6 : 4.6, kind: 'steam', col: lab ? '190,235,205' : '150,142,134' });
+  }
+  // flux vents breathe steam
+  for (const n of game.neutrals) {
+    if (n.kind !== 'vent') continue;
+    const x = (n.tx + 0.5) * TILE, y = (n.ty + 0.5) * TILE;
+    if (!inView(x, y) || !seen(x, y) || !due(-1000 - n.id, dt, 0.22)) continue;
+    addAmbient({ x: x + rnd(-6, 6), y: y + rnd(-4, 4), z: 2, vx: WIND.x * 0.6 + rnd(-4, 4), vy: WIND.y + rnd(-2, 2), vz: rnd(18, 26),
+      life: rnd(1.6, 2.4), max: 2.4, size: rnd(4, 6.5), kind: 'steam', col: '235,240,245' });
+  }
+  // sample a few random on-screen tiles: crystal motes, forest spores, dust
+  const tries = Math.min(6, Math.ceil(dt * 60 * 0.12 * ((vx1 - vx0) * (vy1 - vy0)) / (900 * 600)));
+  for (let k = 0; k < tries; k++) {
+    const x = rnd(vx0, vx1), y = rnd(vy0, vy1);
+    if (!seen(x, y)) continue;
+    const i = idx(tileOf(x), tileOf(y));
+    if (crystal[i] > 0 && Math.random() < 0.6) {
+      addAmbient({ x, y, z: rnd(2, 10), vx: rnd(-3, 3), vy: rnd(-2, 2), vz: rnd(6, 12), life: rnd(1.6, 2.6), max: 2.6, size: rnd(1.4, 2.2), kind: 'mote', col: '120,255,245' });
+    } else if (terrain[i] === 3 && Math.random() < 0.5) {
+      const violet = noise(tileOf(x) / 7 + 9, tileOf(y) / 7 + 30) > 0.62;
+      addAmbient({ x, y, z: rnd(6, 18), vx: WIND.x + rnd(-4, 4), vy: WIND.y + rnd(-3, 3), vz: rnd(-1, 3), life: rnd(2.5, 4), max: 4, size: rnd(1.3, 2), kind: 'mote', col: violet ? '210,170,255' : '170,235,190' });
+    } else if (Math.random() < 0.35) {
+      addAmbient({ x, y, z: rnd(2, 14), vx: WIND.x * 1.6 + rnd(-4, 4), vy: WIND.y + rnd(-2, 2), vz: rnd(-1, 1), life: rnd(3, 5), max: 5, size: rnd(0.9, 1.4), kind: 'mote', col: '226,200,160' });
+    }
+  }
 }
 function shellLift(s: { t: number; dur: number; kind: string }) {
   const p = Math.min(1, s.t / s.dur);
@@ -1628,9 +1706,13 @@ function updateEffects(dt: number) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.life -= dt;
-    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    if (p.life <= 0) { if (p.ambient) ambientCount--; particles.splice(i, 1); continue; }
     p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
-    if (p.kind === 'spark' || p.kind === 'debris') {
+    if (p.kind === 'mote') {
+      p.x += Math.sin(T * 1.7 + p.y * 0.05) * dt * 4;          // a lazy wobble
+    } else if (p.kind === 'steam') {
+      p.size += dt * 5;
+    } else if (p.kind === 'spark' || p.kind === 'debris') {
       p.vz -= 260 * dt;
       if (p.z < 0) { p.z = 0; p.vz *= -0.3; p.vx *= 0.55; p.vy *= 0.55; }
     } else if (p.kind === 'smoke') {
@@ -1656,6 +1738,22 @@ function drawScorches() {
 function drawParticles() {
   for (const p of particles) {
     const f = p.life / p.max, sy = p.y - p.z;
+    if (p.kind === 'mote') {
+      // fade in and out over its life, twinkling a little
+      const a = Math.min(1, (1 - f) * 4, f * 3) * (0.55 + 0.45 * Math.sin(T * 6 + p.x));
+      ctx.fillStyle = `rgba(${p.col},${0.22 * a})`;
+      ctx.beginPath(); ctx.arc(p.x, sy, p.size * 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(${p.col},${0.95 * a})`;
+      ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, p.size);
+      continue;
+    }
+    if (p.kind === 'steam') {
+      const a = Math.min(1, (1 - f) * 5) * f;
+      const gr = ctx.createRadialGradient(p.x, sy, 0, p.x, sy, p.size);
+      gr.addColorStop(0, `rgba(${p.col},${0.62 * a})`); gr.addColorStop(0.5, `rgba(${p.col},${0.3 * a})`); gr.addColorStop(1, `rgba(${p.col},0)`);
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, sy, p.size, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
     if (p.kind === 'smoke') {
       const gr = ctx.createRadialGradient(p.x, sy, 0, p.x, sy, p.size);
       gr.addColorStop(0, `rgba(52,46,42,${0.6 * f})`); gr.addColorStop(0.5, `rgba(60,54,50,${0.32 * f})`); gr.addColorStop(1, 'rgba(60,54,50,0)');
@@ -1746,7 +1844,7 @@ export function render() {
   if (!terrainTex) return; // not initialized yet (briefing screen)
   T = performance.now() / 1000;
   vizDt = Math.min(0.1, Math.max(0, T - vizT)); vizT = T;
-  if (refinedStyle) { const fdt = game.paused ? 0 : vizDt; spawnEffects(fdt); updateEffects(fdt); }
+  if (refinedStyle) { const fdt = game.paused ? 0 : vizDt; spawnEffects(fdt); spawnAmbient(fdt); updateEffects(fdt); }
   if (vehViz.size > units.length + 64) for (const id of [...vehViz.keys()]) if (!byId.has(id)) vehViz.delete(id);
   const vw = canvas.clientWidth, vh = canvas.clientHeight;
   const z = camera.zoom;

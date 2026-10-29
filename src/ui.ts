@@ -9,7 +9,7 @@ import {
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
 import { sfx, duckMusic } from './audio';
-import { defenceIconUrl, bakeAirSprite, artIconUrl, unitIconUrl } from './render';
+import { defenceIconUrl, bakeAirSprite, artIconUrl, unitIconUrl, onStyleChange } from './render';
 
 const creditsEl = document.getElementById('credits')!;
 const powerFill = document.getElementById('powerfill')!;
@@ -73,24 +73,26 @@ function upgradeSvg(defId: string): string {
 
 // icon markup for a def, baked once: a freshly baked data-URL image stalls the
 // next frame for up to a second while it decodes, so tab switches reuse them
+// (owner and level let a selection portrait match the unit or building
+// selected — enemy colours, upgraded art)
 const iconCache = new Map<string, string>();
-function iconHtml(tab: Tab, defId: string): string {
-  const key = tab + ':' + defId;
+function iconHtml(tab: Tab, defId: string, owner = PLAYER, level = 1): string {
+  const key = `${tab}:${defId}:${owner}:${level}`;
   let html = iconCache.get(key);
-  if (html === undefined) { html = bakeIconHtml(tab, defId); iconCache.set(key, html); }
+  if (html === undefined) { html = bakeIconHtml(tab, defId, owner, level); iconCache.set(key, html); }
   return html;
 }
 
-function bakeIconHtml(tab: Tab, defId: string): string {
+function bakeIconHtml(tab: Tab, defId: string, owner: number, level: number): string {
   if (tab === 'ups') return upgradeSvg(defId);
   if (tab === 'inf' || tab === 'veh') {
-    const art = unitIconUrl(defId);
+    const art = unitIconUrl(defId, owner);
     if (art) return `<img src="${art}" alt="">`;
     const d = UNITS[defId];
     if (d.air) return `<img src="${bakeAirSprite(defId, PLAYER).toDataURL()}" alt="">`;
     return `<img src="sprites/u_${d.model}${d.mstep}_s.png" alt="">`;
   }
-  const art = artIconUrl(defId);
+  const art = artIconUrl(defId, owner, level);
   if (art) return `<img src="${art}" alt="">`;
   const s = BUILDINGS[defId]?.sprite;
   if (s) return `<img src="sprites/${s}_1.png" alt="">`;
@@ -114,6 +116,8 @@ function activateTab(t: Tab) {
 }
 
 export function initUI() {
+  // icons are baked in the current render style; re-bake them when it flips
+  onStyleChange(() => { iconCache.clear(); shownPortrait = ''; rebuildGrid(); });
   for (const t of CATEGORIES) {
     const b = document.createElement('button');
     b.className = 'htab' + (t === activeTab ? ' active' : '');
@@ -401,9 +405,10 @@ export function updateUI() {
     if (first) {
       const single = selection.size === 1;
       if (single !== shownSingle) { selInfo.classList.toggle('has-selection', single); shownSingle = single; }
-      const portraitKey = single ? `${first.kind}:${first.def.id}` : '';
+      const lvl0 = first.kind === 'building' ? first.level : 1;
+      const portraitKey = single ? `${first.kind}:${first.def.id}:${first.owner}:${lvl0}` : '';
       if (portraitKey !== shownPortrait) {
-        selPortrait.innerHTML = single ? iconHtml(first.def.tab, first.def.id) : '';
+        selPortrait.innerHTML = single ? iconHtml(first.def.tab, first.def.id, first.owner, lvl0) : '';
         shownPortrait = portraitKey;
       }
       if (single) {
