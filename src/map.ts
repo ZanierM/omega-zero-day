@@ -3,7 +3,7 @@
 export let MAP_W = 60;
 export let MAP_H = 60;
 
-// terrain: 0 = ground, 1 = rock (impassable)
+// terrain: 0 = ground, 1 = rock (impassable), 2 = water (impassable)
 export let terrain: Uint8Array;
 // crystal amount per tile (credits worth remaining)
 export let crystal: Uint16Array;
@@ -86,6 +86,15 @@ export function generateMap(numEnemies: number, crystalMul = 1) {
     const y = 8 + Math.floor(rand() * (MAP_H - 16));
     if (bases.some(b => Math.hypot(x - (b.x + 1), y - (b.y + 1)) < 15)) continue;
     blob(x, y, 2 + Math.floor(rand() * 3), (tx, ty) => { terrain[idx(tx, ty)] = 1; });
+  }
+
+  // A few small lakes, kept well clear of the bases so home crystal stays dry
+  const lakeCount = Math.floor(MAP_W * MAP_H / 700);
+  for (let n = 0; n < lakeCount; n++) {
+    const x = 6 + Math.floor(rand() * (MAP_W - 12));
+    const y = 6 + Math.floor(rand() * (MAP_H - 12));
+    if (bases.some(b => Math.hypot(x - (b.x + 1), y - (b.y + 1)) < 18)) continue;
+    blob(x, y, 2 + Math.floor(rand() * 2), (tx, ty) => { if (terrain[idx(tx, ty)] === 0) terrain[idx(tx, ty)] = 2; });
   }
 
   // Crystal fields: one near each base, several near the middle

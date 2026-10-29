@@ -80,7 +80,7 @@ export function initUI() {
   for (const t of CATEGORIES) {
     const b = document.createElement('button');
     b.className = 'htab' + (t === activeTab ? ' active' : '');
-    b.textContent = TAB_NAMES[t].toUpperCase();
+    b.textContent = TAB_NAMES[t];
     b.addEventListener('click', () => {
       activeTab = t;
       tabBtns.forEach((btn, tab) => btn.classList.toggle('active', tab === t));
@@ -209,7 +209,7 @@ export function updateUI() {
   const frac = pw.supply > 0 ? Math.min(1, pw.drain / pw.supply) : (pw.drain > 0 ? 1 : 0);
   powerFill.style.width = pw.low ? '100%' : `${Math.max(4, 100 - frac * 100)}%`;
   powerFill.className = pw.low ? 'low' : '';
-  powerText.textContent = pw.low ? `${pw.drain - pw.supply} OVER — production slowed` : `${pw.supply - pw.drain} spare`;
+  powerText.textContent = pw.low ? `${pw.drain - pw.supply} over — slowed` : `${pw.supply - pw.drain} spare`;
 
   // supernova countdown
   if (novaTotal > 0) {
@@ -226,7 +226,7 @@ export function updateUI() {
   if (eta !== Infinity && !gameOver) {
     enemySw.classList.add('show');
     enemySw.classList.toggle('imminent', eta <= 0);
-    enemySw.textContent = eta <= 0 ? '⚠ HOSTILE ORBITAL STRIKE READY' : `⚠ HOSTILE ORBITAL STRIKE — ${fmtTime(eta)}`;
+    enemySw.textContent = eta <= 0 ? '⚠ Hostile orbital strike ready' : `⚠ Hostile orbital strike — ${fmtTime(eta)}`;
   } else {
     enemySw.classList.remove('show', 'imminent');
   }
@@ -265,13 +265,13 @@ export function updateUI() {
     if (ab.kind === 'toggle') {
       const on = abilityOn(u);
       abilBtn.classList.toggle('on', on);
-      abilBtn.textContent = `${on ? '◆' : '◇'} ${ab.name.toUpperCase()} [Q]`;
+      abilBtn.textContent = `${on ? '◆' : '◇'} ${ab.name} [Q]`;
       abilBtn.disabled = false;
     } else {
       abilBtn.classList.remove('on');
-      if (u.abilityTimer > 0) { abilBtn.textContent = `${ab.name.toUpperCase()} ACTIVE`; abilBtn.disabled = true; }
-      else if (u.abilityCd > 0) { abilBtn.textContent = `${ab.name.toUpperCase()} ${Math.ceil(u.abilityCd)}s`; abilBtn.disabled = true; }
-      else { abilBtn.textContent = `⚡ ${ab.name.toUpperCase()} [Q]`; abilBtn.disabled = false; }
+      if (u.abilityTimer > 0) { abilBtn.textContent = `${ab.name} active`; abilBtn.disabled = true; }
+      else if (u.abilityCd > 0) { abilBtn.textContent = `${ab.name} ${Math.ceil(u.abilityCd)}s`; abilBtn.disabled = true; }
+      else { abilBtn.textContent = `⚡ ${ab.name} [Q]`; abilBtn.disabled = false; }
     }
   } else {
     abilBtn.style.visibility = 'hidden';
@@ -284,10 +284,10 @@ export function updateUI() {
     upgBtn.style.visibility = 'visible';
     if (ob.upgrading) {
       const pct = Math.round((1 - ob.upgrading.remaining / ob.upgrading.total) * 100);
-      upgBtn.textContent = `UPGRADING… ${pct}%`;
+      upgBtn.textContent = `Upgrading… ${pct}%`;
       upgBtn.disabled = true;
     } else {
-      upgBtn.textContent = `⬆ UPGRADE (LV ${ob.level} → ${ob.level + 1}) — ◈${buildingUpgradeCost(ob)}`;
+      upgBtn.textContent = `⬆ Upgrade to Lv ${ob.level + 1} — ◈${buildingUpgradeCost(ob)}`;
       upgBtn.disabled = false;
     }
   } else {
@@ -298,16 +298,16 @@ export function updateUI() {
   const pio = selectedOwnPioneer();
   if (pio) {
     actBtn.style.visibility = 'visible';
-    actBtn.textContent = '▼ DEPLOY COMMAND POST';
+    actBtn.textContent = '▼ Deploy command post';
     actBtn.disabled = false;
   } else if (ob && ob.def.superweapon) {
     actBtn.style.visibility = 'visible';
-    if (superReady(ob)) { actBtn.textContent = '⊕ LAUNCH ORBITAL STRIKE'; actBtn.disabled = false; }
-    else { actBtn.textContent = `CHARGING… ${Math.round((1 - ob.charge / ob.def.superweapon.charge) * 100)}%`; actBtn.disabled = true; }
+    if (superReady(ob)) { actBtn.textContent = '⊕ Launch orbital strike'; actBtn.disabled = false; }
+    else { actBtn.textContent = `Charging… ${Math.round((1 - ob.charge / ob.def.superweapon.charge) * 100)}%`; actBtn.disabled = true; }
   } else if (ob && ob.hp < ob.maxHp) {
     actBtn.style.visibility = 'visible';
-    if (ob.repairing) { actBtn.textContent = 'REPAIRING…'; actBtn.disabled = true; }
-    else { actBtn.textContent = `🔧 REPAIR — ◈${repairCost(ob)}`; actBtn.disabled = false; }
+    if (ob.repairing) { actBtn.textContent = 'Repairing…'; actBtn.disabled = true; }
+    else { actBtn.textContent = `🔧 Repair — ◈${repairCost(ob)}`; actBtn.disabled = false; }
   } else {
     actBtn.style.visibility = 'hidden';
   }
@@ -316,8 +316,8 @@ export function updateUI() {
     const first = byId.get([...selection][0]);
     if (first) {
       const name = first.def.name;
-      let lvl = first.kind === 'building' && first.level > 1 ? ` <span style="color:#ffd76e">LV${first.level}</span>` : '';
-      if (first.kind === 'unit' && first.rank > 0) lvl += ` <span style="color:#ffd76e">${'★'.repeat(first.rank)} ${VET_NAME[first.rank]}</span>`;
+      let lvl = first.kind === 'building' && first.level > 1 ? ` <span style="color:#e8c66a">Lv ${first.level}</span>` : '';
+      if (first.kind === 'unit' && first.rank > 0) lvl += ` <span style="color:#e8c66a">${'★'.repeat(first.rank)} ${VET_NAME[first.rank]}</span>`;
       const hp = `${Math.ceil(first.hp)} / ${first.maxHp} HP`;
       // combat profile: weapon type + armor class (rock-paper-scissors hint)
       let combat = '';
@@ -326,14 +326,14 @@ export function updateUI() {
         const parts = [];
         if (w) parts.push(`⚔ ${w}`);
         parts.push(`🛡 ${a}`);
-        combat = `<br><span style="color:#cf9d72;font-size:9.5px">${parts.join(' · ')}</span>`;
+        combat = `<br><span style="color:#c9b48a;font-size:0.9em">${parts.join(' · ')}</span>`;
       }
       selInfo.innerHTML = selection.size === 1
         ? `<b>${name}</b>${lvl} — ${hp}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
         : `<b>${selection.size} units selected</b><br>${name} +${selection.size - 1} more`;
     }
   } else {
-    selInfo.innerHTML = '<b>► AWAITING ORDERS</b>';
+    selInfo.innerHTML = '<b>Awaiting orders</b><br>Select a unit or building.';
   }
 
   // toast
@@ -346,7 +346,7 @@ export function updateUI() {
     overlay.style.display = 'flex';
     overlay.className = gameOver;
     const novaExpired = novaTotal > 0 && novaLeft <= 0;
-    overlayTitle.textContent = gameOver === 'win' ? 'VICTORY' : novaExpired ? 'SUPERNOVA' : 'DEFEAT';
+    overlayTitle.textContent = gameOver === 'win' ? 'Victory' : novaExpired ? 'Supernova' : 'Defeat';
     overlaySub.textContent = gameOver === 'win'
       ? 'The launch corridor is clear. The ark-fleet jumps at dawn — humanity survives.'
       : novaExpired
@@ -354,13 +354,13 @@ export function updateUI() {
       : 'Vanguard command has fallen. The fleet dies in orbit, and humanity with the sun.';
     if (!overlayStats.childElementCount) {
       const rows: [string, string][] = [
-        ['TIME', fmtTime(stats.time)],
-        ['FLUX MINED', `◈ ${Math.round(stats.flux).toLocaleString()}`],
-        ['UNITS BUILT', String(stats.built)],
-        ['UNITS LOST', String(stats.lost)],
-        ['ENEMIES KILLED', String(stats.killed)],
-        ['STRUCTURES RAZED', String(stats.razed)],
-        ['ORBITAL STRIKES', String(stats.strikes)],
+        ['Time', fmtTime(stats.time)],
+        ['Flux mined', `◈ ${Math.round(stats.flux).toLocaleString()}`],
+        ['Units built', String(stats.built)],
+        ['Units lost', String(stats.lost)],
+        ['Enemies killed', String(stats.killed)],
+        ['Structures razed', String(stats.razed)],
+        ['Orbital strikes', String(stats.strikes)],
       ];
       overlayStats.innerHTML = rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join('');
     }

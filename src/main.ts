@@ -64,9 +64,8 @@ for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts']
 const muteBtn = document.getElementById('mutebtn')!;
 const pauseMute = document.getElementById('pausemute')!;
 function refreshMuteBtn() {
-  const label = isMuted() ? 'SOUND: OFF' : 'SOUND: ON';
-  muteBtn.textContent = label;
-  pauseMute.textContent = label;
+  muteBtn.textContent = isMuted() ? '🔇' : '🔊';
+  pauseMute.textContent = isMuted() ? 'Sound: off' : 'Sound: on';
 }
 muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
