@@ -1290,14 +1290,19 @@ export function render() {
   ctx.fillRect(0, 0, vw, vh);
   ctx.save();
   ctx.scale(z, z);
-  ctx.translate(-camera.x, -camera.y);
+  // snap the scroll to whole device pixels: pixel art drawn at fractional
+  // offsets shimmers and judders as the camera moves
+  const px = 1 / (z * devicePixelRatio);
+  ctx.translate(-Math.round(camera.x / px) * px, -Math.round(camera.y / px) * px);
 
   // blit only the part of the terrain texture that actually exists — clamping to
   // the map bounds prevents the browser from edge-smearing the last row/column
-  // when you zoom/scroll past the edge of the map
+  // when you zoom/scroll past the edge of the map. Edges sit on whole texels so
+  // nearest-neighbour sampling doesn't swim while scrolling.
   const mW = MAP_W * TILE, mH = MAP_H * TILE;
-  const bx0 = Math.max(0, camera.x), by0 = Math.max(0, camera.y);
-  const bx1 = Math.min(mW, camera.x + vwz), by1 = Math.min(mH, camera.y + vhz);
+  const texel = (v: number, round: (n: number) => number) => round(v / TEX_SCALE) * TEX_SCALE;
+  const bx0 = Math.max(0, texel(camera.x, Math.floor)), by0 = Math.max(0, texel(camera.y, Math.floor));
+  const bx1 = Math.min(mW, texel(camera.x + vwz, Math.ceil)), by1 = Math.min(mH, texel(camera.y + vhz, Math.ceil));
   if (bx1 > bx0 && by1 > by0) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(terrainTex, bx0 / TEX_SCALE, by0 / TEX_SCALE, (bx1 - bx0) / TEX_SCALE, (by1 - by0) / TEX_SCALE,

@@ -538,6 +538,7 @@ export function issueOrder(u: Unit, order: Order) {
   u.order = order;
   u.autoTargetId = -1;
   u.path = null;
+  u.repathTimer = 0; // path on the next tick, not after a leftover retry delay
   if (u.def.harvester) {
     u.harvestState = order.type === 'harvest' ? 'toField' : 'none';
     if (order.type === 'idle') u.harvestState = 'toField';
@@ -571,19 +572,25 @@ function moveToward(u: Unit, px: number, py: number, dt: number): boolean {
     u.path = p;
   }
 
-  const wp = u.path[0];
-  const wx = centerOfTile(wp.x), wy = centerOfTile(wp.y);
-  const dx = wx - u.x, dy = wy - u.y;
-  const d = Math.hypot(dx, dy);
-  const step = unitSpeed(u) * TILE * dt;
-  u.facing = Math.atan2(dy, dx);
-  if (d <= step) {
-    u.x = wx; u.y = wy;
-    u.path.shift();
-    if (u.path.length === 0) u.path = null;
-  } else {
-    u.x += (dx / d) * step;
-    u.y += (dy / d) * step;
+  // walk the full step, carrying what's left past each waypoint into the next
+  // so units don't hitch at every tile centre
+  let step = unitSpeed(u) * TILE * dt;
+  while (u.path && step > 0) {
+    const wp = u.path[0];
+    const wx = centerOfTile(wp.x), wy = centerOfTile(wp.y);
+    const dx = wx - u.x, dy = wy - u.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 0.001) u.facing = Math.atan2(dy, dx);
+    if (d <= step) {
+      u.x = wx; u.y = wy;
+      step -= d;
+      u.path.shift();
+      if (u.path.length === 0) u.path = null;
+    } else {
+      u.x += (dx / d) * step;
+      u.y += (dy / d) * step;
+      step = 0;
+    }
   }
   return false;
 }
