@@ -101,6 +101,8 @@ export interface BuildingDef {
   upgradable?: boolean;
   superweapon?: { charge: number; damage: number; radius: number }; // orbital strike
   limit?: number;      // max this faction may own (e.g. 1 for the superweapon)
+  nonBuildable?: boolean;   // the Vey brood's living structures: never on a build bar
+  bloom?: number;           // radius (tiles) of living ground it spreads around itself
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -142,6 +144,17 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'A soldier in a walking bunker. Requires Armor II.' },
   colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2, ability: ABILITIES.stomp,
                desc: 'Superheavy siege platform. The ground remembers where it walked. Requires Weapons II.' },
+  // ---- the Vey brood: crystal grown through flesh (AI only) ----
+  skitter:   { id: 'skitter',   name: 'Skitter',        tab: 'inf', cost: 110,  buildTime: 1,  hp: 95,   speed: 3.6, damage: 9,   range: 1.4, reload: 0.45, vision: 6, radius: 7,  model: 'soldier', mstep: 2, spriteH: 18, nonBuildable: true, crystalRegen: 3,
+               desc: 'Six legs, a crystal spine, too many of them. They pour out of the pods.' },
+  spitter:   { id: 'spitter',   name: 'Spitter',        tab: 'inf', cost: 240,  buildTime: 1,  hp: 150,  speed: 2.5, damage: 26,  range: 5.5, reload: 1.8, vision: 7, radius: 9,  model: 'soldier', mstep: 2, spriteH: 22, nonBuildable: true, weapon: 'shell', splash: 0.7, antiAir: true,
+               desc: 'Swells its glowing throat and spits a gob of crystal acid.' },
+  carapace:  { id: 'carapace',  name: 'Carapace',       tab: 'veh', cost: 600,  buildTime: 1,  hp: 720,  speed: 2.0, damage: 48,  range: 1.8, reload: 1.3, vision: 5, radius: 14, model: 'mech', mstep: 2, spriteH: 30, nonBuildable: true, crystalRegen: 8,
+               desc: 'A walking shell of crystal plate over meat. It rams armour until something gives.' },
+  moth:      { id: 'moth',      name: 'Lumen Moth',     tab: 'veh', cost: 520,  buildTime: 1,  hp: 230,  speed: 4.2, damage: 18,  range: 3.5, reload: 0.7, vision: 9, radius: 12, model: 'drone', mstep: 3, spriteH: 26, nonBuildable: true, air: true, antiAir: true,
+               desc: 'Translucent wings veined with light. It drifts over walls and burns what is underneath.' },
+  behemoth:  { id: 'behemoth',  name: 'Behemoth',       tab: 'veh', cost: 1700, buildTime: 1,  hp: 2100, speed: 1.3, damage: 110, range: 8.5, reload: 3.6, vision: 8, radius: 22, model: 'mech', mstep: 3, spriteH: 60, nonBuildable: true, weapon: 'shell', splash: 1.7, crystalRegen: 15,
+               desc: 'A hill that walks. The crystal on its back fires like a mortar.' },
   // ---- the Hollow (campaign): the Meridian's descendants, grown through with the Vey's crystal ----
   shardkin:  { id: 'shardkin',  name: 'Shardkin',       tab: 'inf', cost: 0,    buildTime: 1,  hp: 150,  speed: 2.7, damage: 15,  range: 2.4, reload: 0.7, vision: 6, radius: 8,  model: 'soldier', mstep: 2, spriteH: 26, nonBuildable: true, crystalRegen: 6,
                desc: 'Hollow kin with crystal grown through them. Fast, close in, and they mend standing near crystal.' },
@@ -196,6 +209,18 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'Rapid-discharge lightning emitter. Requires Defence Grid I.' },
   bastion:   { id: 'bastion',   name: 'Bastion Battery', tab: 'def',  cost: 3500, buildTime: 18, hp: 1400, power: -60,  w: 2, h: 2, vision: 10, prereq: 'railgun', prereqUp: 'def2', turret: { damage: 150, range: 9, reload: 3.0 }, sprite: 'bld_silo', upgradable: true,
                desc: 'Quad-cannon fortress emplacement. Requires Defence Grid II.' },
+  // ---- the Vey brood: grown, not built (AI only) ----
+  heart:     { id: 'heart',     name: 'Brood Heart',    tab: 'build', cost: 0,    buildTime: 1,  hp: 3200, power: 0,    w: 3, h: 3, vision: 9,  nonBuildable: true, bloom: 8,
+               desc: 'A mound of flesh and crystal the size of a bunker, beating. Everything the brood is grows out from it.' },
+  broodpod:  { id: 'broodpod',  name: 'Brood Pod',      tab: 'build', cost: 450,  buildTime: 1,  hp: 950,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 4,
+               desc: 'A cluster of glowing egg-sacs. Things move inside.' },
+  veinwell:  { id: 'veinwell',  name: 'Vein Well',      tab: 'build', cost: 350,  buildTime: 1,  hp: 750,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 3,
+               desc: 'Roots sunk into the crystal, drinking flux straight from the ground.' },
+  bloomnode: { id: 'bloomnode', name: 'Bloom Node',     tab: 'build', cost: 120,  buildTime: 1,  hp: 320,  power: 0,    w: 1, h: 1, vision: 6,  nonBuildable: true, bloom: 5,
+               desc: 'A bulb on a stalk that pushes the living ground further out.' },
+  spinespire:{ id: 'spinespire',name: 'Spine Spire',    tab: 'def',   cost: 400,  buildTime: 1,  hp: 700,  power: 0,    w: 1, h: 1, vision: 8,  nonBuildable: true, bloom: 2,
+               turret: { damage: 32, range: 6.5, reload: 1.1, antiAir: true },
+               desc: 'A crystal-tipped stalk that flings shards at anything walking on the bloom.' },
 };
 
 // Buildings that can never be queued from the build bar
@@ -258,15 +283,17 @@ export const UNIT_ARMOR: Record<string, ArmorClass> = {
   ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light', gunship: 'light', bomber: 'heavy',
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
   shardkin: 'infantry', burrower: 'light', choir: 'infantry',
+  skitter: 'light', spitter: 'light', carapace: 'heavy', moth: 'light', behemoth: 'heavy',
 };
 export const UNIT_DMGTYPE: Record<string, DmgType> = {
   trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun', gunship: 'gun', bomber: 'cannon',
   pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
   hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
   shardkin: 'flame', burrower: 'cannon', choir: 'gun',   // shard claws tear soft targets; a burrower crushes
+  skitter: 'flame', spitter: 'rocket', carapace: 'cannon', moth: 'gun', behemoth: 'cannon',
 };
 export const TURRET_DMGTYPE: Record<string, DmgType> = {
-  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon',
+  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun',
 };
 // multiplier[weapon dmgType][target armor class]
 export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
@@ -279,5 +306,6 @@ export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
 
 export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes
-export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2'];   // 4 = the Hollow (campaign)
-export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow'];
+export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2', '#b46cff'];   // 4 = the Hollow (campaign), 5 = the Vey brood
+export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow', 'The Vey Brood'];
+export const BROOD = 5;

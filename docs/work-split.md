@@ -24,6 +24,8 @@ edits the other's files and branches merge cleanly.
 
 **Campaign Act II (Claude, `campaign-act2`):** the comms box can carry a choice (`.commschoice` buttons, built in `ui.ts`, styled in `index.html`); the briefing's mission list is grouped by act; `defsFor` in `ui.ts` skips `nonBuildable` units (the Hollow). New portraits in `public/portraits` (Reyes, Vessa Kol, Seren).
 
+**The Vey brood (Claude, `vey-brood`):** new `src/brood.ts` (its AI) and `src/brood-art.ts`. Cross-file: `index.html` has a "The Vey brood: Dormant / Awake" skirmish option (`#broodopts`); `src/main.ts` seeds the brood at the map's centre in `startGame`; `src/ui.ts` keeps `nonBuildable` structures off the build bar.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

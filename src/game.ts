@@ -4,7 +4,7 @@ import {
   WPN_BONUS, ARM_BONUS, DEF_BONUS, BLD_UPGRADE_COST, BLD_UPGRADE_HP, BLD_UPGRADE_DMG,
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
-  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES,
+  VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES, BROOD,
   VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
 import * as telemetry from './telemetry';
@@ -144,6 +144,40 @@ export function addResonance(tx: number, ty: number, amount: number) {
   for (const lvl of [RES_TREMOR, RES_STORM]) if (before < lvl && resonance[c] >= lvl) emit({ type: 'resonance', cell: c, level: lvl });
 }
 
+// ---------- the bloom: the Vey brood's living ground ----------
+// Every brood structure pushes living ground out to its `bloom` radius; it
+// recedes when the structure dies. Brood units mend and move faster on it,
+// nobody else can build on it, and the brood can only grow on it.
+export let bloom = new Uint8Array(0);   // per tile: 0 bare … 255 thick
+let bloomTick = 0;
+const BLOOM_SOLID = 90;
+export const onBloom = (tx: number, ty: number) => inBounds(tx, ty) && bloom[idx(tx, ty)] >= BLOOM_SOLID;
+function updateBloom() {
+  const target = new Uint8Array(bloom.length);
+  let any = false;
+  for (const b of buildings) {
+    const r = b.def.bloom;
+    if (!r || b.owner !== BROOD) continue;
+    any = true;
+    const cx = b.tx + b.def.w / 2, cy = b.ty + b.def.h / 2;
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+      if (!inBounds(x, y) || terrain[idx(x, y)] === 2) continue;   // it won't take on open water
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (d <= r) target[idx(x, y)] = Math.max(target[idx(x, y)], d > r - 1 ? 150 : 255);
+    }
+  }
+  if (!any && !bloom.some(v => v > 0)) return;
+  for (let i = 0; i < bloom.length; i++) {
+    const t = target[i], v = bloom[i];
+    // creeps outward from what's already alive; dies back slowly
+    if (t > v) { const x = i % MAP_W, y = (i / MAP_W) | 0; if (v > 0 || bloomNeighbour(x, y)) bloom[i] = Math.min(t, v + 60); }
+    else if (t < v) bloom[i] = Math.max(t, v - 25);
+  }
+}
+const bloomNeighbour = (x: number, y: number) =>
+  [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inBounds(x + dx, y + dy) && bloom[idx(x + dx, y + dy)] >= BLOOM_SOLID)
+  || buildings.some(b => b.owner === BROOD && x >= b.tx - 1 && x <= b.tx + b.def.w && y >= b.ty - 1 && y <= b.ty + b.def.h);
+
 // tunnel mouths the Hollow come up through (campaign)
 export interface Tunnel { id: number; tx: number; ty: number; born: number }
 export const tunnels: Tunnel[] = [];
@@ -210,6 +244,7 @@ export function initGame(numEnemies: number) {
   resCols = Math.ceil(MAP_W / RES_CELL); resRows = Math.ceil(MAP_H / RES_CELL);
   resonance = new Float32Array(resCols * resRows); tremorAt.clear(); quake = 0;
   tunnels.length = 0;
+  bloom = new Uint8Array(MAP_W * MAP_H); bloomTick = 0;
   resetStats();
   telemetry.startMatch(numPlayers);
 }
@@ -360,6 +395,8 @@ export function unitSpeed(u: Unit): number {
     if (a.immobile) return 0;
     if (a.speedMul) return u.def.speed * a.speedMul;
   }
+  // the brood moves faster over its own living ground
+  if (u.owner === BROOD && !u.def.air && onBloom(tileOf(u.x), tileOf(u.y))) return u.def.speed * 1.2;
   return u.def.speed;
 }
 export function unitRange(u: Unit): number {
@@ -424,6 +461,7 @@ export function canPlace(owner: number, defId: string, tx: number, ty: number, r
       if (!inBounds(x, y)) return false;
       const i = idx(x, y);
       if (terrain[i] !== 0 || occupied[i] !== -1 || crystal[i] > 0) return false;
+      if (owner !== BROOD && bloom[i] >= BLOOM_SOLID) return false;   // living ground won't take a foundation
       for (const u of units) {
         if (tileOf(u.x) === x && tileOf(u.y) === y) return false;
       }
@@ -490,7 +528,8 @@ function destroy(e: Entity) {
   const p = entityPos(e);
   booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
   if (e.owner === PLAYER || audible(p.x, p.y)) {
-    if (e.kind === 'building') sfxAt('explodeBuilding', p.x, p.y, e.def.isWall ? 0.5 : 1.3);
+    if (e.owner === BROOD) sfxAt('squelch', p.x, p.y, e.kind === 'building' ? 1.6 : 1);   // flesh, not metal
+    else if (e.kind === 'building') sfxAt('explodeBuilding', p.x, p.y, e.def.isWall ? 0.5 : 1.3);
     else if (UNIT_ARMOR[e.def.id] !== 'infantry') sfxAt('explodeVehicle', p.x, p.y);
   }
   // stats: what the player lost vs what the player destroyed
@@ -768,8 +807,9 @@ const UNIT_SOUND: Record<string, FieldSound> = {
   ranger: 'autocannon', raider: 'autocannon', warden: 'autocannon', gunship: 'autocannon',
   hovertank: 'cannon', dominator: 'cannon', colossus: 'cannon', bomber: 'cannon', artillery: 'artillery',
   shardkin: 'hitMetal', burrower: 'impact', choir: 'arc',   // crystal on crystal: a ringing clink, a crunch, a hum
+  skitter: 'bite', spitter: 'spit', carapace: 'bite', moth: 'spit', behemoth: 'artillery',
 };
-const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail' };
+const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit' };
 const weaponSound = (e: Unit | Building): FieldSound =>
   (e.kind === 'unit' ? UNIT_SOUND[e.def.id] : TURRET_SOUND[e.def.id]) ?? 'rifle';
 // the sound of a round landing on this target
@@ -1218,6 +1258,7 @@ function step(dt: number) {
     const nearCrystal = (u: Unit, r: number) => !!nearestTile(tileOf(u.x), tileOf(u.y), r, (x, y) => crystal[idx(x, y)] > 0);
     for (const u of units) {
       if (u.def.crystalRegen && u.hp < u.maxHp && nearCrystal(u, 2)) u.hp = Math.min(u.maxHp, u.hp + u.def.crystalRegen * 0.5);
+      if (u.owner === BROOD && u.hp < u.maxHp && onBloom(tileOf(u.x), tileOf(u.y))) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.012);   // the ground feeds it
       const aura = u.def.healAura;
       if (!aura) continue;
       const rate = aura.rate * 0.5 * (nearCrystal(u, 3) ? 2 : 1);
@@ -1228,6 +1269,8 @@ function step(dt: number) {
     }
   }
   if (mission.resonance) updateVey(dt);
+  bloomTick -= dt;
+  if (bloomTick <= 0) { bloomTick = 1.5; updateBloom(); }
 
   // neutral objectives: capture by uncontested presence, income while held
   for (const n of neutrals) {
@@ -1354,7 +1397,8 @@ function updateVey(dt: number) {
 function updateCorridor(dt: number) {
   const need = ventsNeeded();
   let leader = -1;
-  for (let o = 0; o < numPlayers; o++) if (ventsHeld(o) >= need) leader = o;
+  // only factions with a fleet can ride the corridor: the brood and the Hollow just hold the ground
+  for (let o = 0; o < numPlayers; o++) if (o !== BROOD && o !== 4 && ventsHeld(o) >= need) leader = o;
   if (leader !== corridor.owner) {
     const was = corridor.owner;
     corridor.owner = leader; corridor.held = 0;
@@ -1386,7 +1430,7 @@ export interface GameSnapshot {
   explored: number[]; novaTotal: number; novaLeft: number; flareTimer: number;
   neutrals: Neutral[]; stats: typeof stats;
   corridor?: { owner: number; held: number };
-  resonance?: number[]; tunnels?: Tunnel[];
+  resonance?: number[]; tunnels?: Tunnel[]; bloom?: number[];
 }
 export function snapshotGame(): GameSnapshot {
   const plain = <T extends { def: { id: string } }>(e: T) => { const { def, ...rest } = e; return { ...rest, defId: def.id }; };
@@ -1397,7 +1441,7 @@ export function snapshotGame(): GameSnapshot {
     buildings: buildings.filter(b => b.hp > 0).map(b => plain(b)),
     explored: Array.from(explored), novaTotal, novaLeft, flareTimer,
     neutrals: neutrals.map(n => ({ ...n })), stats: { ...stats }, corridor: { ...corridor },
-    resonance: Array.from(resonance), tunnels: tunnels.map(t => ({ ...t })),
+    resonance: Array.from(resonance), tunnels: tunnels.map(t => ({ ...t })), bloom: Array.from(bloom),
   };
 }
 export function restoreGame(s: GameSnapshot) {
@@ -1416,6 +1460,7 @@ export function restoreGame(s: GameSnapshot) {
   resonance = s.resonance ? Float32Array.from(s.resonance) : new Float32Array(resCols * resRows);
   tremorAt.clear(); quake = 0;
   tunnels.length = 0; if (s.tunnels) tunnels.push(...s.tunnels);
+  bloom = s.bloom ? Uint8Array.from(s.bloom) : new Uint8Array(MAP_W * MAP_H);
   for (const p of s.buildings) {
     const { defId, ...rest } = p;
     const b: Building = { ...rest, def: BUILDINGS[defId] };
