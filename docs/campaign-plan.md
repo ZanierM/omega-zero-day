@@ -1,125 +1,150 @@
-# Omega Zero Day — campaign plan (draft for review)
+# Omega Zero Day — campaign plan (draft 2, for review)
 
-Status: **story and plan only, nothing implemented.** Names, tone and the mission list are all open to change before any code is written. Open questions are at the end.
+Status: **story and plan only, nothing implemented.**
+Direction agreed so far: **dark and grim** tone · **two non-human peoples** (native alien life *and* a lost proto-human colony) · the central twist is that **Helion, the player's own side, caused the collapse** · a **silent commander** the story speaks to.
+Open questions are at the end.
 
 ---
 
-## 1. The story
+## 1. The world
 
-### Premise
+### Cinder and Helios
+Cinder is a scorched world circling **Helios**, an old orange star. Thirty-one years ago the Helion Dynamics charter colony landed to mine **flux**: blue crystal that grows in vast fields and breathes out of deep **vents**. Flux powers everything, from jump drives to guns.
 
-Helios is dying. The colony world **Cinder** (the scorched planet the skirmish already plays on) has **214 days** before its sun goes supernova. In orbit waits the **ark-fleet**: forty thousand sleepers and the last of the colony's seed banks. Its jump drives burn **flux crystal**, and the fields are on the surface.
+Officially, Helios is collapsing through bad luck: a rare instability, *nobody's fault*. In **214 days** it goes supernova. The **ark-fleet** in orbit can carry forty thousand sleepers out, but its drives are dry and the last flux is on the surface. The **launch corridor** is a narrow window through the star's dying magnetic shells, opened by a beacon fed from the vents. Only one fleet can ride it.
 
-Flux has one more use. Fed through the **flux vents**, it powers the **launch beacon**, which opens a **corridor**: a short gravitational window that lets a fleet slip past the dying sun's outer shells. The window opens only as Helios destabilises, and only one fleet can ride it. Whoever holds the vents decides who that is.
+### The truth (revealed across the campaign)
+**Flux is alive.** The crystal is the body of **the Vey**, a planet-wide mind that grows through Cinder's crust like a root system. The vents are where it breathes. For millions of years the Vey has done one thing: it **holds Helios steady**. Its resonance damps the star's magnetic storms, which is why an old, unstable star has a living world at all.
 
-Four factions are left on Cinder:
+**Helion knew.** Nineteen years ago a company survey (the *Resonance Report*) found the link between harvesting and the star's flare activity. The board buried it, because flux was too profitable. Six years ago Helion went further: **Project Lantern**, a deep tap drilled into the Vey's heart to pull flux faster than any harvester could. Lantern worked. The Vey convulsed, its grip on Helios broke, and the countdown began.
 
-| Faction | Who they are | What they want | How they fight (skirmish doctrine) |
+**The player's callsign is Lantern.** Helion named its field commander after the project, either as a grim joke or as a test of how much the commander knew. The player learns why in Act II.
+
+---
+
+## 2. Peoples and factions
+
+| | Who they are | What they want | How they fight |
 |---|---|---|---|
-| **Helion Dynamics** (player) | The colony's original charter company: engineers, miners, its security wing | Get the ark-fleet out with everyone aboard | Balanced |
-| **Kessler Collective** | The colony security corps, gone rogue under its marshal | A fleet that leaves under martial law, with their people first | Armoured columns behind gun lines |
-| **Verdant Pact** | Terraformers and their families, who spent thirty years greening Cinder | To stay. They believe the vents can stabilise Helios | Infantry tides that swarm the vents |
-| **Ashen Syndicate** | Deep-crust miners and smugglers | To sell seats on the fleet to the highest bidder | Fast raids on harvesters, aircraft, artillery |
+| **Helion Dynamics** (player) | The charter company: miners, engineers, its security wing | Launch the fleet, and keep the truth buried with the planet | Balanced |
+| **Kessler Collective** | The colony security corps, broken away under its marshal | To take the fleet *and* put Helion's board on trial in front of the sleepers | Armoured columns behind gun lines |
+| **Verdant Pact** | Terraformers who stopped terraforming when they found out what the crystal is | To stop the harvest and let the Vey try to hold the sun. They will die here if it fails | Infantry tides that swarm the vents |
+| **Ashen Syndicate** | Deep-crust miners turned smugglers | To sell fleet seats, and to keep mining the Hollow's crystal-grown bodies for pure flux | Raids, aircraft, artillery |
+| **The Hollow** (new, mostly neutral) | Descendants of the colony ship **Meridian**, which landed 200 years ago and was listed as lost. The Vey grew into them: pale, partly crystalline, living in the deep tunnels | To be left alone. Then, as the Vey dies, to make someone pay | Ambushes from tunnels, crystal-grown infantry, units that heal near crystal |
+| **The Vey** (not a faction) | The living crystal under everything | Unknown. It reacts to harvesting with tremors, crystal storms and vents that go dark | A force on the map, not an army |
 
 ### Characters
 
-**The Commander (player).** Callsign *Lantern*. A Helion field commander given the job nobody wanted. Never seen or voiced; everyone talks *to* Lantern, which keeps the player in the seat.
+**Lantern (the player).** Helion's field commander. Never seen and never heard. Everyone speaks to Lantern, and the briefings never say whether Lantern knew.
 
-**Admiral Ines Varga** — ark-fleet command, in orbit. The voice of every briefing (the skirmish's "final transmission" is hers). She is calm, dry and exhausted, and she counts sleepers the way other people count bullets. She can't land, so she can't help, and she knows it. *Arc:* she starts by giving orders and ends by asking favours.
+**Admiral Ines Varga**, commanding the ark-fleet from orbit. She is calm, exhausted and counts sleepers the way other people count bullets. **She has read the Resonance Report.** She signed off on Project Lantern's fleet contract. Her briefings are honest about everything except that. *Arc:* from command, to evasion, to a confession she makes only once the corridor is open and nobody can turn back.
 
-**Sergeant Mara Okoye** — ground lead and the tutorial voice. She has twenty years in Helion security and served under Kessler before the split. She is blunt, funny under fire and protective of rookies. *Arc:* she knows how Kessler thinks and slowly admits she agrees with half of it.
+**Sergeant Mara Okoye**, Helion's ground lead. She has twenty years in colony security and served under Kessler before the split. She is blunt, funny under fire and loyal to the people beside her rather than to the company. *Arc:* she is the player's conscience. When the truth about Helion lands, she asks Lantern one question, "Did you know?", and never gets an answer. In Act III she either stays or walks to Kessler, depending on what Lantern does at the Meridian.
 
-**Dr. Teodor Lind** — Helion flux engineer. He explains vents, the corridor and research. He is warm, nervous and talks too much. *Secret:* he designed the beacon and knows the corridor fits one fleet, not "everyone". He has known this since day one.
+**Dr. Teodor Lind**, Helion's chief flux engineer and the architect of Project Lantern. He is warm, nervous and talks too much because silence is worse. He has spent six years trying to undo what he built. *Arc:* in Act II he gives Lantern the Resonance Report. In Act III he goes down the Lantern shaft to shut it off, and doesn't come back.
 
-**Marshal Dieter Kessler** — leader of the Kessler Collective. A former security chief who held the colony together through two famines. He is not cruel; he is certain. *Line:* "Order is the only seat belt this colony ever had." *Arc:* becomes the Act III wall, then makes a last offer.
+**Marshal Dieter Kessler**, leader of the Kessler Collective. He held the colony through two famines and found out about Lantern three years too late. He is the campaign's antagonist, and he is **right about Helion**. *Line:* "I don't want your fleet, Lantern. I want your board in a cell when it lands." *Arc:* the wall the player has to break, and the man who offers the only honest deal in the game.
 
-**Speaker Ama Reyes** — elected voice of the Verdant Pact. A gentle scientist who is partly right: vent flux *can* delay the nova, by days, not years. *Arc:* the campaign's moral choice. Do you trust her numbers?
+**Speaker Ama Reyes**, elected voice of the Verdant Pact, and the biologist who first understood the Vey. She is gentle, stubborn and has nothing left to lose. *Arc:* she believes that if the harvesting stops, the Vey can hold Helios for decades. She is half right.
 
-**Vessa Kol, "the Cinder Queen"** — runs the Ashen Syndicate. She is charming, mercenary and the only one who enjoys the end of the world. *Arc:* she is never an ally, but she trades. Two missions offer a deal, at a price.
+**Vessa Kol, "the Cinder Queen"**, who runs the Ashen Syndicate. She is charming and mercenary, and she has been quietly harvesting Hollow captives for the purest flux on Cinder. *Arc:* never an ally, always a deal. Every deal she offers is paid for by the Hollow.
 
-### Three acts
-
-**Act I — Landfall.** Lantern lands at a burned-out Helion depot to restart flux production. Kessler patrols test the new base. Lind shows that vents matter more than crystal fields. Kessler's first real assault reveals the Collective has already taken the colony's armour depots.
-
-**Act II — The Corridor.** Lind reveals the corridor and the vents' role. Every faction starts racing for the vents. The Ashen Syndicate burns Helion's economy to force a deal. The Verdant Pact holds the central vents and Reyes asks Lantern to stop fighting: give her ten days with the vents and she can buy the colony a second window. Lantern **chooses** whether to spare the Verdant research spire. Meanwhile Kessler builds an orbital uplink to hold the fleet hostage, and the act ends with Lantern destroying it.
-
-**Act III — Last Light.** Helios starts flaring. Lind confesses the corridor fits one fleet. Kessler offers to merge fleets under his command. Okoye pushes Lantern to take it. Lantern breaks Kessler's wall either way. In the finale, *Zero Day*, every remaining faction converges on the corridor vents while the sun comes apart. Hold the vents until the beacon fires.
-
-**Ending.** The fleet always launches. The variant depends on the Act II choice:
-- **Spared the spire:** Reyes's data buys enough time for a second, smaller corridor. The Verdant Pact follows the fleet out. The final card is two fleets.
-- **Destroyed it:** the corridor closes behind Lantern. One fleet, and a long silence on the comms.
+**Seren**, an elder of the Hollow, descended from the Meridian's pilot. She speaks through the crystal itself, in fragments and old colony slang two centuries out of date. *Arc:* she is first heard as an unidentified voice on the comms. She becomes a reluctant guide, and her people's fate is the campaign's last decision.
 
 ---
 
-## 2. Missions
+## 3. The story in three acts
 
-Each mission teaches one thing, uses one faction's doctrine, and leans on mechanics that already exist. "New" marks the engine work a mission needs.
+### Act I — Landfall
+Lantern drops into a burned-out Helion depot to restart flux production for the fleet. Kessler patrols probe the new base. Harvesters start disappearing near the deep fields, dragged into tunnels. Something is in the crust. Lind shows Lantern that the vents matter more than the crystal fields. In the act's last mission Kessler's first real assault comes with a broadcast to every channel: **"Ask your company what Project Lantern was."**
 
-| # | Mission | Faction | Teaches / uses | Win | Notes |
+### Act II — The Corridor
+Lind reveals the corridor, and every faction starts racing for the vents. Ashen raids on Helion's economy force a deal with Vessa Kol, paid in Hollow lives. Lantern breaks a Verdant hold on the central vents and finds their labs: the crystal is alive and in pain. Reyes asks Lantern to stop the harvest.
+
+Then Lind hands over the Resonance Report. **Helion did this.** Okoye asks the question. Varga goes quiet on the comms for one full mission.
+
+The act ends at the **wreck of the Meridian**, where the Hollow live. Ashen forces are cutting it apart for crystal. **The first choice:** protect the Hollow (the Ashen raid escalates and the next missions are harder) or let the Ashen take the wreck (Vessa pays well, and the Hollow turn hostile for the rest of the campaign).
+
+### Act III — Last Light
+Helios starts flaring and the surface burns. Kessler offers terms: a merged fleet under his command, with Helion's board arrested on landing, *including the commander*. Lantern refuses (there is no accept button; Lantern is Helion's) and has to break Kessler's wall. Lind goes down the Lantern shaft to shut the tap and dies doing it. His death buys the corridor its last window.
+
+**Zero Day.** Every faction left converges on the corridor vents while the sun comes apart. Lantern has to hold them until the beacon fires.
+
+### The ending: there is no good one
+To fire, the beacon has to burn the vents dry, which means burning out what is left of the Vey. **The final choice**, made on the last mission's map:
+
+- **Fire the beacon.** The fleet escapes. The Vey dies, Cinder dies, and with it the Hollow and the Verdant Pact. Varga finally confesses on an open channel as the fleet jumps. Forty thousand sleepers wake up on the far side carrying the guilt.
+- **Give the vents to Reyes.** The beacon never fires. The Vey, unbled, steadies Helios for a while: years, maybe decades, Reyes can't say. The fleet stays. Humanity lives on Cinder beside the Vey and the Hollow, under a sun that will still die, and the board's crimes are judged in the open.
+
+The Act II choice changes the details: whether the Hollow stand with Lantern in the finale, whether Okoye is still at the commander's side, and what Seren's last line is.
+
+---
+
+## 4. Missions
+
+| # | Mission | Enemy | Teaches / uses | Win | Story beat |
 |---|---|---|---|---|---|
-| 1 | **Cold Drop** | Kessler (patrols only) | Base building, harvesting, power | Build an Extractor and deliver 3,000 flux, then destroy the patrol camp | Okoye tutorial prompts. New: tech locks (structures tab only), tutorial triggers |
-| 2 | **Flux Lines** | Verdant (scouts) | Capturing vents and towers, vision | Hold 2 vents and a tower for 60 s | Lind's first scene. Capture status from skirmish is the core |
-| 3 | **Iron Weather** | Kessler | Defences, repair, upgrades | Survive 3 scripted waves, then destroy the forward base | New: scripted waves, survive timer |
-| 4 | **Sparks** | Ashen | Protecting the economy, raids, mobile defence | Keep 3 harvesters alive for 8 min while you build a Fabricator | Vessa's first deal: pay 2,000 flux and the raids stop for 2 min. New: protect objective, offer dialogue |
-| 5 | **The Green Tide** | Verdant | Infantry counters (pyro and artillery), choice | Break the Verdant hold on the central vents | Optional objective: **spare the research spire** (it sets the ending). New: optional objectives, a campaign flag |
-| 6 | **Uplink** | Kessler | Research, orbital strike, a timed assault | Destroy Kessler's Orbital Uplink before it charges (on-screen timer) | You get the Orbital Protocol early. New: per-mission starting tech |
-| 7 | **Burning Sky** | Ashen and Verdant | Solar flares, three-way fights, the corridor | Secure the launch corridor (hold most vents for 3 min) | Uses the skirmish corridor win directly, with flares from the start |
-| 8 | **Kessler's Wall** | Kessler | Siege: bastions, walls, artillery, colossus | Destroy Kessler's Nexus | Kessler's offer mid-mission: accept and it ends differently (an alternate debrief, same next mission) |
-| 9 | **Zero Day** | All remaining | Everything | Hold the corridor for 5 min with the supernova clock running | Map-wide flares, waves from all sides. Ending variant from the mission 5 flag |
+| 1 | **Cold Drop** | Kessler patrols | Building, harvesting, power | Build an Extractor, deliver 3,000 flux, clear the patrol camp | Okoye and Varga introduced. A harvester goes missing at the end |
+| 2 | **Flux Lines** | Verdant scouts, **Hollow ambush** | Capturing vents and towers, vision | Hold 2 vents and a tower for 60 s | Lind introduced. First tunnel ambush; an unknown voice on the comms (Seren) |
+| 3 | **Iron Weather** | Kessler | Defences, repair, upgrades | Survive 3 scripted waves, then destroy the forward base | Kessler's broadcast: *ask about Project Lantern* |
+| 4 | **Sparks** | Ashen | Protecting the economy, raids | Keep 3 harvesters alive for 8 min while building a Fabricator | Vessa's first deal: the raids stop for 2 min, and she says nothing about where her flux comes from |
+| 5 | **The Green Tide** | Verdant | Infantry counters | Break the Verdant hold on the central vents | Reyes's labs: the crystal is alive. The vents scream on capture (the Vey reacts) |
+| 6 | **Resonance** | Kessler and Hollow | Research and orbital strike under a timer | Destroy Kessler's Orbital Uplink before it charges | Lind hands over the Resonance Report. Okoye asks the question |
+| 7 | **Meridian** | Ashen, Hollow | Escort and defence, **choice** | Defend the wreck *or* let the Ashen take it | First choice. Seren speaks clearly for the first time |
+| 8 | **Kessler's Wall** | Kessler | Siege: bastions, walls, colossus | Destroy Kessler's Nexus | Kessler's terms. Lind goes down the Lantern shaft (a side objective: hold the shaft entrance) |
+| 9 | **Zero Day** | Everyone left | Everything | Hold the corridor for 5 min with the supernova running, then **choose** | Final choice; the ending plays out |
 
-Each mission runs about 12–25 minutes, roughly 3 hours for the whole campaign. There is one difficulty setting for the campaign, using the existing Easy, Normal and Hard knobs.
+There are 9 missions of 12–25 minutes each, about 3 hours in all.
+
+### New mechanics the story needs
+- **The Hollow as a neutral-hostile faction.** They come out of tunnel mouths near deep crystal, with 3 new units (crystal-grown infantry, a burrower that surfaces under harvesters, and a "choir" support unit that heals Hollow near crystal). Their stance (hostile, neutral or allied) is set per mission and by the Act II choice.
+- **Vey resonance.** Over-harvesting a field raises a local resonance meter. High resonance sets off tremors (damage to structures), crystal storms (vision loss) and vents going dark. This is the campaign's proof that the crystal is alive, and it could later become an optional skirmish rule.
+- **Choices.** Two map-based decisions (missions 7 and 9) set campaign flags that change later missions and the ending.
 
 ---
 
-## 3. Implementation plan
+## 5. Implementation plan
 
-The plan reuses the skirmish engine and keeps the existing file ownership. Nothing starts until the story and the mission list are signed off.
+Nothing starts until this draft is signed off. The plan keeps the current file ownership.
 
 ### Phase 0 — engine groundwork (Claude: `game.ts`, `ai.ts`, `map.ts`)
-1. **Objectives replace the hard-coded win check.** An objective list is evaluated every tick. Skirmish becomes the default list ("destroy all" OR "hold corridor", "lose if HQ gone"), so skirmish behaviour doesn't change.
-   - Types: `destroyAll`, `destroyBuilding`, `holdCorridor`, `captureN`, `survive`, `deliverFlux`, `protectUnits`, `timer` (fail when it expires).
-   - Each objective is primary or optional, and can be hidden until a trigger reveals it.
-2. **Event bus.** `unitDied`, `buildingDestroyed`, `captured`, `corridorChanged`, `enteredArea`, `timeReached`, `objectiveDone`. Missions subscribe to these; the game knows nothing about missions.
-3. **Scripted actions.** Spawn a wave at a point with a target, reveal an area, give credits, unlock tech, set an AI posture, end the mission.
-4. **Hand-authored maps.** A fixed seed plus overrides for bases, vents, towers and crystal, so every play of a mission has the same layout.
-5. **Tech locks and starting tech** per mission, checked in `canBuild`.
-6. **AI hooks.** Per-mission doctrine overrides, a "hold position" posture (no waves), "attack now", and switching off expansion.
+1. **Objectives replace the hard-coded win check.** An objective list is evaluated every tick, and skirmish becomes the default list, so it plays the same as now.
+   - Types: `destroyAll`, `destroyBuilding`, `holdCorridor`, `captureN`, `survive`, `deliverFlux`, `protectUnits`, `holdArea`, `timer`, `choice`.
+   - Each objective is primary or optional, and can stay hidden until a trigger reveals it.
+2. **Event bus.** `unitDied`, `buildingDestroyed`, `captured`, `corridorChanged`, `enteredArea`, `timeReached`, `objectiveDone`, `resonanceChanged`.
+3. **Scripted actions.** Spawn a wave, open a tunnel, reveal an area, give credits, unlock tech, set an AI posture or a faction stance, set a flag, end the mission.
+4. **Hand-authored maps.** A fixed seed plus overrides for bases, vents, towers, crystal, tunnel mouths and the Meridian wreck.
+5. **Tech locks and starting tech** per mission.
+6. **Hollow faction:** 3 units, tunnel spawning, stance rules, and an AI that defends its territory instead of building.
+7. **Vey resonance:** per-field meters fed by harvesting, with tremor, storm and dark-vent effects.
 
 ### Phase 1 — mission data and the first slice
-- `src/campaign/missions.ts` holds pure data: map, factions, start state, objectives, triggers, dialogue. The plan is one file per act once it grows.
-- `src/campaign/runner.ts` loads a mission, wires its triggers to the event bus, and tracks objectives and flags.
-- Build **missions 1–3** first as a vertical slice, test them with you, then do Acts II and III.
+- `src/campaign/missions.ts` holds pure data (map, factions, start state, objectives, triggers, dialogue). `src/campaign/runner.ts` loads a mission and wires its triggers and flags.
+- Build **missions 1–3** as a vertical slice and playtest them with you before Acts II and III.
 
 ### UI agent's part (`index.html`, `ui.ts`, `main.ts`)
-- A Campaign / Skirmish choice on the briefing, with a mission select that shows locked and completed missions.
-- A mission briefing card (Varga's transmission, the objectives, and a map thumbnail).
-- A **comms box**: portrait, speaker name and typed-out line, skippable, and never blocking input.
-- An **objective tracker** (primary, optional, timers) alongside the existing corridor strip.
-- Mission complete and failed screens, and the ending cards.
-- Campaign progress in localStorage (one key, try/catch, like the save slot).
+- A Campaign / Skirmish choice and a mission select.
+- Mission briefing cards (Varga's transmissions).
+- A **comms box**: portrait, name and typed-out line; skippable and never blocking. It also needs a "distorted" style for Seren speaking through the crystal.
+- An objective tracker, a **choice prompt**, mission complete and failed screens, and the ending sequences.
+- Campaign progress in localStorage.
 
 ### Claude's art part (`art.ts`, `render.ts`)
-- Code-drawn portrait busts for the six characters, in the refined style, baked once like the icons.
-- Mission props: a crashed lander, a launch-beacon tower for the corridor, Verdant greenhouses, Kessler banners.
-- An area-trigger marker (a ground ring) for "move here" objectives.
-
-### Saves
-- Campaign progress: completed missions, the mission 5 flag, best times.
-- A mid-mission save reuses `save.ts` and adds the mission id, fired triggers, objective state and flags.
+- Portraits for the seven characters, code-drawn in the refined style.
+- The Hollow: 3 new units and tunnel mouths.
+- The Meridian wreck, the Lantern shaft, the launch-beacon tower, and resonance effects (crystal pulses, tremor dust, dark vents).
 
 ### Order of work
-1. Phase 0, with skirmish moved onto the objective system and re-tested (no player-visible change).
-2. Missions 1–3, the comms box and the tracker, then playtest with you.
-3. Missions 4–6 and the choice flag.
-4. Missions 7–9 and the endings.
-5. Balance pass using the new telemetry (time to first fight and match length per mission).
+1. Phase 0, then re-test skirmish.
+2. Missions 1–3 with the comms box and the tracker, then playtest.
+3. Missions 4–6, the Hollow and resonance.
+4. Missions 7–9, the choices and the endings.
+5. A balance pass using the telemetry.
 
 ---
 
-## 4. Questions for you before implementation
-1. **Tone:** grounded and bittersweet (as written), or more pulpy and action-heavy?
-2. **The choice in mission 5:** keep it (two endings), or a single linear ending?
-3. **Kessler's offer in mission 8:** a real branch (a different mission 9 setup), or flavour only?
-4. **Length:** 9 missions (~3 h), or a shorter 5–6 mission first release?
-5. **Names:** keep the planet as *Cinder* and the player callsign as *Lantern*, or something else?
-6. **Voice:** text only (recommended), or should we plan for voice lines later?
+## 6. Still open
+1. **Names:** Cinder (planet), Lantern (player and project), the Vey, the Hollow, Meridian. Keep, or change any?
+2. **How dark the ending is:** two bleak endings as written, or a hidden third ending (e.g. if the Hollow were protected, Seren shows a way to move the Vey's heart onto the fleet)?
+3. **Hollow in skirmish:** keep them campaign-only, or add them later as an optional neutral faction?
+4. **Length:** 9 missions, or a shorter first release (Act I plus a cliffhanger)?
