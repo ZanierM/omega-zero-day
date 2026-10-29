@@ -21,6 +21,10 @@ const selCopy = document.getElementById('selcopy')!;
 const selPortrait = document.getElementById('selportrait')!;
 const selHealth = document.getElementById('selhealth')!;
 const selHealthFill = document.getElementById('selhealthfill')!;
+const detailsBtn = document.getElementById('detailsbtn') as HTMLButtonElement;
+const selectionDetails = document.getElementById('selectiondetails')!;
+const detailsCopy = document.getElementById('detailscopy')!;
+const detailsClose = document.getElementById('detailsclose') as HTMLButtonElement;
 const countdown = document.getElementById('countdown')!;
 const cdTime = document.getElementById('cdtime')!;
 const enemySw = document.getElementById('enemysw')!;
@@ -43,6 +47,7 @@ let shownHealth = -1;
 let shownSingle = false;
 let shownHalt = false;
 let shownGroupBar = false;
+let shownDetailsBtn = false;
 const groupBtns: { el: HTMLButtonElement, count: HTMLElement, key: string, state: string }[] = [];
 
 let activeTab: Tab = 'build';
@@ -224,6 +229,22 @@ export function initUI() {
     startRepair(b);
   });
   abilBtn.addEventListener('pointerdown', () => { for (const u of abilityUnits()) activateAbility(u); });
+  const closeDetails = (returnFocus = false) => {
+    selectionDetails.hidden = true;
+    detailsBtn.setAttribute('aria-expanded', 'false');
+    if (returnFocus) detailsBtn.focus();
+  };
+  detailsBtn.addEventListener('click', () => {
+    if (!selectionDetails.hidden) { closeDetails(true); return; }
+    detailsCopy.innerHTML = selCopy.innerHTML;
+    selectionDetails.hidden = false;
+    detailsBtn.setAttribute('aria-expanded', 'true');
+    detailsClose.focus();
+  });
+  detailsClose.addEventListener('click', () => closeDetails(true));
+  selectionDetails.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closeDetails(true); } });
+  document.getElementById('game')!.addEventListener('pointerdown', () => closeDetails());
+  compactDeck.addEventListener('change', () => { if (!compactDeck.matches) closeDetails(); });
   rebuildGrid();
 }
 
@@ -341,6 +362,12 @@ function abilityUnits(): Unit[] {
 }
 
 export function updateUI() {
+  const showDetailsBtn = selection.size > 0;
+  if (showDetailsBtn !== shownDetailsBtn) {
+    detailsBtn.classList.toggle('show', showDetailsBtn);
+    if (!showDetailsBtn) { selectionDetails.hidden = true; detailsBtn.setAttribute('aria-expanded', 'false'); }
+    shownDetailsBtn = showDetailsBtn;
+  }
   const showGroups = selection.size > 0 || groupBtns.some(b => controlGroupIds(b.key).length > 0);
   if (showGroups !== shownGroupBar) { groupBar.classList.toggle('show', showGroups); shownGroupBar = showGroups; }
   for (const b of groupBtns) {
@@ -514,7 +541,11 @@ export function updateUI() {
       const html = single
         ? `<b>${name}</b>${lvl} — ${hp}${order}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
         : `<b>${selection.size} units selected</b><span class="selorder">${groupOrderText(selectedUnits())}</span>${name} +${selection.size - 1} more`;
-      if (html !== shownSelection) { selCopy.innerHTML = html; shownSelection = html; }
+      if (html !== shownSelection) {
+        selCopy.innerHTML = html;
+        if (!selectionDetails.hidden) detailsCopy.innerHTML = html;
+        shownSelection = html;
+      }
     }
   } else {
     if (shownSingle) { selInfo.classList.remove('has-selection'); shownSingle = false; }
@@ -542,7 +573,7 @@ export function updateUI() {
       ? 'The launch corridor is clear. The ark-fleet jumps at dawn — humanity survives.'
       : novaExpired
       ? 'Helios detonated with the enemy still standing. The fleet burns. There is no dawn.'
-      : 'Vanguard command has fallen. The fleet dies in orbit, and humanity with the sun.';
+      : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.';
     if (!overlayStats.childElementCount) {
       const rows: [string, string][] = [
         ['Time', fmtTime(stats.time)],

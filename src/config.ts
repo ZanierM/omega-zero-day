@@ -143,7 +143,7 @@ export const UNITS: Record<string, UnitDef> = {
 
 export const BUILDINGS: Record<string, BuildingDef> = {
   nexus:     { id: 'nexus',     name: 'Nexus HQ',       tab: 'build', cost: 3000, buildTime: 20, hp: 1500, power: 50,   w: 3, h: 3, vision: 8, sprite: 'bld_hq', upgradable: true,
-               desc: 'Colony command core. Lose it and the operation is over.' },
+               desc: 'Colony command core. Other surviving buildings can keep the operation alive if it falls.' },
   solar:     { id: 'solar',     name: 'Solar Array',    tab: 'build', cost: 800,  buildTime: 6,  hp: 500,  power: 100,  w: 2, h: 2, vision: 4, sprite: 'bld_power',
                desc: '+100 power. Everything else runs on these.' },
   extractor: { id: 'extractor', name: 'Extractor',      tab: 'build', cost: 2000, buildTime: 12, hp: 900,  power: -30,  w: 3, h: 2, vision: 5, prereq: 'solar', grantsHarvester: true, sprite: 'bld_refinery',

@@ -61,6 +61,7 @@ export function strikeAim(): { x: number, y: number } | null {
 }
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
+const orderMarker = document.getElementById('ordermarker')!;
 const keys = new Set<string>();
 let mouse = { x: 0, y: 0, inside: false };
 let dragStart: { x: number, y: number } | null = null;
@@ -71,6 +72,19 @@ export function setOnBuildingPlaced(fn: () => void) { onBuildingPlaced = fn; }
 
 function toWorld(sx: number, sy: number) {
   return { x: sx / camera.zoom + camera.x, y: sy / camera.zoom + camera.y };
+}
+
+function markOrder(sx: number, sy: number, kind: 'move' | 'attack' | 'advance') {
+  const r = canvas.getBoundingClientRect();
+  orderMarker.style.left = `${r.left + sx}px`;
+  orderMarker.style.top = `${r.top + sy}px`;
+  orderMarker.className = kind;
+  orderMarker.getAnimations().forEach(a => a.cancel());
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  orderMarker.animate(
+    [{ opacity: 1, transform: 'scale(.5)' }, { opacity: 0, transform: reduced ? 'scale(1)' : 'scale(1.7)' }],
+    { duration: reduced ? 180 : 520, easing: 'ease-out' },
+  );
 }
 
 // zoom around a screen point, keeping the world under it fixed
@@ -171,6 +185,7 @@ export function initInput() {
           const spread = Math.min(3, Math.floor(i / 4)) * 26;
           issueOrder(u, { type: 'attackMove', x: w.x + Math.cos(ang) * spread, y: w.y + Math.sin(ang) * spread });
         });
+        if (sel.length) markOrder(mouse.x, mouse.y, 'advance');
         return;
       }
       dragStart = { x: mouse.x, y: mouse.y };
@@ -313,6 +328,7 @@ export function initInput() {
         if (touch && !touch.moved && !placement && selectedUnits().some(u => u.def.damage > 0)) {
           const w = toWorld(touch.x, touch.y);
           for (const u of selectedUnits()) if (u.def.damage > 0) issueOrder(u, { type: 'attackMove', x: w.x, y: w.y });
+          markOrder(touch.x, touch.y, 'advance');
           toast('Attack-move');
           touch = null; // consume so the tap doesn't also fire
         }
@@ -481,6 +497,7 @@ function rightClick() {
     const e = byId.get([...selection][0]);
     if (e?.kind === 'building' && e.owner === PLAYER && e.def.produces) {
       e.rallyX = w0.x; e.rallyY = w0.y;
+      markOrder(mouse.x, mouse.y, 'move');
       toast('Rally point set');
       return;
     }
@@ -492,6 +509,7 @@ function rightClick() {
 
   if (hit && hit.owner !== PLAYER) {
     for (const u of sel) if (u.def.damage > 0) issueOrder(u, { type: 'attack', targetId: hit.id });
+    if (sel.some(u => u.def.damage > 0)) markOrder(mouse.x, mouse.y, 'attack');
     return;
   }
   const tx = tileOf(w.x), ty = tileOf(w.y);
@@ -507,6 +525,7 @@ function rightClick() {
       issueOrder(u, { type: 'move', x: w.x + dx, y: w.y + dy });
     }
   });
+  markOrder(mouse.x, mouse.y, 'move');
 }
 
 function clampCamera() {

@@ -7,7 +7,6 @@ import { initInput, updateCamera, centerCameraOn } from './input';
 import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle, setRefinedStyle } from './render';
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted } from './audio';
-import { drawBriefingScene } from './briefing-scene';
 import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
@@ -23,10 +22,8 @@ initInput();
 initUI();
 const app = document.getElementById('app')!;
 const briefing = document.getElementById('briefing')!;
-const briefScene = document.getElementById('briefscene') as HTMLCanvasElement;
-drawBriefingScene(briefScene);
 resize();
-window.addEventListener('resize', () => { resize(); if (!started) drawBriefingScene(briefScene); });
+window.addEventListener('resize', resize);
 // folding/unfolding or rotating reflows the command deck, which resizes the
 // map canvas without always firing a window resize
 new ResizeObserver(resize).observe(document.getElementById('game')!);
@@ -83,12 +80,9 @@ async function resumeGame(save: NonNullable<ReturnType<typeof readSave>>) {
 
 let autosaveTimer = 0;
 function saveNow() { if (started && !game.gameOver) writeSave(difficulty); }
-// a hidden tab may never come back (closed, phone call, app switch): pause and save
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'hidden' || !started || game.gameOver) return;
-  openPause();
-  saveNow();
-});
+// a hidden tab may never come back (closed, phone call, app switch): save it
+// (the pause-menu handler below pauses it)
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
 window.addEventListener('pagehide', saveNow);
 
 // faction-count + difficulty selectors: segmented buttons (delegated)
@@ -122,7 +116,8 @@ muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 graphicsBtn.addEventListener('click', toggleGraphics);
 window.addEventListener('keydown', e => {
-  if ((e.target as HTMLElement).closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+  const target = e.target instanceof Element ? e.target : null;
+  if (target?.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
   if (e.key === 'm' || e.key === 'M') { toggleMute(); refreshMuteBtn(); }
   if (e.key === 'v' || e.key === 'V') toggleGraphics();
 });
@@ -134,6 +129,9 @@ const pauseMenu = document.getElementById('pausemenu')!;
 const menuBtn = document.getElementById('menubtn')!;
 function openPause() { if (started && !game.gameOver) { game.setPaused(true); app.inert = true; pauseMenu.style.display = 'flex'; document.getElementById('resumebtn')!.focus(); } }
 function closePause() { pauseMenu.style.display = 'none'; app.inert = false; game.setPaused(false); last = performance.now(); menuBtn.focus(); }
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && pauseMenu.style.display !== 'flex') openPause();
+});
 menuBtn.addEventListener('click', () => {
   pauseMenu.style.display === 'flex' ? closePause() : openPause();
 });
