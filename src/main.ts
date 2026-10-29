@@ -7,7 +7,6 @@ import { initInput, updateCamera, centerCameraOn } from './input';
 import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle, setRefinedStyle } from './render';
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted } from './audio';
-import { drawBriefingScene } from './briefing-scene';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
 
@@ -22,10 +21,8 @@ initInput();
 initUI();
 const app = document.getElementById('app')!;
 const briefing = document.getElementById('briefing')!;
-const briefScene = document.getElementById('briefscene') as HTMLCanvasElement;
-drawBriefingScene(briefScene);
 resize();
-window.addEventListener('resize', () => { resize(); if (!started) drawBriefingScene(briefScene); });
+window.addEventListener('resize', resize);
 // folding/unfolding or rotating reflows the command deck, which resizes the
 // map canvas without always firing a window resize
 new ResizeObserver(resize).observe(document.getElementById('game')!);
