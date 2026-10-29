@@ -10,6 +10,8 @@ edits the other's files and branches merge cleanly.
 
 **Temporary ownership change:** for the camera and mouse-controls round, Claude has `src/input.ts` (branch `reskin-input`). The UI agent should leave it alone until that branch is merged into `main`, then it returns to the UI agent.
 
+**Small cross-file change (Claude, `reskin-world-3`):** `src/ui.ts` now re-bakes its icon cache when the render style flips (via `onStyleChange` from `render.ts`), and the selection portrait passes the selected thing's owner and level to `artIconUrl` / `unitIconUrl`. Keep those calls when reworking the build bar or the selection panel.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---
