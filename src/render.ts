@@ -101,9 +101,12 @@ export function loadSprites(): Promise<void> {
 // ---------------- terrain texture ----------------
 
 let terrainTex: HTMLCanvasElement;
-// the terrain texture is painted at half resolution and blown up without
-// smoothing, so the ground reads as chunky 2×-pixel art like an old RTS map
-export const TEX_SCALE = 2;
+// classic: the terrain texture is painted at half resolution and blown up
+// without smoothing, so the ground reads as chunky 2×-pixel art like an old RTS
+// map. Refined: full resolution, smooth colour, finer clutter.
+let texScale = 2;
+// the decoration layout is seeded per game so a style toggle repaints the same map
+let terrainSeed = -1;
 
 // 2×2 ordered-dither offsets: quantized colour bands break into a checker
 // pattern instead of hard steps, the classic 16-bit shading trick
@@ -116,7 +119,9 @@ const TREE_TEAL: Pal = { out: '#11231c', dk: '#1f4236', mid: '#2f6b55', lt: '#4f
 const TREE_PURPLE: Pal = { out: '#1b1226', dk: '#36234c', mid: '#573a76', lt: '#8460a6', hi: '#c49edc' };
 
 function paintTerrain() {
-  const P = TEX_SCALE;
+  if (terrainSeed < 0) terrainSeed = nseed; else nseed = terrainSeed;
+  const fine = refinedStyle;
+  const P = texScale = fine ? 1 : 2;
   const W = MAP_W * TILE, H = MAP_H * TILE;   // world size
   const TW = W / P, TH = H / P;               // texture size
   const [tex, g] = makeCanvas(TW, TH);
@@ -142,7 +147,7 @@ function paintTerrain() {
     const ax = fx - ix, ay = fy - iy;
     const top = wet(ix, iy) * (1 - ax) + wet(ix + 1, iy) * ax;
     const bot = wet(ix, iy + 1) * (1 - ax) + wet(ix + 1, iy + 1) * ax;
-    return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3 + (noise(x / 5 + 9, y / 5) - 0.5) * 0.035;
+    return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3 + (noise(x / 5 + 9, y / 5) - 0.5) * (refinedStyle ? 0.01 : 0.035);
   };
 
   const img = g.createImageData(TW, TH);
@@ -192,7 +197,11 @@ function paintTerrain() {
         const depth = Math.min(1, (w - 0.5) * 3.2);
         r = 72 - depth * 46; gg = 160 - depth * 84; b = 178 - depth * 50;
         if (noise(x / 16 + 11, y / 3.2) > 0.8) { r += 30; gg += 34; b += 34; } // ripples
-        if (w < 0.54) { r = 220; gg = 230; b = 216; }                          // foam
+        if (fine) {
+          // a soft foam band fading out into the shallows
+          const f = Math.max(0, 1 - (w - 0.5) / 0.06) * 0.9;
+          r = r * (1 - f) + 220 * f; gg = gg * (1 - f) + 230 * f; b = b * (1 - f) + 216 * f;
+        } else if (w < 0.54) { r = 220; gg = 230; b = 216; }                    // foam
       } else if (w > 0.3) {
         const t = (w - 0.3) / 0.2;    // 0 at the dry edge → 1 at the waterline
         r = r * (1 - t) + (214 - t * 54) * t;
@@ -200,11 +209,17 @@ function paintTerrain() {
         b = b * (1 - t) + (128 - t * 36) * t;
       }
 
-      const dth = BAYER[(py & 1) * 2 + (px & 1)];
       const i = (py * TW + px) * 4;
-      d[i] = Math.floor(r / STEP + dth) * STEP;
-      d[i + 1] = Math.floor(gg / STEP + dth) * STEP;
-      d[i + 2] = Math.floor(b / STEP + dth) * STEP;
+      if (fine) {
+        // smooth colour with a fine natural grain instead of stepped, dithered bands
+        const gr = (noise(x / 2.6 + 17, y / 2.6) - 0.5) * 10 + (noise(x / 9 + 5, y / 9 + 3) - 0.5) * 7;
+        d[i] = r + gr; d[i + 1] = gg + gr * 0.92; d[i + 2] = b + gr * 0.8;
+      } else {
+        const dth = BAYER[(py & 1) * 2 + (px & 1)];
+        d[i] = Math.floor(r / STEP + dth) * STEP;
+        d[i + 1] = Math.floor(gg / STEP + dth) * STEP;
+        d[i + 2] = Math.floor(b / STEP + dth) * STEP;
+      }
       d[i + 3] = 255;
     }
   }
@@ -229,7 +244,7 @@ function paintTerrain() {
     grd.addColorStop(1, 'rgba(60,26,12,0)');
     g.fillStyle = grd;
     g.beginPath(); g.ellipse(cx, cy, r, r * 0.8, 0, 0, Math.PI * 2); g.fill();
-    g.lineWidth = 3;
+    g.lineWidth = fine ? 1.6 : 3;
     g.strokeStyle = 'rgba(255,224,170,0.35)';
     g.beginPath(); g.ellipse(cx, cy, r * 0.8, r * 0.64, 0, Math.PI * 0.05, Math.PI * 0.95); g.stroke();
     g.strokeStyle = 'rgba(50,22,10,0.35)';
@@ -238,7 +253,7 @@ function paintTerrain() {
 
   // hairline cracks
   g.strokeStyle = 'rgba(56,24,12,0.38)';
-  g.lineWidth = 2;
+  g.lineWidth = fine ? 1.1 : 2;
   const cracks = Math.floor(MAP_W * MAP_H / 50);
   for (let n = 0; n < cracks; n++) {
     let x = nrand() * W, y = nrand() * H;
@@ -262,9 +277,18 @@ function paintTerrain() {
     const x = Math.floor(nrand() * TW), y = Math.floor(nrand() * TH);
     if (!dry(x * P, y * P)) continue;
     const sz = nrand() < 0.3 ? 2 : 1;
+    const lit = nrand() < 0.5 ? '#d2b892' : '#a98a6a';
+    if (fine) {
+      const r = sz === 2 ? 1.7 : 1.05;
+      g.fillStyle = 'rgba(48,24,12,0.45)';
+      g.beginPath(); g.ellipse(x + 0.5, y + r * 0.55, r * 1.15, r * 0.55, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = lit; g.beginPath(); g.ellipse(x, y, r, r * 0.72, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,245,225,0.45)'; g.fillRect(x - r * 0.5, y - r * 0.5, r * 0.6, r * 0.35);
+      continue;
+    }
     g.fillStyle = 'rgba(48,24,12,0.6)';
     g.fillRect(x, y + 1, sz, 1);
-    g.fillStyle = nrand() < 0.5 ? '#d2b892' : '#a98a6a';
+    g.fillStyle = lit;
     g.fillRect(x, y + 1 - sz, sz, sz);
   }
   const tufts = Math.floor(MAP_W * MAP_H * 0.8);
@@ -273,14 +297,16 @@ function paintTerrain() {
     if (!dry(x * P, y * P)) continue;
     const hue = nrand();
     const blades = 2 + Math.floor(nrand() * 3);
+    // refined: twice the blades at half the width, so a tuft is finer, not bigger
+    const u = fine ? 2 : 1, n = blades * (fine ? 2 : 1), bw = fine ? 0.8 : 1;
     g.fillStyle = 'rgba(40,22,10,0.45)';
-    g.fillRect(x - 1, y, blades + 2, 1);
-    for (let k = 0; k < blades; k++) {
-      const h = 1 + Math.floor(nrand() * 3);
+    g.fillRect(x - u, y, (blades + 2) * u, fine ? 0.8 : 1);
+    for (let k = 0; k < n; k++) {
+      const h = (1 + Math.floor(nrand() * 3)) * u * (fine ? 0.8 : 1);
       g.fillStyle = hue < 0.6 ? '#76762f' : hue < 0.85 ? '#a08e3a' : '#5e5026';
-      g.fillRect(x + k, y - h, 1, h);
+      g.fillRect(x + k * (fine ? 1 : 1), y - h, bw, h);
       g.fillStyle = '#e4d58e';
-      if (nrand() < 0.5) g.fillRect(x + k, y - h, 1, 1);
+      if (nrand() < 0.5) g.fillRect(x + k, y - h, bw, fine ? 0.8 : 1);
     }
   }
 
@@ -391,7 +417,7 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
     }
     g.closePath();
   };
-  g.lineWidth = 3; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
+  g.lineWidth = refinedStyle ? 1.5 : 3; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
   path(); g.stroke(); g.fill();
   g.save(); path(); g.clip();
   g.fillStyle = pal.dk;
@@ -401,7 +427,7 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
   g.fillStyle = pal.hi;
   g.beginPath(); g.ellipse(cx - r * 0.38, by - r * 0.52, r * 0.26, r * 0.15, -0.3, 0, Math.PI * 2); g.fill();
   if (r > 10) {
-    g.strokeStyle = pal.out; g.lineWidth = 2; g.globalAlpha = 0.6;
+    g.strokeStyle = pal.out; g.lineWidth = refinedStyle ? 1 : 2; g.globalAlpha = 0.6;
     g.beginPath(); g.moveTo(cx + r * 0.1, by - r * 0.3); g.lineTo(cx + r * 0.25, by + r * 0.05); g.lineTo(cx + r * 0.15, by + r * 0.35); g.stroke();
     g.globalAlpha = 1;
   }
@@ -421,7 +447,8 @@ function drawTree(g: CanvasRenderingContext2D, cx: number, cy: number, s: number
   }
   puffs.push([cx, cy - s * 1.1, s * 0.55]);
   g.fillStyle = pal.out;
-  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r + 1.5, 0, Math.PI * 2); g.fill(); }
+  const rim = refinedStyle ? 0.8 : 1.5;
+  for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r + rim, 0, Math.PI * 2); g.fill(); }
   g.fillStyle = pal.dk;
   for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
   g.fillStyle = pal.mid;
@@ -805,6 +832,8 @@ export let refinedStyle = new URLSearchParams(location.search).get('style') !== 
 export function setRefinedStyle(v: boolean) {
   refinedStyle = v;
   sprites.clear();
+  crystalCache.clear();
+  if (terrainTex) paintTerrain();
 }
 function drawBld(s: BldSprite, x: number, y: number) {
   const k = s.k ?? 1;
@@ -1255,6 +1284,7 @@ function updateFogTexture() {
 
 export function initRenderer() {
   sprites.clear();
+  terrainSeed = -1;
   paintTerrain();
   [fogCanvas, fogCtx] = makeCanvas(MAP_W, MAP_H);
   fogImg = fogCtx.createImageData(MAP_W, MAP_H);
@@ -1288,7 +1318,7 @@ function drawCrystal(g: CanvasRenderingContext2D, bx: number, by: number, h: num
     for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]);
     g.closePath(); g.fill();
   };
-  g.strokeStyle = CRY.out; g.lineWidth = 3; g.lineJoin = 'round';
+  g.strokeStyle = CRY.out; g.lineWidth = refinedStyle ? 1.4 : 3; g.lineJoin = 'round';
   g.beginPath(); g.moveTo(...BL); g.lineTo(...BC); g.lineTo(...BR); g.lineTo(...SR); g.lineTo(...A); g.lineTo(...SL); g.closePath(); g.stroke();
   poly([BL, BC, SC, SL], CRY.dk);
   poly([BC, BR, SR, SC], CRY.mid);
@@ -1307,9 +1337,11 @@ function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
   if (cached) return cached;
   const hash = (n: number) => { const v = Math.sin(variant * 91.3 + n * 47.1) * 43758.5; return v - Math.floor(v); };
   const scale = 0.5 + size * 0.17;                // depleting fields shrink
-  // drawn at half resolution, then blown up without smoothing
-  const [lo, g] = makeCanvas(CRY_W / 2, CRY_H / 2);
-  g.scale(0.5, 0.5);
+  // classic: drawn at half resolution, then blown up without smoothing;
+  // refined: drawn at 2× and scaled down when drawn
+  const k = refinedStyle ? 2 : 0.5;
+  const [lo, g] = makeCanvas(CRY_W * k, CRY_H * k);
+  g.scale(k, k);
   const ax = CRY_AX, ay = CRY_AY;
   g.fillStyle = 'rgba(24,10,4,0.45)';
   g.beginPath(); g.ellipse(ax + 6, ay + 2, 18 * scale + 4, 5.5, 0, 0, Math.PI * 2); g.fill();
@@ -1333,6 +1365,7 @@ function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
   }
   parts.sort((a, b) => a.by - b.by);
   for (const p of parts) drawCrystal(g, p.bx, p.by, p.h, p.w, p.lean);
+  if (refinedStyle) { g.setTransform(1, 0, 0, 1, 0, 0); gradeWarmCool(lo, 0.5); crystalCache.set(key, lo); return lo; }
   const [c, cg] = makeCanvas(CRY_W, CRY_H);
   cg.imageSmoothingEnabled = false;
   cg.drawImage(lo, 0, 0, CRY_W, CRY_H);
@@ -1517,12 +1550,12 @@ export function render() {
   // when you zoom/scroll past the edge of the map. Edges sit on whole texels so
   // nearest-neighbour sampling doesn't swim while scrolling.
   const mW = MAP_W * TILE, mH = MAP_H * TILE;
-  const texel = (v: number, round: (n: number) => number) => round(v / TEX_SCALE) * TEX_SCALE;
+  const texel = (v: number, round: (n: number) => number) => round(v / texScale) * texScale;
   const bx0 = Math.max(0, texel(camera.x, Math.floor)), by0 = Math.max(0, texel(camera.y, Math.floor));
   const bx1 = Math.min(mW, texel(camera.x + vwz, Math.ceil)), by1 = Math.min(mH, texel(camera.y + vhz, Math.ceil));
   if (bx1 > bx0 && by1 > by0) {
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(terrainTex, bx0 / TEX_SCALE, by0 / TEX_SCALE, (bx1 - bx0) / TEX_SCALE, (by1 - by0) / TEX_SCALE,
+    ctx.drawImage(terrainTex, bx0 / texScale, by0 / texScale, (bx1 - bx0) / texScale, (by1 - by0) / texScale,
       bx0, by0, bx1 - bx0, by1 - by0);
     ctx.imageSmoothingEnabled = true;
   }
@@ -1546,8 +1579,8 @@ export function render() {
       g2Glow(cx, cy + 2, TILE * 0.5 * pulse, `rgba(67,243,236,${0.07 + amt * 0.09})`);
       const spr = bakeCrystal(Math.floor(hash(0) * 8), size);
       const ox = (hash(1) - 0.5) * 18, oy = (hash(2) - 0.5) * 12;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(spr, cx + ox - CRY_AX, cy + oy + 6 - CRY_AY);
+      ctx.imageSmoothingEnabled = refinedStyle;   // refined crystals are baked 2× and scaled down
+      ctx.drawImage(spr, cx + ox - CRY_AX, cy + oy + 6 - CRY_AY, CRY_W, CRY_H);
       ctx.imageSmoothingEnabled = true;
       // a rare four-point glint on the tip
       if (Math.sin(T * 1.3 + x * 3.1 + y * 5.7) > 0.985) {
