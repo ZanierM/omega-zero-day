@@ -3,7 +3,7 @@ import { MAP_W, MAP_H } from './map';
 import {
   units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding,
   entityPos, entityRadius, toast, Unit, fireStrike, superReady,
-  jumpTargetAlert, starvedHarvesters, activateAbility,
+  jumpTargetAlert, starvedHarvesters, activateAbility, visible, explored,
 } from './game';
 import { crystal, idx, inBounds } from './map';
 import { sfx } from './audio';
@@ -18,6 +18,7 @@ const controlGroups = new Map<string, number[]>(); // '1'..'9' → entity ids
 let usingTouch = false;    // true once any touch happens → disables mouse edge-scroll
 let selectMode = false;    // ⛶ toggle: one-finger drag box-selects instead of panning
 let lastMouseClick = 0, lastMouseUnit = -1; // for desktop double-click select-type
+let pan: { x: number, y: number } | null = null; // middle-button drag in progress
 
 export function startPlacement(defId: string) {
   placement = { defId, tx: 0, ty: 0 };
@@ -28,7 +29,6 @@ export function cancelPlacement() { placement = null; }
 export let strikeTargeting: number | null = null;
 export function startStrikeTargeting(bId: number) {
   strikeTargeting = bId;
-  canvas.style.cursor = 'crosshair';
 }
 function fireStrikeAt(wx: number, wy: number) {
   const b = byId.get(strikeTargeting!);
@@ -115,6 +115,13 @@ export function initInput() {
   });
 
   canvas.addEventListener('mousedown', e => {
+    if (e.button === 1) {
+      // middle button: grab and drag the map (and no browser autoscroll)
+      e.preventDefault();
+      pan = { x: e.clientX, y: e.clientY };
+      vel.x = vel.y = 0;
+      return;
+    }
     if (e.button === 0) {
       // orbital-strike targeting consumes the next click
       if (strikeTargeting !== null) {
@@ -137,7 +144,6 @@ export function initInput() {
       // attack-move: A was pressed — this click is the destination
       if (attackMovePending) {
         attackMovePending = false;
-        canvas.style.cursor = 'crosshair';
         const w = toWorld(mouse.x, mouse.y);
         const sel = selectedUnits().filter(u => u.def.damage > 0);
         sel.forEach((u, i) => {
@@ -153,8 +159,18 @@ export function initInput() {
     // which fires for trackpad two-finger clicks and Ctrl+click too
   });
 
+  // window-level so a pan keeps going (and ends) wherever the pointer goes
+  window.addEventListener('mousemove', e => {
+    if (!pan) return;
+    camera.x -= (e.clientX - pan.x) / camera.zoom;
+    camera.y -= (e.clientY - pan.y) / camera.zoom;
+    pan.x = e.clientX; pan.y = e.clientY;
+    clampCamera();
+  });
+
   // window-level so a drag still completes if the button is released off-canvas
   window.addEventListener('mouseup', e => {
+    if (e.button === 1) { pan = null; return; }
     if (e.button !== 0 || !dragStart) return;
     const wasDrag = selectBox && (selectBox.w > 6 || selectBox.h > 6);
     if (wasDrag) {
@@ -184,14 +200,17 @@ export function initInput() {
   });
 
   window.addEventListener('keydown', e => {
-    const target = e.target as HTMLElement;
-    if (target.closest('[role="dialog"]') || (e.key === ' ' && target.closest('button'))) return;
+    // the target can be the document or window, which have no closest()
+    const target = e.target instanceof Element ? e.target : null;
+    if (target?.closest('[role="dialog"]') || (e.key === ' ' && target?.closest('button'))) return;
     keys.add(e.key);
-    if (e.key === 'Escape') { placement = null; attackMovePending = false; strikeTargeting = null; canvas.style.cursor = 'crosshair'; }
+    if (e.key === 'Escape') { placement = null; attackMovePending = false; strikeTargeting = null; }
+    // +/- zoom about the middle of the view
+    if (e.key === '=' || e.key === '+') zoomAt(1.15, canvas.clientWidth / 2, canvas.clientHeight / 2);
+    if (e.key === '-' || e.key === '_') zoomAt(1 / 1.15, canvas.clientWidth / 2, canvas.clientHeight / 2);
     // A = attack-move mode (next left-click orders the attack)
     if ((e.key === 'a' || e.key === 'A') && selectedUnits().some(u => u.def.damage > 0)) {
       attackMovePending = true;
-      canvas.style.cursor = 'cell';
     }
     // S = stop
     if (e.key === 's' || e.key === 'S') {
@@ -222,6 +241,11 @@ export function initInput() {
     }
   });
   window.addEventListener('keyup', e => keys.delete(e.key));
+  // a key released while another window had focus never sends keyup: forget
+  // everything held when focus leaves, or the camera keeps drifting
+  const dropHeld = () => { keys.clear(); pan = null; dragStart = null; selectBox = null; vel.x = vel.y = 0; };
+  window.addEventListener('blur', dropHeld);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) dropHeld(); });
 
   // ---------- touch controls (phones / tablets) ----------
   // one-finger drag pans · tap selects / orders · long-press = attack-move.
@@ -387,7 +411,6 @@ export function initInput() {
     selectMode = !selectMode;
     selBtn.classList.toggle('active', selectMode);
     selBtn.setAttribute('aria-pressed', String(selectMode));
-    canvas.style.cursor = selectMode ? 'cell' : 'crosshair';
   });
 
   // idle-harvester button: cycle to the next starved harvester and select it
@@ -415,10 +438,24 @@ export function initInput() {
   mm.addEventListener('touchstart', e => { e.preventDefault(); jump(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
   mm.addEventListener('touchmove', e => { e.preventDefault(); jump(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 
-  // desktop: mouse-wheel zoom, anchored at the cursor
+  // desktop wheel, anchored at the cursor. A notched mouse wheel zooms by how
+  // far it turned; a trackpad's two-finger swipe pans and its pinch (sent as
+  // ctrl+wheel) zooms — zooming on every tiny trackpad event made it lurch
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
-    zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, mouse.x, mouse.y);
+    const legacy = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
+    const notched = e.deltaMode !== 0 || (!!legacy && legacy % 120 === 0 && e.deltaX === 0);
+    const clampZoom = (f: number) => Math.max(0.8, Math.min(1.25, f));
+    if (e.ctrlKey) {
+      zoomAt(clampZoom(Math.exp(-e.deltaY * 0.01)), mouse.x, mouse.y);
+    } else if (notched) {
+      const px = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);   // lines/pages → pixels
+      zoomAt(clampZoom(Math.exp(-px * 0.0012)), mouse.x, mouse.y);
+    } else {
+      camera.x += e.deltaX / camera.zoom;
+      camera.y += e.deltaY / camera.zoom;
+      clampCamera();
+    }
   }, { passive: false });
 }
 
@@ -463,26 +500,102 @@ function clampCamera() {
   camera.y = Math.max(0, Math.min(Math.max(0, MAP_H * TILE - viewH), camera.y));
 }
 
-const SCROLL_SPEED = 700; // px per second
-const EDGE = 24;
+// pan speed in screen pixels per second, so it feels the same at every zoom
+const PAN_SPEED = 900;
+const EDGE = 22;                  // edge-scroll zone, screen px
+const EDGE_DELAY = 0.18;          // s the mouse must rest in the zone first...
+const EDGE_DELAY_BOTTOM = 0.4;    // ...longer above the deck, which it crosses constantly
+const vel = { x: 0, y: 0 };       // world px/s, eased toward the wanted speed
+let edgeHold = 0;
+let edgeCursor = '';
 
 export function updateCamera(dt: number) {
+  // arrow keys only: A, S and Q are unit commands and must not also pan
   let dx = 0, dy = 0;
-  if (keys.has('ArrowLeft') || keys.has('a')) dx -= 1;
-  if (keys.has('ArrowRight') || keys.has('d')) dx += 1;
-  if (keys.has('ArrowUp') || keys.has('w')) dy -= 1;
-  if (keys.has('ArrowDown') || keys.has('s')) dy += 1;
-  // edge-scroll is a mouse-only affordance — on touch you drag to pan, and a
-  // finger resting near an edge must never make the camera crawl on its own
-  if (mouse.inside && !dragStart && !usingTouch) {
-    if (mouse.x < EDGE) dx -= 1;
-    if (mouse.x > canvas.clientWidth - EDGE) dx += 1;
-    if (mouse.y < EDGE) dy -= 1;
-    if (mouse.y > canvas.clientHeight - EDGE) dy += 1;
+  if (keys.has('ArrowLeft')) dx -= 1;
+  if (keys.has('ArrowRight')) dx += 1;
+  if (keys.has('ArrowUp')) dy -= 1;
+  if (keys.has('ArrowDown')) dy += 1;
+
+  // edge scroll: mouse only (a resting finger must never crawl the camera),
+  // only after a short dwell so passing through the zone does nothing, and
+  // faster the deeper the pointer sits in it
+  let ex = 0, ey = 0;
+  if (mouse.inside && !dragStart && !pan && !usingTouch && document.hasFocus()) {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const push = (d: number) => d < EDGE ? 0.4 + 0.6 * (1 - Math.max(0, d) / EDGE) : 0;
+    ex = push(w - 1 - mouse.x) - push(mouse.x);
+    ey = push(h - 1 - mouse.y) - push(mouse.y);
   }
-  camera.x += dx * SCROLL_SPEED * dt;
-  camera.y += dy * SCROLL_SPEED * dt;
+  edgeCursor = '';
+  if (ex || ey) {
+    edgeHold += dt;
+    const delay = ey > 0 && !ex ? EDGE_DELAY_BOTTOM : EDGE_DELAY;
+    if (edgeHold < delay) { ex = ey = 0; }
+    else {
+      const ramp = Math.min(1, (edgeHold - delay) / 0.3);
+      ex *= ramp; ey *= ramp;
+      edgeCursor = (ey < 0 ? 'n' : ey > 0 ? 's' : '') + (ex < 0 ? 'w' : ex > 0 ? 'e' : '') + '-resize';
+    }
+  } else edgeHold = 0;
+
+  let tx = dx + ex, ty = dy + ey;
+  const len = Math.hypot(tx, ty);
+  if (len > 1) { tx /= len; ty /= len; }
+  // ease toward the wanted velocity so starts and stops aren't abrupt
+  const k = 1 - Math.exp(-dt * 12);
+  vel.x += (tx * PAN_SPEED / camera.zoom - vel.x) * k;
+  vel.y += (ty * PAN_SPEED / camera.zoom - vel.y) * k;
+  if (Math.abs(vel.x) < 0.5 && !tx) vel.x = 0;
+  if (Math.abs(vel.y) < 0.5 && !ty) vel.y = 0;
+  const bx = camera.x, by = camera.y;
+  camera.x += vel.x * dt;
+  camera.y += vel.y * dt;
   clampCamera();
+  if (vel.x && camera.x === bx) vel.x = 0;       // hit the map edge
+  if (vel.y && camera.y === by) vel.y = 0;
+  updateCursor();
+}
+
+// ---------- cursor: says what a click will do ----------
+
+const svgCursor = (svg: string, fallback: string) =>
+  `url("data:image/svg+xml,${encodeURIComponent(svg)}") 12 12, ${fallback}`;
+const reticle = (col: string) => svgCursor(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none">` +
+  `<g stroke="#140806" stroke-width="4"><circle cx="12" cy="12" r="7"/><path d="M12 1v6M12 17v6M1 12h6M17 12h6"/></g>` +
+  `<g stroke="${col}" stroke-width="2"><circle cx="12" cy="12" r="7"/><path d="M12 1v6M12 17v6M1 12h6M17 12h6"/></g></svg>`, 'crosshair');
+const CUR_ATTACK = reticle('#ff5a4a'), CUR_ATTACK_MOVE = reticle('#ffb02e');
+const CUR_MOVE = svgCursor(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none">` +
+  `<g stroke="#08140c" stroke-width="4"><circle cx="12" cy="12" r="6"/></g><circle cx="12" cy="12" r="6" stroke="#3ddc84" stroke-width="2"/>` +
+  `<circle cx="12" cy="12" r="2" fill="#3ddc84" stroke="#08140c" stroke-width="1"/></svg>`, 'crosshair');
+let shownCursor = '';
+
+function updateCursor() {
+  if (usingTouch || (!mouse.inside && !pan)) return;
+  let c: string;
+  if (pan) c = 'grabbing';
+  else if (strikeTargeting !== null) c = CUR_ATTACK;
+  else if (placement) c = 'crosshair';
+  else if (attackMovePending) c = CUR_ATTACK_MOVE;
+  else if (dragStart || selectMode) c = 'crosshair';
+  else if (edgeCursor) c = edgeCursor;
+  else {
+    const w = toWorld(mouse.x, mouse.y);
+    const hit = entityAt(w.x, w.y);
+    const sel = selectedUnits();
+    // hostile only counts if the player can actually see it, so the cursor
+    // never gives away units hidden in the fog
+    const seen = hit && hit.owner !== PLAYER && (hit.kind === 'unit'
+      ? visible[idx(tileOf(hit.x), tileOf(hit.y))] === 1
+      : explored[idx(hit.tx, hit.ty)] === 1);
+    if (seen && sel.some(u => u.def.damage > 0)) c = CUR_ATTACK;
+    else if (hit && hit.owner === PLAYER) c = 'pointer';
+    else if (sel.length) c = CUR_MOVE;
+    else c = 'default';
+  }
+  if (c !== shownCursor) { canvas.style.cursor = c; shownCursor = c; }
 }
 
 export function centerCameraOn(px: number, py: number) {
