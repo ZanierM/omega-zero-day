@@ -371,11 +371,20 @@ export function initInput() {
     lastTapAt = now;
   }, { passive: false });
 
+  // A system gesture can end touch without touchend; clear stale pan/long-press state.
+  canvas.addEventListener('touchcancel', () => {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    touch = null;
+    pinchDist = 0;
+    selectBox = null;
+  });
+
   // ⛶ box-select toggle (shown only on touch devices via CSS)
   const selBtn = document.getElementById('selectmode');
   selBtn?.addEventListener('click', () => {
     selectMode = !selectMode;
     selBtn.classList.toggle('active', selectMode);
+    selBtn.setAttribute('aria-pressed', String(selectMode));
     canvas.style.cursor = selectMode ? 'cell' : 'crosshair';
   });
 
