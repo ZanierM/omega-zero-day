@@ -3,6 +3,7 @@ import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
+import { BUILDING_ART, nexusBeacon } from './art';
 
 // Renderer v4 — Kenney sprite assets on a pre-rendered noise terrain.
 //  * terrain painted once into a big offscreen texture (per-pixel noise, craters, boulders)
@@ -733,49 +734,62 @@ function bakeBuildingSprite(defId: string, owner: number, level: number): BldSpr
   const def = BUILDINGS[defId];
   const w = def.w * TILE, h = def.h * TILE;
 
-  // isometric pack sprite: bake into a canvas that overflows the plot upward
+  // the structure on its own canvas, overflowing the plot upward; baseY is the
+  // canvas row that sits on the plot's south edge
+  const art = BUILDING_ART[defId];
   const img = def.sprite ? images.get(`${def.sprite}_${level}`) : undefined;
-  if (img && !def.isWall) {
+  let st: HTMLCanvasElement | null = null, baseY = 0;
+  if (art) {
+    // hand-drawn structure: colours are final, it only needs the outline
+    const head = Math.ceil(w * 0.75), m = 6;
+    const [c, cg] = makeCanvas(w + m * 2, h + head + m * 2);
+    cg.translate(m, m + head);
+    art(cg, w, h, level, TEAM_COLORS[owner]);
+    cg.setTransform(1, 0, 0, 1, 0, 0); // outline() reuses this context
+    st = c; baseY = m + head + h;
+  } else if (img && !def.isWall) {
+    // isometric pack sprite: team wash, NW light, contrast lift (the pad's
+    // hazard stripe carries most of the team colour)
     const scale = Math.min((w * 1.3) / img.width, (h * 2.6) / img.height, 1);
     const dw = Math.ceil(img.width * scale), dh = Math.ceil(img.height * scale);
-
-    // the structure on its own: team wash, NW light, contrast lift, then a
-    // hard dark outline (the pad's hazard stripe carries most of the team colour)
-    const [st, sg] = makeCanvas(dw + 6, dh + 6);
+    const [c, sg] = makeCanvas(dw + 6, dh + 6);
     sg.imageSmoothingEnabled = true;
     sg.drawImage(img, 3, 3, dw, dh);
     sg.globalCompositeOperation = 'source-atop';
     sg.fillStyle = TEAM_COLORS[owner];
     sg.globalAlpha = owner === PLAYER ? 0.08 : 0.14;
-    sg.fillRect(0, 0, st.width, st.height);
+    sg.fillRect(0, 0, c.width, c.height);
     sg.globalAlpha = 1;
     sg.globalCompositeOperation = 'source-over';
-    bakeLighting(sg, st.width, st.height, 0.5);
-    punch(sg, st, 0.2);
+    bakeLighting(sg, c.width, c.height, 0.5);
+    punch(sg, c, 0.2);
+    st = c; baseY = c.height - 3;
+  }
+  if (st) {
     outline(st, '#1a120c', 2);
 
     // long low-sun shadow thrown to the south-east
-    const reachX = Math.ceil(dh * 0.42), reachY = Math.ceil(dh * 0.16);
+    const reachX = Math.ceil(baseY * 0.42), reachY = Math.ceil(baseY * 0.16);
     const cw = Math.max(w, st.width) + 16 + reachX * 2;
-    const ch = h + Math.max(0, st.height - h) + 16 + reachY;
+    const ch = h + Math.max(0, baseY - h) + 16 + reachY;
     const [c, g] = makeCanvas(cw, ch);
     const ox = (cw - w) / 2;            // footprint offset inside the canvas
     const oy = ch - h - 6 - reachY;
     g.save(); g.translate(ox, oy);
     drawPad(g, w, h, TEAM_COLORS[owner]);
     g.restore();
-    const bx = cw / 2, by = oy + h - 2;
+    const bx = cw / 2, by = oy + h - (art ? 0 : 2);
     g.save();
     g.translate(bx, by);
     g.transform(1, 0, -0.42, -0.16, 0, 0);
     g.globalAlpha = 0.34;
-    g.drawImage(silhouetteOf(st), -st.width / 2, -st.height + 3);
+    g.drawImage(silhouetteOf(st), -st.width / 2, -baseY);
     g.restore();
     // contact shadow hugging the base
     g.fillStyle = 'rgba(16,8,4,0.35)';
-    g.beginPath(); g.ellipse(bx + 3, by - 2, dw * 0.46, Math.min(10, dh * 0.08), 0, 0, Math.PI * 2); g.fill();
-    // sprite planted on the plot's south edge
-    g.drawImage(st, bx - st.width / 2, by - st.height + 3);
+    g.beginPath(); g.ellipse(bx + 3, by - 2, st.width * 0.44, Math.min(10, baseY * 0.08), 0, 0, Math.PI * 2); g.fill();
+    // structure planted on the plot's south edge
+    g.drawImage(st, bx - st.width / 2, by - baseY);
     pixelate(c);
     const s = c as BldSprite; s.ox = ox; s.oy = oy;
     return s;
@@ -1101,10 +1115,12 @@ function buildingOverlay(b: Building) {
   const w = b.def.w * TILE, h = b.def.h * TILE;
   const cx = px + w / 2, cy = py + h / 2;
   switch (b.def.id) {
-    case 'nexus': {
-      // beacon on the pyramid peak (sprite overflows above the plot)
+    case 'nexus':
+    case 'outpost': {
+      // beacon on the tip of the antenna mast (sprite overflows above the plot)
       const on = Math.sin(T * 4) > 0;
-      g2Glow(cx, py - 6, on ? 4 : 2, on ? 'rgba(255,90,90,0.9)' : 'rgba(120,40,50,0.6)');
+      const bc = nexusBeacon(w, b.level);
+      g2Glow(px + bc.x, py + bc.y, on ? 4 : 2, on ? 'rgba(255,90,90,0.9)' : 'rgba(120,40,50,0.6)');
       break;
     }
     case 'extractor': {
