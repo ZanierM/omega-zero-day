@@ -464,6 +464,27 @@ function destroy(e: Entity) {
   }
 }
 
+// The extractor's unload point: the free tile touching its footprint nearest
+// the harvester, preferring the side below. Building flush against another
+// structure used to put the only dock inside it, stranding full harvesters.
+function dockTile(b: Building, u: Unit): { x: number, y: number } | null {
+  const { tx, ty } = b, { w, h } = b.def;
+  let best: { x: number, y: number } | null = null, bestD = Infinity;
+  for (let y = ty - 1; y <= ty + h; y++) for (let x = tx - 1; x <= tx + w; x++) {
+    if (x >= tx && x < tx + w && y >= ty && y < ty + h) continue;   // inside the footprint
+    if (!inBounds(x, y) || terrain[idx(x, y)] !== 0 || occupied[idx(x, y)] !== -1) continue;
+    const px = centerOfTile(x), py = centerOfTile(y);
+    const d = Math.hypot(px - u.x, py - u.y) + (y === ty + h ? 0 : TILE);   // nudge toward the front
+    if (d < bestD) { bestD = d; best = { x: px, y: py }; }
+  }
+  return best;
+}
+function distToFootprint(u: Unit, b: Building) {
+  const x0 = b.tx * TILE, y0 = b.ty * TILE, x1 = x0 + b.def.w * TILE, y1 = y0 + b.def.h * TILE;
+  const dx = Math.max(x0 - u.x, 0, u.x - x1), dy = Math.max(y0 - u.y, 0, u.y - y1);
+  return Math.hypot(dx, dy);
+}
+
 export function damage(target: Entity, amount: number, attacker?: Unit) {
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;
@@ -835,9 +856,10 @@ function updateHarvester(u: Unit, dt: number) {
       if (d < bestD) { best = b; bestD = d; }
     }
     if (!best) return; // no extractor; wait
-    const c = buildingCenter(best);
-    const dock = { x: c.x, y: (best.ty + best.def.h) * TILE + TILE / 2 };
-    if (moveToward(u, dock.x, dock.y, dt) || Math.hypot(c.x - u.x, c.y - u.y) < TILE * 2.2) {
+    const dock = dockTile(best, u);
+    if (!dock) return;   // boxed in on every side; wait for a gap
+    // unload once alongside the footprint, from whichever side it reached
+    if (moveToward(u, dock.x, dock.y, dt) || distToFootprint(u, best) < TILE * 1.3) {
       p.credits += Math.round(u.cargo);
       telemetry.earned(u.owner, u.cargo);
       emit({ type: 'delivered', owner: u.owner, amount: u.cargo });
