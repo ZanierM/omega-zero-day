@@ -3,7 +3,7 @@ import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
-import { BUILDING_ART, nexusBeacon } from './art';
+import { BUILDING_ART, nexusBeacon, extractorLights } from './art';
 
 // Renderer v4 — Kenney sprite assets on a pre-rendered noise terrain.
 //  * terrain painted once into a big offscreen texture (per-pixel noise, craters, boulders)
@@ -988,6 +988,30 @@ function sprite(kind: 'b' | 'u', defId: string, owner: number, variant = 0): HTM
 }
 const bldSprite = (defId: string, owner: number, level: number) => sprite('b', defId, owner, level) as BldSprite;
 
+// build-bar icon for a structure with hand-drawn art (null if it has none)
+export function artIconUrl(defId: string): string | null {
+  const art = BUILDING_ART[defId];
+  if (!art) return null;
+  const def = BUILDINGS[defId];
+  const w = def.w * TILE, h = def.h * TILE, head = Math.ceil(w * 0.75), m = 4;
+  const [c, g] = makeCanvas(w + m * 2, h + head + m * 2);
+  g.translate(m, m + head);
+  art(g, w, h, 1, TEAM_COLORS[PLAYER]);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  outline(c, '#1a120c', 2);
+  pixelate(c);
+  // crop the empty headroom so the icon fills its button
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < c.width; x++)
+      if (d[(y * c.width + x) * 4 + 3] > 8) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (x1 < x0) return c.toDataURL();
+  const [t, tg] = makeCanvas(x1 - x0 + 1, y1 - y0 + 1);
+  tg.drawImage(c, -x0, -y0);
+  return t.toDataURL();
+}
+
 // build-bar icon for procedurally drawn defences (turret, wall)
 export function defenceIconUrl(defId: string): string {
   const s = bakeProceduralBuilding(defId, PLAYER);
@@ -1126,8 +1150,9 @@ function buildingOverlay(b: Building) {
     case 'extractor': {
       // refinery mast light + processing glow
       const a = 0.5 + Math.sin(T * 3) * 0.3;
-      g2Glow(cx, cy + h * 0.1, 6, `rgba(67,243,236,${a})`);
-      g2Glow(cx + w * 0.12, py - h * 0.45, 2.5, `rgba(255,176,46,${0.4 + Math.sin(T * 5) * 0.3})`);
+      const el = extractorLights(w);
+      g2Glow(px + el.glow[0], py + el.glow[1], 6, `rgba(67,243,236,${a})`);
+      g2Glow(px + el.lamp[0], py + el.lamp[1], 2.5, `rgba(255,176,46,${0.4 + Math.sin(T * 5) * 0.3})`);
       break;
     }
     case 'lab': {

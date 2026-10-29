@@ -9,7 +9,7 @@ import {
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting } from './input';
 import { sfx, duckMusic } from './audio';
-import { defenceIconUrl, bakeAirSprite } from './render';
+import { defenceIconUrl, bakeAirSprite, artIconUrl } from './render';
 
 const creditsEl = document.getElementById('credits')!;
 const powerFill = document.getElementById('powerfill')!;
@@ -69,6 +69,8 @@ function iconHtml(tab: Tab, defId: string): string {
     if (d.air) return `<img src="${bakeAirSprite(defId, PLAYER).toDataURL()}" alt="">`;
     return `<img src="sprites/u_${d.model}${d.mstep}_s.png" alt="">`;
   }
+  const art = artIconUrl(defId);
+  if (art) return `<img src="${art}" alt="">`;
   const s = BUILDINGS[defId]?.sprite;
   if (s) return `<img src="sprites/${s}_1.png" alt="">`;
   return `<img src="${defenceIconUrl(defId)}" alt="">`; // turret / wall: baked art

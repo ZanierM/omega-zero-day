@@ -183,8 +183,240 @@ export function drawNexus(g: Ctx, w: number, _h: number, level: number, team: st
   g.restore();
 }
 
+// ---------------- shared bits ----------------
+
+const CONCRETE_TOP = '#7a746b', CONCRETE = '#544f48';
+const DARK = '#2a2622', STEEL = '#b8bcc8';
+
+// a flat quad on a wall or roof, given four screen points
+function quad(g: Ctx, a: Pt, b: Pt, c: Pt, d: Pt, fill: string, stroke = true) { poly(g, [a, b, c, d], fill, stroke); }
+
+// diagonal hazard stripes inside a screen rect
+function hazard(g: Ctx, x: number, y: number, w: number, h: number, col: string) {
+  g.save();
+  g.beginPath(); g.rect(x, y, w, h); g.clip();
+  g.fillStyle = col; g.fillRect(x, y, w, h);
+  g.fillStyle = 'rgba(16,10,6,0.85)';
+  for (let k = -h; k < w + h; k += 6) { g.beginPath(); g.moveTo(x + k, y); g.lineTo(x + k + 3, y); g.lineTo(x + k + 3 - h, y + h); g.lineTo(x + k - h, y + h); g.closePath(); g.fill(); }
+  g.restore();
+  g.strokeStyle = OUT; g.lineWidth = 1.5; g.strokeRect(x, y, w, h);
+}
+
+// thin vertical pole with a small pennant in team colour
+function flag(g: Ctx, x: number, y: number, z0: number, z1: number, team: string) {
+  g.fillStyle = OUT; g.fillRect(x - 1.5, y - z1, 3, z1 - z0);
+  g.fillStyle = STEEL; g.fillRect(x - 0.5, y - z1, 1, z1 - z0);
+  poly(g, [[x + 1, y - z1], [x + 13, y - z1 + 3], [x + 11, y - z1 + 6], [x + 1, y - z1 + 8]], team);
+}
+
+function lamp(g: Ctx, x: number, y: number, col: string) {
+  glow(g, x, y, 6, col);
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y, 1.5, 0, Math.PI * 2); g.fill();
+}
+
+// ---------------- Solar Array ----------------
+
+// one photovoltaic panel tilted toward the sun: back edge raised
+function solarPanel(g: Ctx, x0: number, y0: number, x1: number, y1: number) {
+  const zb = 16, zf = 7;
+  // struts
+  g.fillStyle = OUT;
+  for (const x of [x0 + 3, x1 - 4]) g.fillRect(x, y1 - zf, 2, zf - 2);
+  const a: Pt = [x0, y0 - zb], b: Pt = [x1, y0 - zb], c: Pt = [x1, y1 - zf], d: Pt = [x0, y1 - zf];
+  // panel edge (thickness) seen from the front
+  quad(g, d, c, [x1, y1 - zf + 2], [x0, y1 - zf + 2], '#2a2e38');
+  quad(g, a, b, c, d, '#1d3a6a');
+  // cell grid
+  g.strokeStyle = '#3d6cb0'; g.lineWidth = 1;
+  for (let k = 1; k < 4; k++) {
+    const t = k / 4;
+    g.beginPath(); g.moveTo(x0 + (x1 - x0) * t, a[1]); g.lineTo(x0 + (x1 - x0) * t, d[1]); g.stroke();
+  }
+  for (let k = 1; k < 3; k++) {
+    const t = k / 3, yy = a[1] + (d[1] - a[1]) * t;
+    g.beginPath(); g.moveTo(x0, yy); g.lineTo(x1, yy); g.stroke();
+  }
+  // sky reflection streak
+  g.save(); g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.lineTo(...c); g.lineTo(...d); g.closePath(); g.clip();
+  g.fillStyle = 'rgba(190,225,255,0.35)';
+  g.beginPath(); g.moveTo(x0, a[1] + 6); g.lineTo(x0 + 8, a[1]); g.lineTo(x0 + 14, a[1]); g.lineTo(x0, d[1] - 2); g.closePath(); g.fill();
+  g.restore();
+  g.strokeStyle = OUT; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.lineTo(...c); g.lineTo(...d); g.closePath(); g.stroke();
+}
+
+export function drawSolar(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  // low concrete frame
+  prism(g, chamfer(3, 5, 61, 61, 6), 0, 3, CONCRETE_TOP, CONCRETE);
+  // back row, inverter, front row
+  solarPanel(g, 6, 10, 30, 28);
+  solarPanel(g, 34, 10, 58, 28);
+  prism(g, [[26, 31], [38, 31], [38, 39], [26, 39]], 3, 12, '#6a6d78', HULL);
+  quad(g, [26, 39 - 10], [38, 39 - 10], [38, 39 - 8], [26, 39 - 8], team, false);
+  g.fillStyle = '#7fff8a'; g.fillRect(35, 39 - 6, 2, 2);
+  solarPanel(g, 6, 38, 30, 56);
+  solarPanel(g, 34, 38, 58, 56);
+  g.restore();
+}
+
+// ---------------- Extractor (refinery) ----------------
+
+// where the live overlay puts the processing glow and the stack lamp
+export function extractorLights(w: number): { glow: Pt, lamp: Pt } {
+  const s = w / 96;
+  return { glow: [52 * s, (56 - 10) * s], lamp: [80 * s, (18 - 62) * s] };
+}
+
+export function drawExtractor(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 96; g.scale(s, s);
+  prism(g, chamfer(3, 4, 93, 62, 8), 0, 5, CONCRETE_TOP, CONCRETE);
+
+  // smoke stack at the back right
+  cylinder(g, 80, 18, 6, 26, 60, '#2a2c32', '#6a6d78');
+  for (const z of [36, 48]) quad(g, [74, 18 - z - 2], [86, 18 - z - 2], [86, 18 - z + 1], [74, 18 - z + 1], team, false);
+  g.fillStyle = '#1a1612'; g.beginPath(); g.arc(80, 18 - 60, 4, 0, Math.PI * 2); g.fill();
+
+  // processing hall with a sloped roof
+  prism(g, [[34, 12], [90, 12], [90, 56], [34, 56]], 5, 22, null, HULL);
+  quad(g, [34, 12 - 30], [90, 12 - 30], [90, 34 - 22], [34, 34 - 22], '#7c808c');   // rear slope
+  quad(g, [34, 34 - 22], [90, 34 - 22], [90, 56 - 22], [34, 56 - 22], HULL_TOP);   // flat front roof
+  poly(g, [[90, 12 - 30], [90, 12 - 22], [90, 34 - 22]], shade(HULL, 0.8));
+  for (let x = 42; x < 88; x += 10) quad(g, [x, 34 - 22 - 1], [x + 6, 34 - 22 - 1], [x + 6, 34 - 22 + 3], [x, 34 - 22 + 3], '#3a3c44', false);
+  // intake bay where harvesters unload: dark mouth glowing with crystal slurry
+  quad(g, [40, 56 - 18], [64, 56 - 18], [64, 56 - 5], [40, 56 - 5], '#0e1416');
+  g.fillStyle = 'rgba(67,243,236,0.55)'; g.fillRect(42, 56 - 10, 20, 4);
+  hazard(g, 40, 56 - 21, 24, 3, '#e8c66a');
+  // side windows
+  for (const x of [70, 78]) quad(g, [x, 56 - 17], [x + 5, 56 - 17], [x + 5, 56 - 12], [x, 56 - 12], GLASS_DK);
+
+  // big storage tank on the left, piped into the hall
+  g.fillStyle = OUT; g.fillRect(28, 34 - 18, 8, 5);
+  g.fillStyle = '#8a8e9a'; g.fillRect(28, 34 - 17, 8, 3);
+  cylinder(g, 18, 34, 14, 5, 34, '#9aa0ac', '#6c717e');
+  dome(g, 18, 34, 14, 34, '#9aa0ac');
+  quad(g, [4, 34 - 26], [32, 34 - 26], [32, 34 - 22], [4, 34 - 22], team, false);
+  // crystal level gauge
+  quad(g, [16, 34 - 20], [20, 34 - 20], [20, 34 - 8], [16, 34 - 8], '#0e1416');
+  g.fillStyle = GLASS; g.fillRect(17, 34 - 14, 2, 5);
+  g.restore();
+}
+
+// ---------------- Barracks ----------------
+
+export function drawBarracks(g: Ctx, w: number, _h: number, level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 6, 61, 61, 6), 0, 4, CONCRETE_TOP, CONCRETE);
+
+  // LV2+: watch post at the back left
+  if (level >= 2) {
+    cylinder(g, 12, 14, 6, 4, 30, HULL_TOP, HULL);
+    prism(g, chamfer(4, 6, 20, 20, 3), 30, 33, '#6a6d78', HULL);
+    lamp(g, 12, 14 - 36, team);
+  }
+
+  // armoured bunker: straight walls, a sloped armour skirt on the front
+  const body = chamfer(10, 12, 56, 50, 6);
+  prism(g, body, 4, 22, null, '#5d6170');
+  quad(g, [12, 50 - 10], [54, 50 - 10], [56, 55 - 4], [10, 55 - 4], '#4b4f5c');          // skirt
+  prism(g, body, 22, 25, null, level >= 3 ? GOLD : team);                                 // trim band
+  prism(g, body, 25, 26, '#7e8290', '#5d6170');
+  // roof: hatch, vents, sandbag-style armour blocks along the rim
+  prism(g, [[26, 22], [40, 22], [40, 32], [26, 32]], 26, 29, '#5a5d69', HULL);
+  for (const x of [14, 46]) quad(g, [x, 40 - 26 - 1], [x + 6, 40 - 26 - 1], [x + 6, 40 - 26 + 2], [x, 40 - 26 + 2], '#3a3c44', false);
+  // entrance: team-framed doorway in the skirt
+  quad(g, [26, 55 - 18], [40, 55 - 18], [40, 55 - 4], [26, 55 - 4], team);
+  quad(g, [28, 55 - 16], [38, 55 - 16], [38, 55 - 4], [28, 55 - 4], '#14110e');
+  g.fillStyle = '#e8c66a'; g.fillRect(30, 55 - 14, 6, 1.5);
+  // slit windows either side of the door
+  for (const x of [15, 44]) quad(g, [x, 50 - 18], [x + 7, 50 - 18], [x + 7, 50 - 15], [x, 50 - 15], GLASS_DK);
+  g.fillStyle = GLASS; g.fillRect(16, 50 - 17, 5, 1); g.fillRect(45, 50 - 17, 5, 1);
+
+  flag(g, 52, 16, 26, level >= 3 ? 52 : 44, team);
+  // LV3: roof antenna and floodlight
+  if (level >= 3) {
+    g.fillStyle = OUT; g.fillRect(31, 22 - 46, 3, 18);
+    g.fillStyle = STEEL; g.fillRect(32, 22 - 46, 1, 17);
+    lamp(g, 18, 40 - 30, '#fff3c4');
+  }
+  g.restore();
+}
+
+// ---------------- Fabricator (vehicle factory) ----------------
+
+export function drawFabricator(g: Ctx, w: number, _h: number, level: number, team: string) {
+  g.save();
+  const s = w / 96; g.scale(s, s);
+  prism(g, chamfer(3, 6, 93, 93, 8), 0, 5, CONCRETE_TOP, CONCRETE);
+  // vehicle apron in front of the doors
+  quad(g, [32, 93 - 5], [64, 93 - 5], [66, 95], [30, 95], shade(CONCRETE_TOP, 0.85));
+
+  // LV2+: gantry crane over the back right corner
+  if (level >= 2) {
+    for (const x of [70, 88]) { g.fillStyle = OUT; g.fillRect(x - 2, 16 - 54, 4, 50); g.fillStyle = '#e8c66a'; g.fillRect(x - 1, 16 - 53, 2, 48); }
+    quad(g, [66, 16 - 56], [92, 16 - 56], [92, 16 - 51], [66, 16 - 51], '#e8c66a');
+    g.fillStyle = OUT; g.fillRect(78, 16 - 51, 2, 12);
+    prism(g, [[74, 16 - 39 + 16], [84, 16 - 39 + 16], [84, 16 - 39 + 22], [74, 16 - 39 + 22]], 0, 4, '#6a6d78', HULL);
+  }
+
+  // hangar: side walls, arched roof running north-south, front gable
+  const x0 = 10, x1 = 86, yb = 14, yf = 80, zw = 26, R = 18;
+  prism(g, [[x0, yb], [x1, yb], [x1, yf], [x0, yf]], 5, zw, null, '#5a5e6c');
+  const zr = (x: number) => zw + R * Math.sqrt(Math.max(0, 1 - ((x - (x0 + x1) / 2) / ((x1 - x0) / 2)) ** 2));
+  const xs: number[] = [];
+  for (let x = x0; x <= x1; x += 2) xs.push(x);
+  // roof surface, lit on the west half
+  g.beginPath();
+  xs.forEach((x, i) => i ? g.lineTo(x, yb - zr(x)) : g.moveTo(x, yb - zr(x)));
+  for (let i = xs.length - 1; i >= 0; i--) g.lineTo(xs[i], yf - zr(xs[i]));
+  g.closePath();
+  const rg = g.createLinearGradient(x0, 0, x1, 0);
+  rg.addColorStop(0, '#a3a8b4'); rg.addColorStop(0.4, '#8a8f9c'); rg.addColorStop(1, '#5a5e6a');
+  g.fillStyle = rg; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  // roof ribs and skylights
+  g.strokeStyle = 'rgba(26,18,12,0.55)'; g.lineWidth = 1.2;
+  for (let y = yb + 8; y < yf; y += 9) {
+    g.beginPath(); xs.forEach((x, i) => i ? g.lineTo(x, y - zr(x)) : g.moveTo(x, y - zr(x))); g.stroke();
+  }
+  if (level >= 3) {
+    for (let y = yb + 10; y < yf - 12; y += 18)
+      quad(g, [44, y - zr(44)], [52, y - zr(52)], [52, y + 6 - zr(52)], [44, y + 6 - zr(44)], '#24406a');
+  }
+  // front gable wall
+  g.beginPath();
+  g.moveTo(x0, yf - 5);
+  xs.forEach(x => g.lineTo(x, yf - zr(x)));
+  g.lineTo(x1, yf - 5);
+  g.closePath();
+  g.fillStyle = '#6a6e7c'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  // team band across the gable and a round vent at its peak
+  quad(g, [x0, yf - zw + 2], [x1, yf - zw + 2], [x1, yf - zw + 6], [x0, yf - zw + 6], level >= 3 ? GOLD : team, false);
+  g.fillStyle = OUT; g.beginPath(); g.arc(48, yf - zw - 9, 6, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#3a3c44'; g.beginPath(); g.arc(48, yf - zw - 9, 4.5, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#6a6e7c'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(44, yf - zw - 9); g.lineTo(52, yf - zw - 9); g.moveTo(48, yf - zw - 13); g.lineTo(48, yf - zw - 5); g.stroke();
+  // roller door with hazard frame
+  hazard(g, 30, yf - 23, 36, 3, '#e8c66a');
+  quad(g, [32, yf - 20], [64, yf - 20], [64, yf - 5], [32, yf - 5], '#3a3d46');
+  g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1;
+  for (let y = yf - 18; y < yf - 5; y += 3) { g.beginPath(); g.moveTo(33, y); g.lineTo(63, y); g.stroke(); }
+  // side windows
+  for (const x of [16, 72]) {
+    quad(g, [x, yf - 18], [x + 8, yf - 18], [x + 8, yf - 12], [x, yf - 12], GLASS_DK);
+    g.fillStyle = GLASS; g.fillRect(x + 1, yf - 16, 6, 2);
+  }
+  g.restore();
+}
+
 // custom art by building id; anything not listed keeps the pack sprite
 export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number, level: number, team: string) => void>> = {
   nexus: drawNexus,
   outpost: drawNexus,
+  solar: drawSolar,
+  extractor: drawExtractor,
+  barracks: drawBarracks,
+  fab: drawFabricator,
 };
