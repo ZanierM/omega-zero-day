@@ -16,6 +16,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `intent-and-saves`):** save/resume lives in a new `src/save.ts`. `src/main.ts` now auto-pauses and saves when the tab is hidden, autosaves every 20 s of play, clears the slot on game over, restart and a new deploy, and has a `resumeGame()` path behind a new `#resumesave` button in the briefing (`index.html`, styled next to `#deploy`). Keep these when reworking the briefing or the pause menu.
 
+**Small cross-file change (Claude, `ai-objectives`):** `src/ui.ts` game-over text now covers a launch-corridor win or loss (`endReason`, `corridor` from `game.ts`), and the briefing objectives in `index.html` gained a line for the corridor victory. The corridor tracker and objective status pills are drawn on the canvas in `render.ts`. **Overlap to settle:** `input.ts` (PR #13) and `render.ts` (PR #15) both draw an order marker now; keep one.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

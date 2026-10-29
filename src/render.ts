@@ -1,4 +1,5 @@
-import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME } from './config';
+import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES } from './config';
+import * as telemetry from './telemetry';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
@@ -1426,6 +1427,104 @@ function updateFogTexture() {
   fogCtx.putImageData(fogImg, 0, 0);
 }
 
+
+// ---- objective status: capture radius, a status pill under each objective ----
+
+const shortName = (o: number) => o === PLAYER ? 'Yours' : FACTION_NAMES[o].split(' ')[0];
+function drawObjectiveStatus(n: game.Neutral, cx: number, cy: number) {
+  const capturing = n.prog > 0 && n.progOwner >= 0;
+  // capture radius: faint until someone is on it, so it's clear where to stand
+  ctx.save();
+  ctx.setLineDash([6, 6]); ctx.lineDashOffset = -T * 8;
+  ctx.strokeStyle = n.contested ? '#ff5a4a' : capturing ? TEAM_COLORS[n.progOwner] : 'rgba(232,220,190,0.9)';
+  ctx.globalAlpha = n.contested || capturing ? 0.7 : 0.18; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 4, CAPTURE_RADIUS * TILE, CAPTURE_RADIUS * TILE * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+
+  const what = n.kind === 'vent' ? 'VENT' : 'TOWER';
+  const text = n.contested ? `${what} · CONTESTED`
+    : capturing ? `${what} · ${n.progOwner === PLAYER ? '' : shortName(n.progOwner).toUpperCase() + ' '}CAPTURING ${Math.floor(n.prog / CAPTURE_TIME * 100)}%`
+    : n.owner >= 0 ? `${what} · ${shortName(n.owner).toUpperCase()}` : `${what} · UNCLAIMED`;
+  const col = n.contested ? '#ff5a4a' : capturing ? TEAM_COLORS[n.progOwner] : n.owner >= 0 ? TEAM_COLORS[n.owner] : '#b8ae98';
+  ctx.font = '700 9px system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 12, y = cy + 30;
+  ctx.fillStyle = 'rgba(10,12,20,0.78)';
+  ctx.beginPath(); ctx.roundRect(cx - w / 2, y - 7, w, 14, 7); ctx.fill();
+  ctx.strokeStyle = col; ctx.globalAlpha = n.contested ? 0.6 + 0.4 * Math.sin(T * 8) : 0.8; ctx.lineWidth = 1;
+  ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, cx, y + 0.5);
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+
+// ---- launch-corridor tracker (screen space, top centre under the HUD) ----
+
+let hudTop = 56, hudTopCheck = 0;
+function drawCorridorStrip(vw: number) {
+  const vents = game.neutrals.filter(n => n.kind === 'vent');
+  if (!vents.length) return;
+  // the top bar wraps on narrow screens; re-measure now and then, never every frame
+  if (T - hudTopCheck > 1) {
+    hudTopCheck = T;
+    const tb = document.getElementById('topbar')?.getBoundingClientRect();
+    const cv = canvas.getBoundingClientRect();
+    hudTop = tb ? Math.max(8, tb.bottom - cv.top + 6) : 56;
+  }
+  const { owner, held } = game.corridor, need = game.ventsNeeded();
+  const mine = game.ventsHeld(PLAYER);
+  const left = Math.max(0, game.CORRIDOR_HOLD - held);
+  const clock = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+  const status = owner === PLAYER ? `LAUNCH IN ${clock}`
+    : owner >= 0 ? `${FACTION_NAMES[owner].split(' ')[0].toUpperCase()} LAUNCHES IN ${clock}`
+    : `HOLD ${need} OF ${vents.length} VENTS · YOU HOLD ${mine}`;
+  const danger = owner > 0;
+  ctx.font = '800 10px system-ui, sans-serif';
+  const label = 'LAUNCH CORRIDOR';
+  const lw = ctx.measureText(label).width, sw = ctx.measureText(status).width;
+  const pipW = vents.length * 14;
+  const w = Math.min(vw - 24, lw + sw + pipW + 44), h = 24;
+  const x = Math.round(vw / 2 - w / 2), y = Math.round(hudTop);
+  ctx.fillStyle = 'rgba(14,20,36,0.86)';
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 6); ctx.fill();
+  ctx.strokeStyle = danger ? `rgba(255,90,74,${0.55 + 0.35 * Math.sin(T * 5)})` : owner === PLAYER ? '#3ddc84' : 'rgba(201,160,82,0.7)';
+  ctx.lineWidth = 1.5; ctx.stroke();
+  // hold progress along the bottom edge
+  if (owner >= 0) {
+    ctx.fillStyle = TEAM_COLORS[owner];
+    ctx.fillRect(x + 4, y + h - 3, (w - 8) * Math.min(1, held / game.CORRIDOR_HOLD), 2);
+  }
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#c9a052'; ctx.fillText(label, x + 10, y + h / 2);
+  let px = x + 18 + lw;
+  for (const n of vents) {
+    ctx.beginPath(); ctx.arc(px + 5, y + h / 2, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = n.owner >= 0 ? TEAM_COLORS[n.owner] : 'rgba(184,174,152,0.25)'; ctx.fill();
+    if (n.contested) { ctx.strokeStyle = '#ff5a4a'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    px += 14;
+  }
+  ctx.fillStyle = danger ? '#ff8a7a' : owner === PLAYER ? '#7dffb0' : '#e8dcc0';
+  ctx.fillText(status, px + 8, y + h / 2);
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ---- performance overlay (?perf): frame pacing and match pacing at a glance ----
+
+function drawPerfOverlay(vh: number) {
+  const r = telemetry.liveSummary();
+  const lines = [
+    `frame p50 ${r.p50.toFixed(1)} ms  p95 ${r.p95.toFixed(1)}  worst ${r.worst.toFixed(0)}  (${r.fps.toFixed(0)} fps)`,
+    `update ${r.updateMs.toFixed(2)} ms  render ${r.renderMs.toFixed(2)} ms  long frames ${r.longFrames}`,
+    `units ${units.length}  buildings ${buildings.length}  factions ${game.numPlayers}  t ${Math.floor(game.stats.time / 60)}:${String(Math.floor(game.stats.time % 60)).padStart(2, '0')}`,
+    `first fight ${r.firstFight ?? '—'}  stalls ${r.stalls} (${r.stallSec}s)  lost ${r.losses.join('/')}`,
+  ];
+  ctx.font = '11px ui-monospace, Menlo, monospace';
+  const w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16, h = lines.length * 15 + 10;
+  const x = 8, y = vh - h - 8;
+  ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = '#9dffb8';
+  lines.forEach((l, i) => ctx.fillText(l, x + 8, y + 18 + i * 15));
+}
+
 // ---------------- init ----------------
 
 /** Seed the ground was painted with, so a saved match repaints the same map. */
@@ -2042,6 +2141,7 @@ export function render() {
       ctx.arc(cx, cy, 24, -Math.PI / 2, -Math.PI / 2 + (n.prog / CAPTURE_TIME) * Math.PI * 2);
       ctx.stroke();
     }
+    drawObjectiveStatus(n, cx, cy);
   }
 
   // buildings, sorted so southern (nearer) structures draw over northern ones
@@ -2427,6 +2527,10 @@ export function render() {
     ctx.fillStyle = `rgba(255,${170 + f * 60},${120 + f * 80},${f * 0.55})`;
     ctx.fillRect(0, 0, vw, vh);
   }
+
+  drawCorridorStrip(vw);
+  telemetry.frameDrawn(performance.now() - T * 1000);
+  if (telemetry.overlayOn) drawPerfOverlay(vh);
 
   if (selectBox && refinedStyle) {
     const { x, y, w, h } = selectBox, k = Math.min(10, w / 3, h / 3);
