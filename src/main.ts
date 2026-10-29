@@ -41,7 +41,7 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
   initGame(numEnemies);
   game.setSupernova(opts.nova);
   await loadSprites();
-  initRenderer();
+  await initRenderer();   // paints the ground in slices so the page stays live
 
   for (const p of game.players) p.credits = opts.credits;
   const bases = startBases; // randomized by generateMap

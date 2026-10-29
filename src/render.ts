@@ -40,13 +40,16 @@ function nrand() { nseed = (nseed * 16807) % 2147483647; return (nseed % 10000) 
 const NG = 128;
 const ngrid = new Float32Array(NG * NG);
 for (let i = 0; i < ngrid.length; i++) ngrid[i] = nrand();
+// NG is a power of two, so wrapping the lattice is a mask (also for negatives)
+const NGM = NG - 1;
 function noise(x: number, y: number): number {
   const xi = Math.floor(x), yi = Math.floor(y);
   const xf = x - xi, yf = y - yi;
   const sx = xf * xf * (3 - 2 * xf), sy = yf * yf * (3 - 2 * yf);
-  const g = (a: number, b: number) => ngrid[((b % NG + NG) % NG) * NG + ((a % NG + NG) % NG)];
-  const v00 = g(xi, yi), v10 = g(xi + 1, yi), v01 = g(xi, yi + 1), v11 = g(xi + 1, yi + 1);
-  return (v00 + (v10 - v00) * sx) + ((v01 + (v11 - v01) * sx) - (v00 + (v10 - v00) * sx)) * sy;
+  const x0 = xi & NGM, x1 = (xi + 1) & NGM, r0 = (yi & NGM) * NG, r1 = ((yi + 1) & NGM) * NG;
+  const v00 = ngrid[r0 + x0], v10 = ngrid[r0 + x1], v01 = ngrid[r1 + x0], v11 = ngrid[r1 + x1];
+  const top = v00 + (v10 - v00) * sx;
+  return top + ((v01 + (v11 - v01) * sx) - top) * sy;
 }
 function fbm(x: number, y: number): number {
   return noise(x, y) * 0.55 + noise(x * 2.7, y * 2.7) * 0.3 + noise(x * 7.1, y * 7.1) * 0.15;
@@ -100,7 +103,7 @@ export function loadSprites(): Promise<void> {
 
 // ---------------- terrain texture ----------------
 
-let terrainTex: HTMLCanvasElement;
+let terrainTex: HTMLCanvasElement | null = null;
 // classic: the terrain texture is painted at half resolution and blown up
 // without smoothing, so the ground reads as chunky 2×-pixel art like an old RTS
 // map. Refined: full resolution, smooth colour, finer clutter.
@@ -118,8 +121,24 @@ const ROCK_RED: Pal = { out: '#2c170f', dk: '#683724', mid: '#93553a', lt: '#bb7
 const TREE_TEAL: Pal = { out: '#11231c', dk: '#1f4236', mid: '#2f6b55', lt: '#4f9a72', hi: '#93cf8c' };
 const TREE_PURPLE: Pal = { out: '#1b1226', dk: '#36234c', mid: '#573a76', lt: '#8460a6', hi: '#c49edc' };
 
-function paintTerrain() {
-  if (terrainSeed < 0) terrainSeed = nseed; else nseed = terrainSeed;
+// Painted in slices that pause every ~12 ms, so the page keeps drawing frames
+// (the briefing's "Deploying…" stays live) instead of freezing while a large
+// map is built. A newer paint (a style flip mid-paint) supersedes an older one.
+let paintGen = 0;
+async function paintTerrain() {
+  const gen = ++paintGen;
+  if (terrainSeed < 0) terrainSeed = 1 + Math.floor(Math.random() * 2147483645);
+  // its own generator, seeded per game: a pause must not let sprite baking draw
+  // from the shared one and shift where rocks and props land
+  let rs = terrainSeed;
+  const rand = () => (rs = (rs * 16807) % 2147483647) / 2147483647;
+  let lastYield = performance.now();
+  const pace = async () => {
+    if (performance.now() - lastYield < 12) return true;
+    await new Promise(r => setTimeout(r, 0));
+    lastYield = performance.now();
+    return gen === paintGen;
+  };
   const fine = refinedStyle;
   const P = texScale = fine ? 1 : 2;
   const W = MAP_W * TILE, H = MAP_H * TILE;   // world size
@@ -141,14 +160,34 @@ function paintTerrain() {
     }
   const wet = (tx: number, ty: number) =>
     tx >= 0 && ty >= 0 && tx < MAP_W && ty < MAP_H ? soft[idx(tx, ty)] : 0;
-  const waterAt = (x: number, y: number) => {
+  const waterBase = (x: number, y: number) => {
     const fx = x / TILE - 0.5, fy = y / TILE - 0.5;
     const ix = Math.floor(fx), iy = Math.floor(fy);
     const ax = fx - ix, ay = fy - iy;
     const top = wet(ix, iy) * (1 - ax) + wet(ix + 1, iy) * ax;
     const bot = wet(ix, iy + 1) * (1 - ax) + wet(ix + 1, iy + 1) * ax;
-    return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3 + (noise(x / 5 + 9, y / 5) - 0.5) * (refinedStyle ? 0.01 : 0.035);
+    return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3;
   };
+  const shoreWobble = fine ? 0 : 0.035;      // fine-grained edge jitter, classic only
+  const waterAt = (x: number, y: number) =>
+    waterBase(x, y) + (shoreWobble ? (noise(x / 5 + 9, y / 5) - 0.5) * shoreWobble : 0);
+
+  // the broad fields (basins, the first octave of the bumps, sand/ash/scrub
+  // patches, lake shapes) change over tens of pixels, so they're sampled every
+  // S texture pixels and blended; only the finer bumps and grain are worked out
+  // per pixel. This was the bulk of a ~1.2 s freeze on deploy.
+  const S = 4, CW = Math.ceil(TW / S) + 2, CH = Math.ceil(TH / S) + 2;
+  const nC = new Float32Array(CW * CH), dC = new Float32Array(CW * CH);
+  const ashC = new Float32Array(CW * CH), vegC = new Float32Array(CW * CH), wC = new Float32Array(CW * CH);
+  for (let cy = 0; cy < CH; cy++)
+    for (let cx = 0; cx < CW; cx++) {
+      const x = cx * S * P, y = cy * S * P, i = cy * CW + cx;
+      nC[i] = fbm(x / 110, y / 110);
+      dC[i] = noise(x / 34 + 300, y / 34);
+      ashC[i] = noise(x / 140 + 40, y / 140);
+      vegC[i] = noise(x / 70 + 200, y / 70 + 90);
+      wC[i] = waterBase(x, y);
+    }
 
   const img = g.createImageData(TW, TH);
   const d = img.data;
@@ -158,10 +197,17 @@ function paintTerrain() {
   let left = 0;
   const STEP = 9;
   for (let py = 0; py < TH; py++) {
+    if (!(await pace())) return;
+    const fy = py / S, iy = fy | 0, ty = fy - iy, row = iy * CW;
     for (let px = 0; px < TW; px++) {
       const x = px * P, y = py * P;
-      const n = fbm(x / 110, y / 110);            // broad basins and plateaus
-      const detail = fbm(x / 34 + 300, y / 34);   // small bumps
+      const fx = px / S, ix = fx | 0, tx = fx - ix;
+      const c00 = row + ix, c10 = c00 + 1, c01 = c00 + CW, c11 = c01 + 1;
+      const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
+      const n = nC[c00] * w00 + nC[c10] * w10 + nC[c01] * w01 + nC[c11] * w11;        // broad basins and plateaus
+      const X = x / 34 + 300, Y = y / 34;                                                 // small bumps
+      const detail = (dC[c00] * w00 + dC[c10] * w10 + dC[c01] * w01 + dC[c11] * w11) * 0.55
+        + noise(X * 2.7, Y * 2.7) * 0.3 + noise(X * 7.1, Y * 7.1) * 0.15;
       const hgt = n * 0.75 + detail * 0.25;
       const grain = noise(x / 5, y / 5);
       const m = hgt * 0.8 + grain * 0.2;
@@ -169,11 +215,13 @@ function paintTerrain() {
       // sunlit ochre desert under a swollen red sun: warm sand, cooler ash
       // flats and olive scrub, each in crisp-edged patches
       let r = 132 + m * 74, gg = 82 + m * 46, b = 46 + m * 24;
-      const ashMix = Math.min(1, Math.max(0, (noise(x / 140 + 40, y / 140) - 0.56) * 6));
+      const ashN = ashC[c00] * w00 + ashC[c10] * w10 + ashC[c01] * w01 + ashC[c11] * w11;
+      const ashMix = Math.min(1, Math.max(0, (ashN - 0.56) * 6));
       r = r * (1 - ashMix) + (124 + m * 48) * ashMix;
       gg = gg * (1 - ashMix) + (100 + m * 40) * ashMix;
       b = b * (1 - ashMix) + (86 + m * 32) * ashMix;
-      const veg = Math.min(0.9, Math.max(0, (noise(x / 70 + 200, y / 70 + 90) - 0.57) * 5)) * (0.75 + grain * 0.35);
+      const vegN = vegC[c00] * w00 + vegC[c10] * w10 + vegC[c01] * w01 + vegC[c11] * w11;
+      const veg = Math.min(0.9, Math.max(0, (vegN - 0.57) * 5)) * (0.75 + grain * 0.35);
       r = r * (1 - veg) + (88 + m * 40) * veg;
       gg = gg * (1 - veg) + (104 + m * 40) * veg;
       b = b * (1 - veg) + (42 + m * 18) * veg;
@@ -192,7 +240,8 @@ function paintTerrain() {
       prevRow[px] = hgt;
 
       // lakes: deep blue centre, teal shallows, a foam line and a sandy beach
-      const w = waterAt(x, y);
+      const w = wC[c00] * w00 + wC[c10] * w10 + wC[c01] * w01 + wC[c11] * w11
+        + (shoreWobble ? (noise(x / 5 + 9, y / 5) - 0.5) * shoreWobble : 0);
       if (w > 0.5) {
         const depth = Math.min(1, (w - 0.5) * 3.2);
         r = 72 - depth * 46; gg = 160 - depth * 84; b = 178 - depth * 50;
@@ -233,10 +282,11 @@ function paintTerrain() {
   // from here on draw in world coordinates
   g.setTransform(1 / P, 0, 0, 1 / P, 0, 0);
 
+  if (!(await pace())) return;
   // impact craters: dark bowl, lit far rim, shadowed near rim
   const craters = Math.floor(MAP_W * MAP_H / 110);
   for (let n = 0; n < craters; n++) {
-    const cx = nrand() * W, cy = nrand() * H, r = 10 + nrand() * 24;
+    const cx = rand() * W, cy = rand() * H, r = 10 + rand() * 24;
     if (!dry(cx, cy)) continue;
     const grd = g.createRadialGradient(cx + r * 0.15, cy + r * 0.1, r * 0.1, cx, cy, r);
     grd.addColorStop(0, 'rgba(60,26,12,0.5)');
@@ -256,28 +306,29 @@ function paintTerrain() {
   g.lineWidth = fine ? 1.1 : 2;
   const cracks = Math.floor(MAP_W * MAP_H / 50);
   for (let n = 0; n < cracks; n++) {
-    let x = nrand() * W, y = nrand() * H;
+    let x = rand() * W, y = rand() * H;
     if (!dry(x, y)) continue;
-    let a = nrand() * Math.PI * 2;
+    let a = rand() * Math.PI * 2;
     g.beginPath(); g.moveTo(x, y);
     for (let s = 0; s < 6; s++) {
-      a += (nrand() - 0.5) * 1.2;
-      x += Math.cos(a) * (6 + nrand() * 10);
-      y += Math.sin(a) * (6 + nrand() * 10);
+      a += (rand() - 0.5) * 1.2;
+      x += Math.cos(a) * (6 + rand() * 10);
+      y += Math.sin(a) * (6 + rand() * 10);
       g.lineTo(x, y);
     }
     g.stroke();
   }
 
+  if (!(await pace())) return;
   // pixel-scale clutter, the detail that makes old maps feel busy: pebbles with
   // a lit top and a dark underside, and tufts of dry scrub (texture pixels)
   g.setTransform(1, 0, 0, 1, 0, 0);
   const pebbles = MAP_W * MAP_H * 2;
   for (let n = 0; n < pebbles; n++) {
-    const x = Math.floor(nrand() * TW), y = Math.floor(nrand() * TH);
+    const x = Math.floor(rand() * TW), y = Math.floor(rand() * TH);
     if (!dry(x * P, y * P)) continue;
-    const sz = nrand() < 0.3 ? 2 : 1;
-    const lit = nrand() < 0.5 ? '#d2b892' : '#a98a6a';
+    const sz = rand() < 0.3 ? 2 : 1;
+    const lit = rand() < 0.5 ? '#d2b892' : '#a98a6a';
     if (fine) {
       const r = sz === 2 ? 1.7 : 1.05;
       g.fillStyle = 'rgba(48,24,12,0.45)';
@@ -293,30 +344,31 @@ function paintTerrain() {
   }
   const tufts = Math.floor(MAP_W * MAP_H * 0.8);
   for (let n = 0; n < tufts; n++) {
-    const x = Math.floor(nrand() * TW), y = Math.floor(nrand() * TH);
+    const x = Math.floor(rand() * TW), y = Math.floor(rand() * TH);
     if (!dry(x * P, y * P)) continue;
-    const hue = nrand();
-    const blades = 2 + Math.floor(nrand() * 3);
+    const hue = rand();
+    const blades = 2 + Math.floor(rand() * 3);
     // refined: twice the blades at half the width, so a tuft is finer, not bigger
     const u = fine ? 2 : 1, n = blades * (fine ? 2 : 1), bw = fine ? 0.8 : 1;
     g.fillStyle = 'rgba(40,22,10,0.45)';
     g.fillRect(x - u, y, (blades + 2) * u, fine ? 0.8 : 1);
     for (let k = 0; k < n; k++) {
-      const h = (1 + Math.floor(nrand() * 3)) * u * (fine ? 0.8 : 1);
+      const h = (1 + Math.floor(rand() * 3)) * u * (fine ? 0.8 : 1);
       g.fillStyle = hue < 0.6 ? '#76762f' : hue < 0.85 ? '#a08e3a' : '#5e5026';
       g.fillRect(x + k * (fine ? 1 : 1), y - h, bw, h);
       g.fillStyle = '#e4d58e';
-      if (nrand() < 0.5) g.fillRect(x + k, y - h, bw, fine ? 0.8 : 1);
+      if (rand() < 0.5) g.fillRect(x + k, y - h, bw, fine ? 0.8 : 1);
     }
   }
 
   g.setTransform(1 / P, 0, 0, 1 / P, 0, 0);
 
+  if (!(await pace())) return;
   // drifting cloud shadows: huge soft dark patches give the plain a sense of
   // scale and break up the even lighting
   const clouds = Math.max(3, Math.floor(W * H / (520 * 520)));
   for (let n = 0; n < clouds; n++) {
-    const cx = nrand() * W, cy = nrand() * H, r = 160 + nrand() * 220;
+    const cx = rand() * W, cy = rand() * H, r = 160 + rand() * 220;
     const grd = g.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
     grd.addColorStop(0, 'rgba(36,16,10,0.2)');
     grd.addColorStop(1, 'rgba(36,16,10,0)');
@@ -339,16 +391,17 @@ function paintTerrain() {
   // scattered alien flora on open ground (purely decorative)
   const props = Math.floor(MAP_W * MAP_H / 60);
   for (let n = 0; n < props; n++) {
-    const tx = 1 + Math.floor(nrand() * (MAP_W - 2));
-    const ty = 1 + Math.floor(nrand() * (MAP_H - 2));
+    const tx = 1 + Math.floor(rand() * (MAP_W - 2));
+    const ty = 1 + Math.floor(rand() * (MAP_H - 2));
     const i = idx(tx, ty);
     if (terrain[i] !== 0 || crystal[i] > 0) continue;
-    const file = FLORA_SPRITES[Math.floor(nrand() * FLORA_SPRITES.length)];
+    const file = FLORA_SPRITES[Math.floor(rand() * FLORA_SPRITES.length)];
     const tall = file === 'env_17' || file === 'env_19';
-    stamp(file, tx * TILE + TILE / 2 + (nrand() - 0.5) * 14, ty * TILE + TILE / 2 + (nrand() - 0.5) * 14,
-      tall ? 30 + nrand() * 16 : 18 + nrand() * 10);
+    stamp(file, tx * TILE + TILE / 2 + (rand() - 0.5) * 14, ty * TILE + TILE / 2 + (rand() - 0.5) * 14,
+      tall ? 30 + rand() * 16 : 18 + rand() * 10);
   }
 
+  if (!(await pace())) return;
   // ---- impassable features: boulder masses and alien forest ----
   // every boulder and tree is queued first, then all cast shadows are drawn,
   // then the bodies back-to-front, so overlapping pieces stack like a mountain
@@ -372,16 +425,16 @@ function paintTerrain() {
         let inner = 0;
         for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++)
           if (terrain[idx(Math.min(MAP_W - 1, Math.max(0, tx + dx)), Math.min(MAP_H - 1, Math.max(0, ty + dy)))] === 1) inner++;
-        const big = 10 + inner * 1.4 + nrand() * 6;
-        pieces.push({ x: cx + (nrand() - 0.5) * 22, y: cy + (nrand() - 0.5) * 18, r: big, pal, tree: false, seed: nrand() });
-        const extra = Math.floor(nrand() * 3);
+        const big = 10 + inner * 1.4 + rand() * 6;
+        pieces.push({ x: cx + (rand() - 0.5) * 22, y: cy + (rand() - 0.5) * 18, r: big, pal, tree: false, seed: rand() });
+        const extra = Math.floor(rand() * 3);
         for (let k = 0; k < extra; k++)
-          pieces.push({ x: cx + (nrand() - 0.5) * 34, y: cy + (nrand() - 0.5) * 28, r: 5 + nrand() * 6, pal, tree: false, seed: nrand() });
+          pieces.push({ x: cx + (rand() - 0.5) * 34, y: cy + (rand() - 0.5) * 28, r: 5 + rand() * 6, pal, tree: false, seed: rand() });
       } else {
         const pal = noise(tx / 7 + 9, ty / 7 + 30) > 0.62 ? TREE_PURPLE : TREE_TEAL;
-        const trees = 2 + (nrand() < 0.4 ? 1 : 0);
+        const trees = 2 + (rand() < 0.4 ? 1 : 0);
         for (let k = 0; k < trees; k++)
-          pieces.push({ x: cx + (nrand() - 0.5) * 28, y: cy + (nrand() - 0.5) * 24, r: 9 + nrand() * 9, pal, tree: true, seed: nrand() });
+          pieces.push({ x: cx + (rand() - 0.5) * 28, y: cy + (rand() - 0.5) * 24, r: 9 + rand() * 9, pal, tree: true, seed: rand() });
       }
     }
   pieces.sort((a, b) => a.y - b.y);
@@ -395,7 +448,7 @@ function paintTerrain() {
   for (const p of pieces) p.tree ? drawTree(g, p.x, p.y, p.r, p.pal, p.seed) : drawBoulder(g, p.x, p.y, p.r, p.pal, p.seed);
 
   g.setTransform(1, 0, 0, 1, 0, 0);
-  terrainTex = tex;
+  if (gen === paintGen) terrainTex = tex;
 }
 
 // a rounded boulder: dark outline, shadowed lower-right, lit upper-left lobe,
@@ -837,7 +890,7 @@ export function setRefinedStyle(v: boolean) {
   refinedStyle = v;
   sprites.clear();
   crystalCache.clear();
-  if (terrainTex) paintTerrain();
+  if (terrainTex) void paintTerrain();     // the old ground stays up until the new one is ready
   warmIcons();
   for (const fn of styleListeners) fn();
 }
@@ -1375,7 +1428,7 @@ function updateFogTexture() {
 
 // ---------------- init ----------------
 
-export function initRenderer() {
+export async function initRenderer(): Promise<void> {
   // the deck appears as the briefing hides, resizing the map canvas; take its
   // size now so the late resize notification doesn't shift the camera the game
   // is about to centre on the base
@@ -1383,7 +1436,8 @@ export function initRenderer() {
   lastViewW = canvas.clientWidth; lastViewH = canvas.clientHeight;
   sprites.clear();
   terrainSeed = -1;
-  paintTerrain();
+  terrainTex = null;   // no stale ground from a previous game
+  await paintTerrain();
   [fogCanvas, fogCtx] = makeCanvas(MAP_W, MAP_H);
   fogImg = fogCtx.createImageData(MAP_W, MAP_H);
 }

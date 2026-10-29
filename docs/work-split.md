@@ -12,6 +12,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `reskin-world-3`):** `src/ui.ts` now re-bakes its icon cache when the render style flips (via `onStyleChange` from `render.ts`), and the selection portrait passes the selected thing's owner and level to `artIconUrl` / `unitIconUrl`. Keep those calls when reworking the build bar or the selection panel.
 
+**Small cross-file change (Claude, `perf-load`):** `initRenderer()` in `render.ts` is now async (it paints the ground in slices so the page stays live), so `startGame` in `src/main.ts` awaits it. Keep the `await` when touching the deploy flow.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---
