@@ -1517,6 +1517,60 @@ const JUGGERNAUT: SoldierSpec = {
   glow: (g, a, bob) => { const [x, y] = at(2.6, 0, a); g.fillStyle = 'rgba(255,176,46,0.9)'; g.fillRect(x - 1.2, y - 6.8 - bob - 12.6, 2.4, 0.8); },
 };
 
+// ---------------- aircraft (refined style) ----------------
+// Drawn at their own ground point; the renderer lifts them to flying height.
+
+function drawSkyhawk(g: Ctx, a: number, team: string) {
+  // tail stabilisers and fin first (furthest back)
+  box(g, a, -13.5, -4.2, -10.5, 4.2, 2.6, 3.4, '#7e8290', '#5d6170');
+  const fuselage: Pt[] = [[-11, -2.6], [6, -3], [12, -1.3], [14, 0], [12, 1.3], [6, 3], [-11, 2.6], [-13.5, 0]];
+  // stub wings with rocket pods underneath
+  box(g, a, -3, -9.5, 3.5, 9.5, 1.4, 2.6, '#7e8290', '#5d6170');
+  for (const y of [-6, 6]) box(g, a, -1.5, y - 0.9, 4.5, y + 0.9, 0.4, 1.4, '#4a4d56', '#2c2e35');
+  for (const y of [-8.2, 8.2]) deckPlate(g, a, 2.6, -2.5, y - 0.6, 3, y + 0.6, team);
+  prism(g, rot(fuselage, a), 0, 4, '#9a9eaa', '#5d6170');
+  box(g, a, 12, -0.5, 16, 0.5, 0.4, 1.4, '#3a3c44', '#2a2c32');                              // chin gun
+  deckPlate(g, a, 4, 5, -1.7, 10.5, 1.7, GLASS_DK, true);                                    // canopy
+  deckPlate(g, a, 4, 6, -1, 9.6, -0.2, GLASS);
+  deckPlate(g, a, 4, -9.5, -1.8, -5.5, 1.8, team);                                           // spine marking
+  box(g, a, -13, -0.6, -10, 0.6, 4, 7.5, '#848894', '#5d6170');                              // fin
+  // ducted lift fans at the wingtips, glowing through the grilles
+  for (const y of [-10.5, 10.5]) {
+    const [fx, fy] = at(0, y, a);
+    cylinder(g, fx, fy, 3.6, 0.5, 3.4, '#24384a', '#5d6170');
+    g.save(); g.globalCompositeOperation = 'lighter'; glow(g, fx, fy - 3.4, 4.2, 'rgba(110,210,255,0.85)'); g.restore();
+    g.strokeStyle = 'rgba(200,230,255,0.5)'; g.lineWidth = 0.4;
+    g.beginPath(); g.moveTo(fx - 3, fy - 3.4); g.lineTo(fx + 3, fy - 3.4); g.moveTo(fx, fy - 6.4); g.lineTo(fx, fy - 0.4); g.stroke();
+  }
+  const [ex, ey] = at(-13.8, 0, a);
+  g.save(); g.globalCompositeOperation = 'lighter'; glow(g, ex, ey - 2, 4, 'rgba(110,210,255,0.6)'); g.restore();
+}
+
+function drawRavager(g: Ctx, a: number, team: string) {
+  const wing: Pt[] = [[-9, -17], [3, -5.5], [14, -1.6], [15.5, 0], [14, 1.6], [3, 5.5], [-9, 17], [-12, 15], [-8.5, 6.5], [-12.5, 3], [-12.5, -3], [-8.5, -6.5], [-12, -15]];
+  prism(g, rot(wing, a), 0, 2.6, '#5e636e', '#3a3d46');
+  for (const y of [-14, 14]) deckPlate(g, a, 2.6, -9.5, y - 1, -6, y + 1, team);
+  // panel lines across the wing
+  g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.5;
+  g.beginPath();
+  for (const y of [-10, -6, 6, 10]) { const p0 = at(-9, y, a), p1 = at(3 - Math.abs(y) * 0.2, y, a); g.moveTo(p0[0], p0[1] - 2.6); g.lineTo(p1[0], p1[1] - 2.6); }
+  g.stroke();
+  // twin engines with glowing exhausts
+  for (const y of [-5.2, 5.2]) {
+    box(g, a, -11, y - 1.7, -3, y + 1.7, 2.6, 4.8, '#6a6d78', '#3a3c44');
+    const [ex, ey] = at(-11.6, y, a);
+    g.save(); g.globalCompositeOperation = 'lighter'; glow(g, ex, ey - 3.7, 4, 'rgba(255,150,70,0.65)'); g.restore();
+  }
+  // raised spine with the cockpit and bomb-bay doors
+  const spine: Pt[] = [[-10, -3], [8, -2.6], [11.5, 0], [8, 2.6], [-10, 3]];
+  prism(g, rot(spine, a), 2.6, 5.4, '#757a86', '#4d5260');
+  deckPlate(g, a, 5.4, 6, -1.5, 9.8, 1.5, GLASS_DK, true);
+  deckPlate(g, a, 5.4, 6.8, -0.9, 9.2, -0.2, GLASS);
+  deckPlate(g, a, 5.4, -4, -1.8, 3, 1.8, '#3a3c44', true);
+  deckPlate(g, a, 5.4, -4, -0.15, 3, 0.15, '#14110e');
+  deckPlate(g, a, 5.4, -9.5, -1.8, -6.5, 1.8, team);
+}
+
 const soldierArt = (sp: SoldierSpec, reach: number, height: number): VehicleArt => ({
   hull: (g, a, team, phase = 0) => drawSoldier(g, a, team, phase, sp), reach, height, frames: 4, turn: 10,
 });
@@ -1546,6 +1600,8 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   sniper:     soldierArt(SNIPER, 14, 20),
   pyro:       soldierArt(PYRO, 10, 20),
   juggernaut: soldierArt(JUGGERNAUT, 13, 24),
+  gunship:    { hull: drawSkyhawk, reach: 18, height: 10, turn: 5 },
+  bomber:     { hull: drawRavager, reach: 19, height: 8, turn: 3 },
 };
 
 // ---------------- defences ----------------

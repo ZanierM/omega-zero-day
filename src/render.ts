@@ -659,7 +659,7 @@ function turnToward(cur: number, want: number, maxStep: number): number {
   return cur + Math.max(-maxStep, Math.min(maxStep, d));
 }
 const headingIndex = (a: number, n: number) => ((Math.round(a / (Math.PI * 2 / n)) % n) + n) % n;
-function drawVehicle(u: Unit, moving: boolean) {
+function drawVehicle(u: Unit, moving: boolean, lift = 0) {
   const va = VEHICLE_ART[u.def.id]!, n = vehAngles(u.def.id);
   const v = vehViz.get(u.id) ?? { hull: u.facing, tur: u.facing };
   vehViz.set(u.id, v);
@@ -674,7 +674,7 @@ function drawVehicle(u: Unit, moving: boolean) {
   const bob = va.frames ? 0 : Math.sin(T * 2.4 + u.id) * 0.8;
   for (const part of va.turret ? ['hull', 'turret'] as const : ['hull'] as const) {
     const s = vehiclePart(u.def.id, u.owner, part, headingIndex(part === 'hull' ? v.hull : v.tur, n), part === 'hull' ? frame : 0);
-    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob, s.ww, s.wh);
+    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob - lift, s.ww, s.wh);
   }
 }
 
@@ -1854,12 +1854,17 @@ export function render() {
     // ground shadow, offset from the airframe so the altitude reads
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(u.x + 8, u.y + 10, u.def.radius * 0.9, u.def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save();
-    ctx.translate(u.x, u.y - AIR_ALT + bob);
-    ctx.rotate(u.facing);
-    const ak = kOf(s);
-    ctx.drawImage(s, -s.width / ak / 2, -s.height / ak / 2, s.width / ak, s.height / ak);
-    ctx.restore();
+    if (refinedStyle && VEHICLE_ART[u.def.id]) {
+      // baked per heading so the sun stays put as it turns; lifted to altitude
+      drawVehicle(u, false, AIR_ALT - bob);
+    } else {
+      ctx.save();
+      ctx.translate(u.x, u.y - AIR_ALT + bob);
+      ctx.rotate(u.facing);
+      const ak = kOf(s);
+      ctx.drawImage(s, -s.width / ak / 2, -s.height / ak / 2, s.width / ak, s.height / ak);
+      ctx.restore();
+    }
     const sel = selection.has(u.id);
     if (sel || u.hp < u.maxHp) {
       const w2 = u.def.radius * 2.2;
