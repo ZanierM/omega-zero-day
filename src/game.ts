@@ -125,7 +125,35 @@ export const corridor = { owner: -1, held: 0 };
 export function ventsNeeded() { return Math.floor(neutrals.filter(n => n.kind === 'vent').length / 2) + 1; }
 export function ventsHeld(owner: number) { return neutrals.filter(n => n.kind === 'vent' && n.owner === owner).length; }
 /** How the match ended, for the game-over screen. */
-export let endReason: 'conquest' | 'corridor' | 'nova' | 'eliminated' | null = null;
+export let endReason: 'conquest' | 'corridor' | 'nova' | 'eliminated' | 'mission' | null = null;
+
+// ---------- campaign hooks ----------
+// A running campaign mission plugs in here; skirmish leaves it untouched.
+export const mission = {
+  active: false,
+  tick: null as null | ((dt: number) => void),
+  checkEnd: null as null | (() => 'win' | 'lose' | null),
+  corridor: true,                       // launch-corridor victory in play
+  allowed: null as Set<string> | null,  // player tech allowed (null = everything)
+};
+export function resetMission() {
+  mission.active = false; mission.tick = null; mission.checkEnd = null; mission.corridor = true; mission.allowed = null;
+}
+export const techAllowed = (owner: number, id: string) => owner !== PLAYER || !mission.allowed || mission.allowed.has(id);
+
+export type GameEvent =
+  | { type: 'destroyed'; e: Entity }
+  | { type: 'built'; b: Building }
+  | { type: 'delivered'; owner: number; amount: number }
+  | { type: 'captured'; n: Neutral; owner: number };
+export const gameEvents: ((ev: GameEvent) => void)[] = [];
+const emit = (ev: GameEvent) => { for (const fn of gameEvents) fn(ev); };
+
+/** Pad the player list so a faction slot (e.g. the Hollow, 4) exists. */
+export function ensureFaction(owner: number) {
+  while (players.length <= owner) players.push(freshPlayer());
+  numPlayers = Math.max(numPlayers, owner + 1);
+}
 export const neutrals: Neutral[] = [];
 
 export function initGame(numEnemies: number) {
@@ -384,6 +412,7 @@ export function placeBuilding(defId: string, owner: number, tx: number, ty: numb
   byId.set(b.id, b);
   for (let y = ty; y < ty + def.h; y++)
     for (let x = tx; x < tx + def.w; x++) occupied[idx(x, y)] = b.id;
+  emit({ type: 'built', b });
   if (def.grantsHarvester) {
     const spot = nearestTile(tx + def.w, ty + def.h, 8, (x, y) => inBounds(x, y) && terrain[idx(x, y)] === 0 && occupied[idx(x, y)] === -1);
     if (spot) spawnUnit('harvester', owner, centerOfTile(spot.x), centerOfTile(spot.y));
@@ -417,6 +446,7 @@ export function buildingUpgradeCost(b: Building) {
 
 function destroy(e: Entity) {
   byId.delete(e.id);
+  emit({ type: 'destroyed', e });
   const p = entityPos(e);
   booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
   if (e.owner === PLAYER || audible(p.x, p.y)) sfx('explosion');
@@ -468,6 +498,7 @@ function atBuildLimit(owner: number, tab: Tab, defId: string): boolean {
 }
 
 export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
+  if (!techAllowed(owner, defId)) return false;
   if (tab === 'ups') {
     const up = UPGRADES[defId];
     if (!hasBuilding(owner, 'lab')) return false;
@@ -488,6 +519,7 @@ export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
 
 // human-readable reason a def can't be produced right now (null = no blocker)
 export function requirementText(owner: number, tab: Tab, defId: string): string | null {
+  if (!techAllowed(owner, defId)) return 'Not cleared for this mission';
   if (tab === 'ups') {
     const up = UPGRADES[defId];
     if (!up) return null;
@@ -808,6 +840,7 @@ function updateHarvester(u: Unit, dt: number) {
     if (moveToward(u, dock.x, dock.y, dt) || Math.hypot(c.x - u.x, c.y - u.y) < TILE * 2.2) {
       p.credits += Math.round(u.cargo);
       telemetry.earned(u.owner, u.cargo);
+      emit({ type: 'delivered', owner: u.owner, amount: u.cargo });
       if (u.owner === PLAYER) { stats.flux += Math.round(u.cargo); sfx('cash'); }
       u.cargo = 0;
       u.path = null;
@@ -1108,6 +1141,7 @@ function step(dt: number) {
         if (n.prog >= CAPTURE_TIME) {
           const was = n.owner;
           n.owner = o; n.prog = 0; n.progOwner = -1;
+          emit({ type: 'captured', n, owner: o });
           const label = n.kind === 'vent' ? 'Flux vent' : 'Watchtower';
           if (o === PLAYER) { toast(`${label} captured`); sfx('ready'); }
           else if (was === PLAYER) { toast(`${label} lost`); sfx('error'); }
@@ -1123,7 +1157,8 @@ function step(dt: number) {
     }
   }
 
-  updateCorridor(dt);
+  if (mission.corridor) updateCorridor(dt);
+  mission.tick?.(dt);
 
   // fog of war (player perspective), cheap enough to refresh a few times a second
   fogTimer -= dt;
@@ -1169,7 +1204,10 @@ function step(dt: number) {
   // win / lose: walls don't keep a faction "alive"
   const alive = (owner: number) => buildings.some(b => b.owner === owner && !b.def.isWall);
   if (!alive(PLAYER)) { gameOver = 'lose'; endReason = 'eliminated'; }
-  else if (corridor.owner >= 0 && corridor.held >= CORRIDOR_HOLD) {
+  else if (mission.checkEnd) {
+    const r = mission.checkEnd();
+    if (r) { gameOver = r; endReason = 'mission'; }
+  } else if (corridor.owner >= 0 && corridor.held >= CORRIDOR_HOLD) {
     gameOver = corridor.owner === PLAYER ? 'win' : 'lose'; endReason = 'corridor';
   } else {
     let anyEnemy = false;

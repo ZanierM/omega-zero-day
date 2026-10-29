@@ -267,5 +267,5 @@ export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
 
 export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes
-export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8'];
-export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate'];
+export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2'];   // 4 = the Hollow (campaign)
+export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow'];

@@ -18,6 +18,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `ai-objectives`):** `src/ui.ts` game-over text now covers a launch-corridor win or loss (`endReason`, `corridor` from `game.ts`), and the briefing objectives in `index.html` gained a line for the corridor victory. The corridor tracker and objective status pills are drawn on the canvas in `render.ts`. **Overlap to settle:** `input.ts` (PR #13) and `render.ts` (PR #15) both draw an order marker now; keep one.
 
+**Campaign Act I (Claude, `campaign-act1`):** new `src/campaign/` (runner + mission data). Cross-file changes: `index.html` has a Skirmish / Campaign mode switch, the mission list and transmission in the briefing (`.skirmish-only` hides the skirmish copy), a `#comms` box and an `#objtracker`, and an `#againbtn` id on the end-screen button. `src/ui.ts` drives the comms box, tracker and mission end text, and filters the build bar through `techAllowed`. `src/main.ts` has `startMission()` and the mode switch. `src/save.ts` saves the mission run state. `src/config.ts` gained a fifth team colour and faction name (the Hollow). Keep these when reworking the briefing or the deck.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

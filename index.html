@@ -477,6 +477,36 @@
       #countdown.warn, #idlebtn.show, #enemysw.imminent { animation: none; }
       #powerfill, #toast, .bbtn, .opt { transition: none; }
     }
+    /* ---- campaign: mode switch, mission list, comms box, objective tracker ---- */
+    #modeopts { margin: 4px 0 14px; }
+    #campaignpanel { display: none; }
+    #briefbox.campaign #campaignpanel { display: block; }
+    #briefbox.campaign .skirmish-only { display: none; }
+    #missionlist { display: flex; gap: 6px; margin-bottom: 12px; }
+    #missionlist .opt { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    #missionlist .opt i { font-style: normal; font-family: var(--head); font-size: 11px; color: var(--gold); letter-spacing: .08em; }
+    #missionlist .opt span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 600; }
+    #missionlist .opt:disabled { opacity: .45; cursor: not-allowed; }
+    #missionbrief p { font-size: 14px; }
+    #comms { position: fixed; z-index: 7; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: min(520px, calc(100vw - 24px));
+      display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px 10px 10px; background: var(--brief-glass); border: 1px solid var(--edge-hi); border-radius: 6px;
+      box-shadow: 0 0 0 3px var(--plate-dk), 0 0 0 4px var(--edge), 0 10px 24px var(--frame-shadow); pointer-events: auto; cursor: pointer; }
+    #comms[hidden] { display: none; }
+    #commsbadge { flex: none; width: 40px; height: 40px; border-radius: 4px; display: grid; place-items: center; font-family: var(--head); font-weight: 900; font-size: 17px; color: var(--ink); }
+    #commswho { font-family: var(--head); font-size: var(--type-xs); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    #commswho small { color: var(--muted); font-weight: 600; letter-spacing: .04em; margin-left: 6px; text-transform: none; }
+    #commstext { font-size: var(--type-sm); line-height: 1.45; color: var(--cream); margin-top: 2px; }
+    #comms.seren #commstext { font-style: italic; letter-spacing: .04em; color: #d8f6f8; text-shadow: 0 0 6px rgba(191,238,242,.6); }
+    #objtracker { position: absolute; z-index: 5; left: calc(8px + env(safe-area-inset-left)); top: calc(56px + env(safe-area-inset-top)); max-width: min(340px, calc(100vw - 80px));
+      padding: 8px 12px 9px; background: var(--brief-glass); border: 1px solid var(--edge); border-radius: 6px; pointer-events: none; }
+    #objtracker[hidden] { display: none; }
+    #objtitle { font-family: var(--head); font-size: 10.5px; font-weight: 800; letter-spacing: .1em; color: var(--gold); text-transform: uppercase; margin-bottom: 4px; }
+    #objlist { list-style: none; }
+    #objlist li { font-size: 12.5px; line-height: 1.5; color: var(--cream); }
+    #objlist li::before { content: "◇ "; color: var(--gold); }
+    #objlist li.done { color: var(--muted); text-decoration: line-through; }
+    #objlist li.done::before { content: "◆ "; color: var(--good); }
+    @media (max-height: 500px) { #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
   </style>
 </head>
 <body>
@@ -518,7 +548,7 @@
     </div>
     <div id="selectiondetails" role="region" aria-label="Selection details" hidden><button id="detailsclose" type="button" aria-label="Close details">✕</button><div id="detailscopy"></div></div>
   </div>
-  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlaytitle"><div id="overlaycard"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><div id="overlaystats"></div><button onclick="location.reload()">Play again</button></div></div>
+  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlaytitle"><div id="overlaycard"><h1 id="overlaytitle"></h1><div id="overlaysub"></div><div id="overlaystats"></div><button id="againbtn" onclick="location.reload()">Play again</button></div></div>
   <div id="pausemenu" role="dialog" aria-modal="true" aria-labelledby="pausetitle">
     <div id="pausebox">
       <h2 id="pausetitle">Paused</h2>
@@ -529,6 +559,8 @@
     </div>
   </div>
   <div id="toast"></div>
+  <div id="comms" aria-live="polite" hidden><div id="commsbadge"></div><div id="commsbody"><div id="commswho"></div><div id="commstext"></div></div></div>
+  <div id="objtracker" hidden><div id="objtitle"></div><ul id="objlist"></ul></div>
   <div id="buildtip" role="tooltip"></div>
   <div id="briefing" role="dialog" aria-modal="true" aria-labelledby="brieftitle">
     <div id="briefwrap">
@@ -540,16 +572,25 @@
         with it. The ark-fleet in orbit can carry what's left of humanity to Andromeda, but its jump
         drives are dry: they burn <b>flux crystal</b>, and the last fields lie on this scorched world
         beneath us.</p>
-      <p>Three rogue factions hold the ground, and they've decided the fleet leaves with <b>them</b> —
+      <p class="skirmish-only">Three rogue factions hold the ground, and they've decided the fleet leaves with <b>them</b> —
         not us. There is no second launch window. Take the crystal. Break their war machines.
         Destroy their buildings before they destroy yours.</p>
-      <ul class="objectives">
+      <div class="paramrow" id="modeopts" role="group" aria-label="Game mode">
+        <button class="opt sel" type="button" data-m="skirmish">Skirmish</button>
+        <button class="opt" type="button" data-m="campaign">Campaign · Act I</button>
+      </div>
+      <div id="campaignpanel">
+        <div class="optlabel">Act I — Landfall</div>
+        <div id="missionlist"></div>
+        <div id="missionbrief"></div>
+      </div>
+      <ul class="objectives skirmish-only">
         <li>Secure a flux extraction economy — the fleet's drives depend on it</li>
         <li>Fortify — hostile factions raid whoever is closest</li>
         <li>Eliminate every hostile building — walls alone cannot hold a faction</li>
         <li>Or hold most of the flux vents for 3 minutes to light the launch corridor — rivals can win this way too</li>
       </ul>
-      <div id="opponents">
+      <div id="opponents" class="skirmish-only">
         <div class="optlabel">Hostile factions</div>
         <div id="aiopts">
           <button class="opt sel" type="button" data-n="1">1<span>Kessler Collective</span></button>

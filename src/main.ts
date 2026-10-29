@@ -8,6 +8,7 @@ import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle,
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted } from './audio';
 import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
+import * as campaign from './campaign/runner';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
 
@@ -35,6 +36,7 @@ let difficulty: import('./ai').Difficulty = 'normal';
 interface SkirmishOpts { credits: number; crystalMul: number; nova: number }
 
 async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 5000, crystalMul: 1, nova: 0 }) {
+  campaign.endRun();
   generateMap(numEnemies, opts.crystalMul);
   initGame(numEnemies);
   game.setSupernova(opts.nova);
@@ -63,6 +65,17 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
   started = true;
   game.setPaused(false);
   last = performance.now();
+}
+
+async function startMission(id: string) {
+  campaign.setupMission(id);   // map, bases and script; same seed every time
+  await loadSprites();
+  await initRenderer();
+  clearSave();
+  started = true;
+  game.setPaused(false);
+  last = performance.now();
+  campaign.bootComms();
 }
 
 async function resumeGame(save: NonNullable<ReturnType<typeof readSave>>) {
@@ -169,7 +182,8 @@ deployBtn.addEventListener('click', async () => {
   const opts = { credits: pick('creditopts', 5000), crystalMul: pick('crystalopts', 1), nova: pick('novaopts', 0) };
   try {
     initAudio(); // must start from a user gesture (browser autoplay rules)
-    await startGame(n, opts);
+    if (mode === 'campaign') await startMission(selectedMission);
+    else await startGame(n, opts);
     briefing.style.display = 'none';
     app.inert = false;
     document.getElementById('game')!.focus();
@@ -183,6 +197,47 @@ deployBtn.addEventListener('click', async () => {
     deployBtn.removeAttribute('aria-busy');
   }
 });
+
+// ---------- campaign / skirmish mode on the briefing ----------
+const modeKey = 'ozd-mode';
+let mode: 'skirmish' | 'campaign' = 'skirmish';
+let selectedMission = '';   // picked on first render: the next unfinished mission
+const briefBox = document.getElementById('briefbox')!;
+const missionList = document.getElementById('missionlist')!;
+const missionBrief = document.getElementById('missionbrief')!;
+function renderMissions() {
+  const done = campaign.progress().done;
+  const firstOpen = campaign.MISSIONS.find(m => campaign.unlocked(m.id) && !done.includes(m.id)) ?? campaign.MISSIONS[0];
+  if (!selectedMission || !campaign.unlocked(selectedMission)) selectedMission = firstOpen.id;
+  missionList.innerHTML = campaign.MISSIONS.map(m => {
+    const open = campaign.unlocked(m.id), fin = done.includes(m.id);
+    return `<button class="opt mission${m.id === selectedMission ? ' sel' : ''}" type="button" data-id="${m.id}"${open ? '' : ' disabled'}>`
+      + `<i>${fin ? '✓' : open ? m.code : '🔒'}</i>${m.title}<span>${open ? m.tagline : 'Complete the previous mission'}</span></button>`;
+  }).join('');
+  const m = campaign.MISSIONS.find(x => x.id === selectedMission)!;
+  missionBrief.innerHTML = `<div class="optlabel">Transmission · ${m.code} ${m.title}</div>`
+    + m.briefing.map(p => `<p>${p}</p>`).join('')
+    + `<ul class="objectives">${m.goals.map(g => `<li>${g}</li>`).join('')}</ul>`;
+}
+function setMode(m: typeof mode) {
+  mode = m;
+  briefBox.classList.toggle('campaign', m === 'campaign');
+  document.querySelectorAll('#modeopts .opt').forEach(b => b.classList.toggle('sel', (b as HTMLElement).dataset.m === m));
+  deployBtn.textContent = m === 'campaign' ? 'Begin mission ▸' : 'Commence operation ▸';
+  if (m === 'campaign') renderMissions();
+  try { localStorage.setItem(modeKey, m); } catch { /* storage may be unavailable */ }
+}
+document.getElementById('modeopts')!.addEventListener('click', e => {
+  const b = e.target instanceof Element ? e.target.closest<HTMLElement>('.opt') : null;
+  if (b?.dataset.m) setMode(b.dataset.m as typeof mode);
+});
+missionList.addEventListener('click', e => {
+  const b = e.target instanceof Element ? e.target.closest<HTMLButtonElement>('.mission') : null;
+  if (!b || b.disabled) return;
+  selectedMission = b.dataset.id!;
+  renderMissions();
+});
+try { if (localStorage.getItem(modeKey) === 'campaign') setMode('campaign'); } catch { /* storage may be unavailable */ }
 
 const resumeSaveBtn = document.getElementById('resumesave') as HTMLButtonElement;
 const pendingSave = readSave();
