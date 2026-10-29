@@ -479,7 +479,8 @@
     #campaignpanel { display: none; }
     #briefbox.campaign #campaignpanel { display: block; }
     #briefbox.campaign .skirmish-only { display: none; }
-    #missionlist { display: flex; gap: 6px; margin-bottom: 12px; }
+    #missionlist { margin-bottom: 12px; }
+    #missionlist .actrow { display: flex; gap: 6px; margin-bottom: 8px; }
     #missionlist .opt { display: flex; flex-direction: column; align-items: center; gap: 2px; }
     #missionlist .opt i { font-style: normal; font-family: var(--head); font-size: 11px; color: var(--gold); letter-spacing: .08em; }
     #missionlist .opt span { display: block; font-size: 10.5px; color: var(--muted); font-weight: 600; }
@@ -499,6 +500,11 @@
     #commswho { font-family: var(--head); font-size: var(--type-xs); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     #commswho small { color: var(--muted); font-weight: 600; letter-spacing: .04em; margin-left: 6px; text-transform: none; }
     #commstext { font-size: var(--type-sm); line-height: 1.45; color: var(--cream); margin-top: 2px; }
+    .commschoice { display: flex; gap: 8px; margin-top: 8px; }
+    .commschoice button { min-height: 36px; padding: 6px 14px; font-family: var(--head); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+      color: var(--cream); background: var(--plates-dk); border: 1px solid var(--edge-hi); border-radius: 4px; }
+    .commschoice button:first-child { color: var(--ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold) 48%, var(--edge-hi)); }
+    @media (pointer: coarse) { .commschoice button { min-height: 44px; } }
     #comms.seren #commstext { font-style: italic; letter-spacing: .04em; color: #d8f6f8; text-shadow: 0 0 6px rgba(191,238,242,.6); }
     #objtracker { position: absolute; z-index: 5; left: calc(8px + env(safe-area-inset-left)); top: calc(56px + env(safe-area-inset-top)); max-width: min(340px, calc(100vw - 80px));
       padding: 8px 12px 9px; background: var(--brief-glass); border: 1px solid var(--edge); border-radius: 6px; pointer-events: none; }
@@ -512,7 +518,7 @@
     @media (orientation: portrait), (max-width: 760px) { #comms { top: auto; right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: calc(100vw - 24px); } }
     @media (max-height: 500px) { #commsbadge { width: 44px; height: 44px; } #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
   </style>
-  <script type="module" crossorigin src="./assets/index-DWjnHxhw.js"></script>
+  <script type="module" crossorigin src="./assets/index-WaCXY31l.js"></script>
 </head>
 <body>
   <div id="app" inert>
@@ -580,10 +586,9 @@
         Destroy their buildings before they destroy yours.</p>
       <div class="paramrow" id="modeopts" role="group" aria-label="Game mode">
         <button class="opt sel" type="button" data-m="skirmish">Skirmish</button>
-        <button class="opt" type="button" data-m="campaign">Campaign · Act I</button>
+        <button class="opt" type="button" data-m="campaign">Campaign</button>
       </div>
       <div id="campaignpanel">
-        <div class="optlabel">Act I — Landfall</div>
         <div id="missionlist"></div>
         <div id="missionbrief"></div>
       </div>
