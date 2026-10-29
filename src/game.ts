@@ -488,6 +488,14 @@ function distToFootprint(u: Unit, b: Building) {
   return Math.hypot(dx, dy);
 }
 
+/** Take a unit off the map without a fight (the Hollow going back underground). */
+export function burrowUnit(u: Unit) {
+  if (!byId.has(u.id)) return;
+  byId.delete(u.id);
+  units.splice(units.indexOf(u), 1);
+  booms.push({ x: u.x, y: u.y, r: 2, ttl: 0.4, max: u.def.radius * 1.4 });   // a puff of crust where it went down
+}
+
 export function damage(target: Entity, amount: number, attacker?: Unit) {
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
   target.hp -= amount;

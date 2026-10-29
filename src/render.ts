@@ -106,11 +106,9 @@ export function loadSprites(): Promise<void> {
 // ---------------- terrain texture ----------------
 
 let terrainTex: HTMLCanvasElement | null = null;
-// classic: the terrain texture is painted at half resolution and blown up
-// without smoothing, so the ground reads as chunky 2×-pixel art like an old RTS
-// map. Refined: full resolution, smooth colour, finer clutter.
-let texScale = 2;
-// the decoration layout is seeded per game so a style toggle repaints the same map
+// the ground is painted at full resolution with smooth colour and fine clutter
+let texScale = 1;
+// the decoration layout is seeded per game so a saved match repaints the same map
 let terrainSeed = -1;
 
 // 2×2 ordered-dither offsets: quantized colour bands break into a checker
@@ -141,8 +139,8 @@ async function paintTerrain() {
     lastYield = performance.now();
     return gen === paintGen;
   };
-  const fine = refinedStyle;
-  const P = texScale = fine ? 1 : 2;
+  const fine = true;
+  const P = texScale = 1;
   const W = MAP_W * TILE, H = MAP_H * TILE;   // world size
   const TW = W / P, TH = H / P;               // texture size
   const [tex, g] = makeCanvas(TW, TH);
@@ -170,7 +168,7 @@ async function paintTerrain() {
     const bot = wet(ix, iy + 1) * (1 - ax) + wet(ix + 1, iy + 1) * ax;
     return top * (1 - ay) + bot * ay + (noise(x / 11 + 70, y / 11) - 0.5) * 0.3;
   };
-  const shoreWobble = fine ? 0 : 0.035;      // fine-grained edge jitter, classic only
+  const shoreWobble = 0;                      // smooth shorelines
   const waterAt = (x: number, y: number) =>
     waterBase(x, y) + (shoreWobble ? (noise(x / 5 + 9, y / 5) - 0.5) * shoreWobble : 0);
 
@@ -472,7 +470,7 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
     }
     g.closePath();
   };
-  g.lineWidth = refinedStyle ? 1.5 : 3; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
+  g.lineWidth = 1.5; g.strokeStyle = pal.out; g.fillStyle = pal.mid;
   path(); g.stroke(); g.fill();
   g.save(); path(); g.clip();
   g.fillStyle = pal.dk;
@@ -482,7 +480,7 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
   g.fillStyle = pal.hi;
   g.beginPath(); g.ellipse(cx - r * 0.38, by - r * 0.52, r * 0.26, r * 0.15, -0.3, 0, Math.PI * 2); g.fill();
   if (r > 10) {
-    g.strokeStyle = pal.out; g.lineWidth = refinedStyle ? 1 : 2; g.globalAlpha = 0.6;
+    g.strokeStyle = pal.out; g.lineWidth = 1; g.globalAlpha = 0.6;
     g.beginPath(); g.moveTo(cx + r * 0.1, by - r * 0.3); g.lineTo(cx + r * 0.25, by + r * 0.05); g.lineTo(cx + r * 0.15, by + r * 0.35); g.stroke();
     g.globalAlpha = 1;
   }
@@ -502,7 +500,7 @@ function drawTree(g: CanvasRenderingContext2D, cx: number, cy: number, s: number
   }
   puffs.push([cx, cy - s * 1.1, s * 0.55]);
   g.fillStyle = pal.out;
-  const rim = refinedStyle ? 0.8 : 1.5;
+  const rim = 0.8;
   for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r + rim, 0, Math.PI * 2); g.fill(); }
   g.fillStyle = pal.dk;
   for (const [x, y, r] of puffs) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
@@ -560,41 +558,6 @@ function silhouetteOf(c: HTMLCanvasElement): HTMLCanvasElement {
   return sil;
 }
 
-// weathered concrete foundation slab that buildings sit on
-function drawApron(g: CanvasRenderingContext2D, w: number, h: number) {
-  const grd = g.createLinearGradient(0, 0, w * 0.7, h);
-  grd.addColorStop(0, '#3e414c'); grd.addColorStop(0.5, '#33363f'); grd.addColorStop(1, '#25272f');
-  g.fillStyle = grd;
-  rr(g, 1, 1, w - 2, h - 2, 4);
-  g.fill();
-  // concrete speckle
-  for (let i = 0; i < w * h / 26; i++) {
-    g.fillStyle = nrand() < 0.6 ? `rgba(0,0,0,${0.06 + nrand() * 0.10})` : `rgba(255,255,255,${0.03 + nrand() * 0.05})`;
-    g.fillRect(2 + nrand() * (w - 4), 2 + nrand() * (h - 4), 1 + nrand() * 1.6, 1 + nrand() * 1.6);
-  }
-  // panel seams
-  g.strokeStyle = 'rgba(0,0,0,0.28)';
-  g.lineWidth = 1;
-  for (let x = 32; x < w - 4; x += 32) { g.beginPath(); g.moveTo(x, 3); g.lineTo(x, h - 3); g.stroke(); }
-  for (let y = 32; y < h - 4; y += 32) { g.beginPath(); g.moveTo(3, y); g.lineTo(w - 3, y); g.stroke(); }
-  // cracks
-  for (let n = 0; n < Math.max(1, w * h / 3000); n++) {
-    let x = nrand() * w, y = nrand() * h, a = nrand() * Math.PI * 2;
-    g.strokeStyle = 'rgba(0,0,0,0.30)';
-    g.beginPath(); g.moveTo(x, y);
-    for (let s2 = 0; s2 < 4; s2++) {
-      a += (nrand() - 0.5) * 1.3;
-      x += Math.cos(a) * (3 + nrand() * 6); y += Math.sin(a) * (3 + nrand() * 6);
-      g.lineTo(x, y);
-    }
-    g.stroke();
-  }
-  // lit top-left edge, shaded bottom-right edge
-  g.strokeStyle = 'rgba(255,255,255,0.14)';
-  g.beginPath(); g.moveTo(2, h - 3); g.lineTo(2, 2); g.lineTo(w - 3, 2); g.stroke();
-  g.strokeStyle = 'rgba(0,0,0,0.5)';
-  g.beginPath(); g.moveTo(w - 2, 2); g.lineTo(w - 2, h - 2); g.lineTo(2, h - 2); g.stroke();
-}
 
 function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   g.beginPath();
@@ -632,10 +595,10 @@ function bakeGrime(g: CanvasRenderingContext2D, w: number, h: number, n: number)
 // frame 0 = idle pose, frames 1/2 = walk cycle (falls back to idle art)
 // procedurally-drawn aircraft (faces east, rotated freely at draw time —
 // smooth rotation reads naturally for flight, unlike ground walkers)
-export function bakeAirSprite(defId: string, owner: number, refined = false): HTMLCanvasElement {
+export function bakeAirSprite(defId: string, owner: number): HTMLCanvasElement {
   const def = UNITS[defId];
   const team = TEAM_COLORS[owner];
-  const S = def.radius * 3, k = refined ? 3 : 1;
+  const S = def.radius * 3, k = 3;
   const [c, g] = makeCanvas(S * k, S * k);
   g.scale(k, k);
   g.translate(S / 2, S / 2);
@@ -678,12 +641,10 @@ export function bakeAirSprite(defId: string, owner: number, refined = false): HT
   g.fillStyle = team; g.globalAlpha = 0.85;
   g.fillRect(-L * 0.3, -1.6, L * 0.5, 3.2);
   g.globalAlpha = 1;
-  if (refined) {
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    gradeWarmCool(c, 0.7);
-    outline(c, 'rgba(16,10,8,0.6)', 2);
-    (c as Scaled).k = k;
-  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  gradeWarmCool(c, 0.7);
+  outline(c, 'rgba(16,10,8,0.6)', 2);
+  (c as Scaled).k = k;
   return c;
 }
 
@@ -809,23 +770,7 @@ function bakeUnitSprite(defId: string, owner: number, variant: number): HTMLCanv
     g.beginPath(); g.arc(def.radius, def.radius, def.radius, 0, Math.PI * 2); g.fill();
     return c;
   }
-  if (refinedStyle) return bakeUnitSpriteRefined(img, def, owner);
-  const scale = def.spriteH / img.height;
-  const dw = Math.ceil(img.width * scale), dh = Math.ceil(img.height * scale);
-  const [c, g] = makeCanvas(dw, dh);
-  g.imageSmoothingEnabled = true;
-  g.drawImage(img, 0, 0, dw, dh);
-  // team identity wash (subtle on the player's own units)
-  g.globalCompositeOperation = 'source-atop';
-  g.fillStyle = TEAM_COLORS[owner];
-  g.globalAlpha = owner === PLAYER ? 0.14 : 0.30;
-  g.fillRect(0, 0, dw, dh);
-  g.globalCompositeOperation = 'source-over';
-  g.globalAlpha = 1;
-  // match the structures: NW sunlight + a light contrast/saturation lift
-  bakeLighting(g, dw, dh, 0.55);
-  punch(g, c, 0.22);
-  return c;
+  return bakeUnitSpriteRefined(img, def, owner);
 }
 
 // irregular disturbed-ground patch: scorch, dust and tracks — no hard edges
@@ -849,23 +794,6 @@ function bakeGroundPatch(g: CanvasRenderingContext2D, w: number, h: number) {
   }
 }
 
-// cheap 2.5D: stack a darkened silhouette downwards, then the sprite on top —
-// reads as the structure having real height
-function extrude(g: CanvasRenderingContext2D, img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number, height: number) {
-  const [sc, sg] = makeCanvas(Math.ceil(dw), Math.ceil(dh));
-  sg.imageSmoothingEnabled = true;
-  sg.drawImage(img, 0, 0, dw, dh);
-  sg.globalCompositeOperation = 'source-atop';
-  sg.fillStyle = 'rgba(10,10,20,0.88)';
-  sg.fillRect(0, 0, dw, dh);
-  for (let k = height; k >= 1; k--) {
-    g.globalAlpha = 0.75;
-    g.drawImage(sc, dx, dy + k);
-  }
-  g.globalAlpha = 1;
-  g.imageSmoothingEnabled = true;
-  g.drawImage(img, dx, dy, dw, dh);
-}
 
 // self-overlay blend: boosts contrast and saturation (works in every browser,
 // unlike ctx.filter)
@@ -881,21 +809,6 @@ function punch(g: CanvasRenderingContext2D, c: HTMLCanvasElement, amount: number
 // k: the sprite is baked k× larger than world size (refined style) and drawn back down
 export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number; k?: number }
 
-// refined render style is the default; ?style=classic (or V in game) shows the
-// original chunky pixelated look for comparison
-export let refinedStyle = new URLSearchParams(location.search).get('style') !== 'classic';
-// listeners told when the render style flips (e.g. the UI's baked icons)
-const styleListeners: (() => void)[] = [];
-export function onStyleChange(fn: () => void) { styleListeners.push(fn); }
-export function setRefinedStyle(v: boolean) {
-  if (v === refinedStyle) return;
-  refinedStyle = v;
-  sprites.clear();
-  crystalCache.clear();
-  if (terrainTex) void paintTerrain();     // the old ground stays up until the new one is ready
-  warmIcons();
-  for (const fn of styleListeners) fn();
-}
 function drawBld(s: BldSprite, x: number, y: number) {
   const k = s.k ?? 1;
   ctx.drawImage(s, x - s.ox, y - s.oy, s.width / k, s.height / k);
@@ -928,105 +841,10 @@ function pixelate(c: HTMLCanvasElement) {
   g.imageSmoothingEnabled = true;
 }
 
-// riveted metal foundation pad with bevelled edges and a team hazard stripe
-function drawPad(g: CanvasRenderingContext2D, w: number, h: number, team: string) {
-  // trampled dirt ring around the pad
-  const dg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
-  dg.addColorStop(0, 'rgba(46,24,12,0.45)');
-  dg.addColorStop(1, 'rgba(46,24,12,0)');
-  g.fillStyle = dg;
-  g.fillRect(-14, -14, w + 28, h + 28);
-  const pg = g.createLinearGradient(0, 0, w * 0.6, h);
-  pg.addColorStop(0, '#6a6158'); pg.addColorStop(0.5, '#514a43'); pg.addColorStop(1, '#3a342f');
-  rr(g, 2, 2, w - 4, h - 4, 6);
-  g.fillStyle = pg; g.fill();
-  g.lineWidth = 3; g.strokeStyle = '#1a120c'; g.stroke();
-  g.lineWidth = 1;
-  g.strokeStyle = 'rgba(0,0,0,0.35)';
-  for (let x = 32; x < w - 4; x += 32) { g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - 4); g.stroke(); }
-  for (let y = 32; y < h - 4; y += 32) { g.beginPath(); g.moveTo(4, y); g.lineTo(w - 4, y); g.stroke(); }
-  g.strokeStyle = 'rgba(255,236,200,0.28)'; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(5, h - 6); g.lineTo(5, 5); g.lineTo(w - 6, 5); g.stroke();
-  g.strokeStyle = 'rgba(0,0,0,0.45)';
-  g.beginPath(); g.moveTo(w - 5, 6); g.lineTo(w - 5, h - 5); g.lineTo(6, h - 5); g.stroke();
-  for (const [rx, ry] of [[9, 9], [w - 9, 9], [9, h - 15], [w - 9, h - 15]]) {
-    g.fillStyle = '#1a120c'; g.beginPath(); g.arc(rx, ry, 2.4, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#b8a688'; g.beginPath(); g.arc(rx - 0.5, ry - 0.5, 1.4, 0, Math.PI * 2); g.fill();
-  }
-  // hazard stripe along the south lip, in team colour
-  g.save();
-  g.beginPath(); g.rect(6, h - 11, w - 12, 5); g.clip();
-  g.fillStyle = team; g.fillRect(6, h - 11, w - 12, 5);
-  g.fillStyle = 'rgba(16,10,6,0.8)';
-  for (let x = 0; x < w + 10; x += 8) { g.beginPath(); g.moveTo(x, h - 11); g.lineTo(x + 4, h - 11); g.lineTo(x, h - 6); g.lineTo(x - 4, h - 6); g.closePath(); g.fill(); }
-  g.restore();
-}
 
 function bakeBuildingSprite(defId: string, owner: number, level: number): BldSprite {
-  const def = BUILDINGS[defId];
-  const w = def.w * TILE, h = def.h * TILE;
-
-  // the structure on its own canvas, overflowing the plot upward; baseY is the
-  // canvas row that sits on the plot's south edge
-  const art = BUILDING_ART[defId];
-  if (art && refinedStyle) return bakeRefinedSprite(defId, owner, level);
-  const img = def.sprite ? images.get(`${def.sprite}_${level}`) : undefined;
-  let st: HTMLCanvasElement | null = null, baseY = 0;
-  if (art) {
-    // hand-drawn structure: colours are final, it only needs the outline
-    const head = Math.ceil(w * 0.75), m = 6;
-    const [c, cg] = makeCanvas(w + m * 2, h + head + m * 2);
-    cg.translate(m, m + head);
-    art(cg, w, h, level, TEAM_COLORS[owner]);
-    cg.setTransform(1, 0, 0, 1, 0, 0); // outline() reuses this context
-    st = c; baseY = m + head + h;
-  } else if (img && !def.isWall) {
-    // isometric pack sprite: team wash, NW light, contrast lift (the pad's
-    // hazard stripe carries most of the team colour)
-    const scale = Math.min((w * 1.3) / img.width, (h * 2.6) / img.height, 1);
-    const dw = Math.ceil(img.width * scale), dh = Math.ceil(img.height * scale);
-    const [c, sg] = makeCanvas(dw + 6, dh + 6);
-    sg.imageSmoothingEnabled = true;
-    sg.drawImage(img, 3, 3, dw, dh);
-    sg.globalCompositeOperation = 'source-atop';
-    sg.fillStyle = TEAM_COLORS[owner];
-    sg.globalAlpha = owner === PLAYER ? 0.08 : 0.14;
-    sg.fillRect(0, 0, c.width, c.height);
-    sg.globalAlpha = 1;
-    sg.globalCompositeOperation = 'source-over';
-    bakeLighting(sg, c.width, c.height, 0.5);
-    punch(sg, c, 0.2);
-    st = c; baseY = c.height - 3;
-  }
-  if (st) {
-    outline(st, '#1a120c', 2);
-
-    // long low-sun shadow thrown to the south-east
-    const reachX = Math.ceil(baseY * 0.42), reachY = Math.ceil(baseY * 0.16);
-    const cw = Math.max(w, st.width) + 16 + reachX * 2;
-    const ch = h + Math.max(0, baseY - h) + 16 + reachY;
-    const [c, g] = makeCanvas(cw, ch);
-    const ox = (cw - w) / 2;            // footprint offset inside the canvas
-    const oy = ch - h - 6 - reachY;
-    g.save(); g.translate(ox, oy);
-    if (!def.isWall) drawPad(g, w, h, TEAM_COLORS[owner]);
-    g.restore();
-    const bx = cw / 2, by = oy + h - (art ? 0 : 2);
-    g.save();
-    g.translate(bx, by);
-    g.transform(1, 0, -0.42, -0.16, 0, 0);
-    g.globalAlpha = 0.34;
-    g.drawImage(silhouetteOf(st), -st.width / 2, -baseY);
-    g.restore();
-    // contact shadow hugging the base
-    g.fillStyle = 'rgba(16,8,4,0.35)';
-    g.beginPath(); g.ellipse(bx + 3, by - 2, st.width * 0.44, Math.min(10, baseY * 0.08), 0, 0, Math.PI * 2); g.fill();
-    // structure planted on the plot's south edge
-    g.drawImage(st, bx - st.width / 2, by - baseY);
-    pixelate(c);
-    const s = c as BldSprite; s.ox = ox; s.oy = oy;
-    return s;
-  }
+  // every structure has hand-drawn art; the procedural bake is only a fallback
+  if (BUILDING_ART[defId]) return bakeRefinedSprite(defId, owner, level);
   return bakeProceduralBuilding(defId, owner);
 }
 
@@ -1344,45 +1162,35 @@ setTimeout(warmIcons, 300);
 // defences show their turret head, aimed toward the viewer
 const ICON_AIM = 0.6;
 export function artIconUrl(defId: string, owner = PLAYER, level = 1): string | null {
-  return memoIcon(`a:${refinedStyle}:${defId}:${owner}:${level}`, () => bakeArtIcon(defId, owner, level));
+  return memoIcon(`a:${defId}:${owner}:${level}`, () => bakeArtIcon(defId, owner, level));
 }
 function bakeArtIcon(defId: string, owner: number, level: number): string | null {
   const art = BUILDING_ART[defId];
   if (!art) return null;
   const def = BUILDINGS[defId];
   const w = def.w * TILE, h = def.h * TILE, head = Math.ceil(w * 0.75), m = 4;
-  if (refinedStyle) {
-    const k = 2;
-    const [c, g] = makeCanvas((w + m * 2) * k, (h + head + m * 2) * k);
-    g.scale(k, k); g.translate(m, m + head);
-    setFineArt(true);
-    art(g, w, h, level, TEAM_COLORS[owner]);
-    const ta = TURRET_ART[defId];
-    if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[owner]); g.restore(); }
-    setFineArt(false);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    gradeWarmCool(c, 0.7);
-    outline(c, 'rgba(20,12,8,0.55)', 1);
-    return iconUrl(c);
-  }
-  const [c, g] = makeCanvas(w + m * 2, h + head + m * 2);
-  g.translate(m, m + head);
+  const k = 2;
+  const [c, g] = makeCanvas((w + m * 2) * k, (h + head + m * 2) * k);
+  g.scale(k, k); g.translate(m, m + head);
+  setFineArt(true);
   art(g, w, h, level, TEAM_COLORS[owner]);
+  const ta = TURRET_ART[defId];
+  if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[owner]); g.restore(); }
+  setFineArt(false);
   g.setTransform(1, 0, 0, 1, 0, 0);
-  outline(c, '#1a120c', 2);
-  pixelate(c);
-  return cropToContent(c).toDataURL();
+  gradeWarmCool(c, 0.7);
+  outline(c, 'rgba(20,12,8,0.55)', 1);
+  return iconUrl(c);
 }
 
 // build-bar icon for a unit drawn in code (infantry, vehicles, aircraft),
-// three-quarter view facing the viewer; null if it has no code-drawn art, and in
-// the classic style, whose units are the pack sprites
+// three-quarter view facing the viewer; null if it has no code-drawn art
 export function unitIconUrl(defId: string, owner = PLAYER): string | null {
-  return memoIcon(`u:${refinedStyle}:${defId}:${owner}`, () => bakeUnitIcon(defId, owner));
+  return memoIcon(`u:${defId}:${owner}`, () => bakeUnitIcon(defId, owner));
 }
 function bakeUnitIcon(defId: string, owner: number): string | null {
   const va = VEHICLE_ART[defId];
-  if (!va || !refinedStyle) return null;
+  if (!va) return null;
   const k = 3, ww = va.reach * 2 + 4, wh = ww + va.height;
   const [c, g] = makeCanvas(ww * k, wh * k);
   g.scale(k, k); g.translate(ww / 2, ww / 2 + va.height);
@@ -1548,6 +1356,7 @@ export async function initRenderer(seed = -1): Promise<void> {
   resize();
   lastViewW = canvas.clientWidth; lastViewH = canvas.clientHeight;
   sprites.clear();
+  resetStructureLife();
   terrainSeed = seed;
   terrainTex = null;   // no stale ground from a previous game
   await paintTerrain();
@@ -1583,7 +1392,7 @@ function drawCrystal(g: CanvasRenderingContext2D, bx: number, by: number, h: num
     for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]);
     g.closePath(); g.fill();
   };
-  g.strokeStyle = CRY.out; g.lineWidth = refinedStyle ? 1.4 : 3; g.lineJoin = 'round';
+  g.strokeStyle = CRY.out; g.lineWidth = 1.4; g.lineJoin = 'round';
   g.beginPath(); g.moveTo(...BL); g.lineTo(...BC); g.lineTo(...BR); g.lineTo(...SR); g.lineTo(...A); g.lineTo(...SL); g.closePath(); g.stroke();
   poly([BL, BC, SC, SL], CRY.dk);
   poly([BC, BR, SR, SC], CRY.mid);
@@ -1602,9 +1411,8 @@ function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
   if (cached) return cached;
   const hash = (n: number) => { const v = Math.sin(variant * 91.3 + n * 47.1) * 43758.5; return v - Math.floor(v); };
   const scale = 0.5 + size * 0.17;                // depleting fields shrink
-  // classic: drawn at half resolution, then blown up without smoothing;
-  // refined: drawn at 2× and scaled down when drawn
-  const k = refinedStyle ? 2 : 0.5;
+  // drawn at 2× and scaled down when drawn
+  const k = 2;
   const [lo, g] = makeCanvas(CRY_W * k, CRY_H * k);
   g.scale(k, k);
   const ax = CRY_AX, ay = CRY_AY;
@@ -1630,20 +1438,15 @@ function bakeCrystal(variant: number, size: number): HTMLCanvasElement {
   }
   parts.sort((a, b) => a.by - b.by);
   for (const p of parts) drawCrystal(g, p.bx, p.by, p.h, p.w, p.lean);
-  if (refinedStyle) { g.setTransform(1, 0, 0, 1, 0, 0); gradeWarmCool(lo, 0.5); crystalCache.set(key, lo); return lo; }
-  const [c, cg] = makeCanvas(CRY_W, CRY_H);
-  cg.imageSmoothingEnabled = false;
-  cg.drawImage(lo, 0, 0, CRY_W, CRY_H);
-  crystalCache.set(key, c);
-  return c;
+  g.setTransform(1, 0, 0, 1, 0, 0); gradeWarmCool(lo, 0.5); crystalCache.set(key, lo);
+  return lo;
 }
 
 function buildingOverlay(b: Building) {
   const px = b.tx * TILE, py = b.ty * TILE;
   const w = b.def.w * TILE, h = b.def.h * TILE;
   const cx = px + w / 2, cy = py + h / 2;
-  // (classic had no live Skyguard head, so it uses the baked one in both styles)
-  if (TURRET_ART[b.def.id] && (refinedStyle || b.def.id === 'skyguard')) {
+  if (TURRET_ART[b.def.id]) {
     drawDefenceHead(b, px, py);
     // ready lamps on the heavy emplacements
     if (b.def.id === 'bastion' || b.def.id === 'railgun') {
@@ -1656,7 +1459,7 @@ function buildingOverlay(b: Building) {
     case 'outpost': {
       // beacon on the tip of the antenna mast (sprite overflows above the plot)
       const on = Math.sin(T * 4) > 0;
-      const bc = nexusBeacon(w, b.level, refinedStyle);
+      const bc = nexusBeacon(w, b.level, true);
       g2Glow(px + bc.x, py + bc.y, on ? 4 : 2, on ? 'rgba(255,90,90,0.9)' : 'rgba(120,40,50,0.6)');
       break;
     }
@@ -1938,6 +1741,115 @@ function drawScorches() {
   }
 }
 
+
+// ---- structure life cycle: rise on placement, scaffold while upgrading, rubble after ----
+
+const RISE = 1.2;                                          // seconds a new structure takes to rise
+const bornAt = new Map<number, number>();                  // building id → when it appeared
+const levelSeen = new Map<number, number>();
+const upgradedAt = new Map<number, number>();              // building id → when an upgrade finished
+const knownBld = new Map<number, { tx: number; ty: number; w: number; h: number; wall: boolean }>();
+interface Rubble { tx: number; ty: number; w: number; h: number; spr: HTMLCanvasElement }
+const rubble: Rubble[] = [];
+const MAX_RUBBLE = 60;
+let lifeReady = false;                                     // the first frame's buildings were already standing
+function resetStructureLife() { bornAt.clear(); levelSeen.clear(); upgradedAt.clear(); knownBld.clear(); rubble.length = 0; lifeReady = false; }
+
+function trackStructures() {
+  const seen = new Set<number>();
+  for (const b of buildings) {
+    seen.add(b.id);
+    if (!knownBld.has(b.id)) {
+      knownBld.set(b.id, { tx: b.tx, ty: b.ty, w: b.def.w, h: b.def.h, wall: !!b.def.isWall });
+      levelSeen.set(b.id, b.level);
+      if (!lifeReady) continue;
+      bornAt.set(b.id, T);
+      // building over a ruin clears it
+      for (let i = rubble.length - 1; i >= 0; i--) {
+        const r = rubble[i];
+        if (r.tx < b.tx + b.def.w && r.tx + r.w > b.tx && r.ty < b.ty + b.def.h && r.ty + r.h > b.ty) rubble.splice(i, 1);
+      }
+      const cx = (b.tx + b.def.w / 2) * TILE, cy = (b.ty + b.def.h) * TILE;
+      for (let k = 0; k < 6 + b.def.w * 3; k++)
+        addParticle({ x: cx + rnd(-0.5, 0.5) * b.def.w * TILE, y: cy - rnd(0, 6), z: rnd(0, 4), vx: rnd(-14, 14), vy: rnd(-4, 4), vz: rnd(4, 12),
+          life: rnd(0.9, 1.6), max: 1.6, size: rnd(5, 9), kind: 'smoke', col: '150,128,104' });
+    } else if ((levelSeen.get(b.id) ?? 1) < b.level) {
+      levelSeen.set(b.id, b.level);
+      upgradedAt.set(b.id, T);
+    }
+  }
+  for (const [id, k] of knownBld) {
+    if (seen.has(id)) continue;
+    knownBld.delete(id); bornAt.delete(id); levelSeen.delete(id); upgradedAt.delete(id);
+    if (rubble.length >= MAX_RUBBLE) rubble.shift();
+    rubble.push({ tx: k.tx, ty: k.ty, w: k.w, h: k.h, spr: bakeRubble(k.w, k.h, k.wall, id) });
+  }
+  lifeReady = true;
+}
+
+// a ruin: charred footprint, broken slabs, a few twisted beams. Baked once at 2×.
+function bakeRubble(tw: number, th: number, wall: boolean, seed: number): HTMLCanvasElement {
+  const w = tw * TILE, h = th * TILE, k = 2, m = 8;
+  const [c, g] = makeCanvas((w + m * 2) * k, (h + m * 2) * k);
+  g.scale(k, k); g.translate(m, m);
+  let r = seed * 9301 + 49297;
+  const rand = () => (r = (r * 233280 + 49297) % 2147483647) / 2147483647;
+  // scorched ground under it
+  const gr = g.createRadialGradient(w / 2, h * 0.6, 2, w / 2, h * 0.6, Math.max(w, h) * 0.75);
+  gr.addColorStop(0, 'rgba(18,10,6,0.75)'); gr.addColorStop(0.7, 'rgba(40,24,14,0.4)'); gr.addColorStop(1, 'rgba(40,24,14,0)');
+  g.fillStyle = gr; g.fillRect(-m, -m, w + m * 2, h + m * 2);
+  // slabs and chunks, lighter on the sunlit (north-west) side
+  const n = wall ? 4 : 10 + tw * th * 3;
+  for (let i = 0; i < n; i++) {
+    const x = rand() * w, y = h * 0.25 + rand() * h * 0.75, s2 = (wall ? 3 : 4) + rand() * (wall ? 4 : 9);
+    const a = rand() * Math.PI;
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = ['#3a342e', '#4a423a', '#2c2723', '#56504a'][Math.floor(rand() * 4)];
+    g.beginPath(); g.moveTo(-s2, -s2 * 0.4); g.lineTo(s2 * 0.6, -s2 * 0.6); g.lineTo(s2, s2 * 0.3); g.lineTo(-s2 * 0.3, s2 * 0.5); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,240,220,0.12)'; g.fillRect(-s2 * 0.8, -s2 * 0.45, s2 * 1.2, 1.2);
+    g.restore();
+  }
+  // twisted beams
+  if (!wall) for (let i = 0; i < 2 + tw; i++) {
+    const x0 = rand() * w, y0 = h * 0.4 + rand() * h * 0.5;
+    g.strokeStyle = '#1e1a17'; g.lineWidth = 2.2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + rand() * 14 - 7, y0 - 8 - rand() * 8, x0 + rand() * 18 - 9, y0 - 4 - rand() * 14); g.stroke();
+    g.strokeStyle = 'rgba(200,150,110,0.25)'; g.lineWidth = 0.8; g.stroke();
+  }
+  // a few embers still glowing in the cracks
+  for (let i = 0; i < (wall ? 1 : 3); i++) {
+    const x = w * 0.2 + rand() * w * 0.6, y = h * 0.4 + rand() * h * 0.5;
+    const eg = g.createRadialGradient(x, y, 0, x, y, 4);
+    eg.addColorStop(0, 'rgba(255,140,60,0.55)'); eg.addColorStop(1, 'rgba(255,90,30,0)');
+    g.fillStyle = eg; g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill();
+  }
+  return c;
+}
+
+function drawRubble() {
+  for (const r of rubble) {
+    if (!explored[idx(r.tx, r.ty)]) continue;
+    ctx.drawImage(r.spr, r.tx * TILE - 8, r.ty * TILE - 8, r.w * TILE + 16, r.h * TILE + 16);
+    // the odd wisp of smoke from a fresh ruin
+    if (Math.random() < 0.02) addAmbient({ x: (r.tx + r.w / 2) * TILE + rnd(-8, 8), y: (r.ty + r.h * 0.7) * TILE, z: 4, vx: WIND.x * 0.6, vy: WIND.y * 0.4, vz: rnd(6, 10),
+      life: rnd(2, 3), max: 3, size: rnd(4, 6), kind: 'smoke' });
+  }
+}
+
+// scaffold poles and braces around a structure that is going up or being upgraded
+function drawScaffold(px: number, py: number, w: number, h: number, rise: number, alpha: number) {
+  const top = py + h - rise;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = '#c9a052'; ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  for (const x of [px + 3, px + w - 3]) { ctx.moveTo(x, py + h + 2); ctx.lineTo(x, top); }
+  for (let y = py + h - 6; y > top; y -= 12) { ctx.moveTo(px + 3, y); ctx.lineTo(px + w - 3, y); }
+  ctx.moveTo(px + 3, py + h); ctx.lineTo(px + w - 3, Math.max(top, py + h - 24));
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawParticles() {
   for (const p of particles) {
     const f = p.life / p.max, sy = p.y - p.z;
@@ -1995,23 +1907,16 @@ function drawRefinedBoom(bo: { x: number; y: number; r: number; ttl: number; max
 
 function drawHealthBar(x: number, y: number, w: number, frac: number) {
   const col = frac > 0.5 ? '#3ddc84' : frac > 0.25 ? '#ffb02e' : '#e5484d';
-  if (refinedStyle) {
-    // slim bar: dark rounded well, lit fill, quarter ticks
-    const hh = 3;
-    ctx.fillStyle = 'rgba(10,8,6,0.62)';
-    rr(ctx, x - 0.5, y - 0.5, w + 1, hh + 1, 1.5); ctx.fill();
-    ctx.fillStyle = col;
-    if (frac > 0) { rr(ctx, x, y, Math.max(1.5, w * frac), hh, 1); ctx.fill(); }
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.fillRect(x + 0.5, y + 0.3, Math.max(0, w * frac - 1), 0.8);
-    ctx.fillStyle = 'rgba(10,8,6,0.5)';
-    for (const t of [0.25, 0.5, 0.75]) ctx.fillRect(x + w * t - 0.25, y, 0.5, hh);
-    return;
-  }
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.fillRect(x, y, w, 4.5);
+  // slim bar: dark rounded well, lit fill, quarter ticks
+  const hh = 3;
+  ctx.fillStyle = 'rgba(10,8,6,0.62)';
+  rr(ctx, x - 0.5, y - 0.5, w + 1, hh + 1, 1.5); ctx.fill();
   ctx.fillStyle = col;
-  ctx.fillRect(x + 0.5, y + 0.5, (w - 1) * frac, 3.5);
+  if (frac > 0) { rr(ctx, x, y, Math.max(1.5, w * frac), hh, 1); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillRect(x + 0.5, y + 0.3, Math.max(0, w * frac - 1), 0.8);
+  ctx.fillStyle = 'rgba(10,8,6,0.5)';
+  for (const t of [0.25, 0.5, 0.75]) ctx.fillRect(x + w * t - 0.25, y, 0.5, hh);
 }
 
 // refined selection: a soft gold ring lying on the ground, four ticks turning
@@ -2032,22 +1937,12 @@ function groundRing(x: number, y: number, rx: number, ry: number) {
   ctx.restore();
 }
 
-function cornersSel(x: number, y: number, w: number, h: number) {
-  const s = Math.min(8, w / 3);
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x, y + s); ctx.lineTo(x, y); ctx.lineTo(x + s, y);
-  ctx.moveTo(x + w - s, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + s);
-  ctx.moveTo(x + w, y + h - s); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - s, y + h);
-  ctx.moveTo(x + s, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - s);
-  ctx.stroke();
-}
 
 export function render() {
   if (!terrainTex) return; // not initialized yet (briefing screen)
   T = performance.now() / 1000;
   vizDt = Math.min(0.1, Math.max(0, T - vizT)); vizT = T;
-  if (refinedStyle) { const fdt = game.paused ? 0 : vizDt; spawnEffects(fdt); spawnAmbient(fdt); updateEffects(fdt); }
+  { const fdt = game.paused ? 0 : vizDt; spawnEffects(fdt); spawnAmbient(fdt); updateEffects(fdt); }
   if (vehViz.size > units.length + 64) for (const id of [...vehViz.keys()]) if (!byId.has(id)) vehViz.delete(id);
   const vw = canvas.clientWidth, vh = canvas.clientHeight;
   const z = camera.zoom;
@@ -2077,7 +1972,9 @@ export function render() {
       bx0, by0, bx1 - bx0, by1 - by0);
     ctx.imageSmoothingEnabled = true;
   }
-  if (refinedStyle) drawScorches();
+  drawScorches();
+  trackStructures();
+  drawRubble();
 
   const tx0 = Math.max(0, Math.floor(camera.x / TILE));
   const ty0 = Math.max(0, Math.floor(camera.y / TILE));
@@ -2098,7 +1995,6 @@ export function render() {
       g2Glow(cx, cy + 2, TILE * 0.5 * pulse, `rgba(67,243,236,${0.07 + amt * 0.09})`);
       const spr = bakeCrystal(Math.floor(hash(0) * 8), size);
       const ox = (hash(1) - 0.5) * 18, oy = (hash(2) - 0.5) * 12;
-      ctx.imageSmoothingEnabled = refinedStyle;   // refined crystals are baked 2× and scaled down
       ctx.drawImage(spr, cx + ox - CRY_AX, cy + oy + 6 - CRY_AY, CRY_W, CRY_H);
       ctx.imageSmoothingEnabled = true;
       // a rare four-point glint on the tip
@@ -2165,12 +2061,43 @@ export function render() {
     const w = b.def.w * TILE, h = b.def.h * TILE;
     const s = bldSprite(b.def.id, b.owner, b.level);
     const sel = selection.has(b.id);
-    if (sel && refinedStyle) groundRing(px + w / 2, py + h * 0.55, w * 0.66, h * 0.5);
-    drawBld(s, px, py);
-    buildingOverlay(b);
-    // refined art stands up over the footprint's top edge, so its bars sit
+    if (sel) groundRing(px + w / 2, py + h * 0.55, w * 0.66, h * 0.5);
+    const born = bornAt.get(b.id), rise = born === undefined ? 1 : Math.min(1, (T - born) / RISE);
+    const sk = s.k ?? 1, tall = s.oy + h;                    // how far the art stands above the ground line
+    if (rise < 1) {
+      // rising out of the ground: slide the art up through the ground line
+      const e = 1 - (1 - rise) ** 3;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(px - s.ox, py - s.oy - 40, s.width / sk, h + s.oy + 44); ctx.clip();
+      ctx.translate(0, (1 - e) * (tall + 6));
+      drawBld(s, px, py);
+      ctx.restore();
+      drawScaffold(px, py, w, h, (tall + 6) * Math.min(1, rise * 1.6), 1 - rise * 0.8);
+    } else {
+      drawBld(s, px, py);
+      buildingOverlay(b);
+    }
+    if (b.upgrading) {
+      drawScaffold(px, py, w, h, Math.min(tall, h * 1.6), 0.85);
+      // welding sparks somewhere on the structure
+      if (Math.random() < 0.25) {
+        const sx = px + rnd(4, w - 4), sy = py + h - rnd(6, Math.min(tall, h * 1.4));
+        for (let k2 = 0; k2 < 3; k2++) addParticle({ x: sx, y: sy, z: 0, vx: rnd(-40, 40), vy: rnd(-20, 30), vz: rnd(-10, 30), life: rnd(0.2, 0.4), max: 0.4, size: 1, kind: 'spark' });
+      }
+    }
+    const up = upgradedAt.get(b.id);
+    if (up !== undefined && T - up < 0.7) {
+      // upgrade complete: a gold flash and a ring washing out across the plot
+      const f = (T - up) / 0.7;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      g2Glow(px + w / 2, py + h * 0.4, w * (0.6 + f * 0.6), `rgba(255,220,140,${0.55 * (1 - f)})`);
+      ctx.strokeStyle = `rgba(255,227,154,${1 - f})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(px + w / 2, py + h * 0.6, w * (0.4 + f * 0.7), h * (0.25 + f * 0.45), 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    // the art stands up over the footprint's top edge, so its bars sit
     // just below the footprint instead of across the building
-    const barY = refinedStyle ? py + h + 2 : py - 9, upY = refinedStyle ? py + h + 7 : py - 15;
+    const barY = py + h + 2, upY = py + h + 7;
     if (sel || b.hp < b.maxHp) drawHealthBar(px + 4, barY, w - 8, b.hp / b.maxHp);
     if (b.upgrading) {
       // amber upgrade progress bar + wrench glint
@@ -2181,7 +2108,6 @@ export function render() {
       ctx.fillRect(px + 4.5, upY + 0.5, (w - 9) * frac, 3.5);
       if (Math.sin(T * 6) > 0) g2Glow(px + w - 8, py + 6, 3, 'rgba(255,215,110,0.9)');
     }
-    if (sel && !refinedStyle) cornersSel(px, py, w, h);
   }
 
   // units: 8-direction isometric sprites with 2-frame walk cycles
@@ -2192,7 +2118,7 @@ export function render() {
     const frame = moving ? 1 + (Math.floor(T * 6 + u.id) % 2) : 0;
     const s = sprite('u', u.def.id, u.owner, dirIndex(u.facing) * 3 + frame);
     const sw = s.width / kOf(s), sh = s.height / kOf(s);
-    const va = refinedStyle ? VEHICLE_ART[u.def.id] : undefined;
+    const va = VEHICLE_ART[u.def.id];
     if (va) {
       // soft shadow and team glow pooled under the hull
       const tr = va.reach * 0.9;
@@ -2203,7 +2129,7 @@ export function render() {
       ctx.restore();
       ctx.fillStyle = 'rgba(0,0,0,0.24)';
       ctx.beginPath(); ctx.ellipse(u.x + 4, u.y + 3, va.reach * 0.62, va.reach * 0.36, 0, 0, Math.PI * 2); ctx.fill();
-    } else if (refinedStyle) {
+    } else {
       // team identity as a soft glow on the ground, under a softer shadow
       const tr = sw * 0.55;
       const tg = ctx.createRadialGradient(u.x, u.y + sh * 0.3, 0, u.x, u.y + sh * 0.3, tr);
@@ -2213,13 +2139,9 @@ export function render() {
       ctx.restore();
       ctx.fillStyle = 'rgba(0,0,0,0.22)';
       ctx.beginPath(); ctx.ellipse(u.x + 2, u.y + sh * 0.32, sw * 0.32, sh * 0.09, 0, 0, Math.PI * 2); ctx.fill();
-    } else {
-      // flat sliver of shadow at the feet — offset SE like the buildings
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
-      ctx.beginPath(); ctx.ellipse(u.x + 3, u.y + sh * 0.34, sw * 0.42, sh * 0.12, 0, 0, Math.PI * 2); ctx.fill();
     }
     const picked = selection.has(u.id);
-    if (picked && refinedStyle) groundRing(u.x, u.y + 1, u.def.radius + 4, (u.def.radius + 4) * 0.55);
+    if (picked) groundRing(u.x, u.y + 1, u.def.radius + 4, (u.def.radius + 4) * 0.55);
     if (va) {
       drawVehicle(u, moving);
     } else if (u.def.harvester) {
@@ -2275,15 +2197,11 @@ export function render() {
       const w = u.def.radius * 2.2;
       drawHealthBar(u.x - w / 2, u.y - u.def.radius - 10, w, u.hp / u.maxHp);
     }
-    if (sel && !refinedStyle) {
-      const r = u.def.radius + 5;
-      cornersSel(u.x - r, u.y - r, r * 2, r * 2);
-    }
   }
 
   // projectiles: shells arc high, rockets fly flat with a flame trail
   for (const s2 of shells) {
-    const tr = refinedStyle ? trails.get(s2) : undefined;
+    const tr = trails.get(s2);
     if (tr && tr.length > 1 && s2.kind === 'shell') {
       for (let k = 1; k < tr.length; k++) {
         ctx.strokeStyle = `rgba(255,190,110,${(k / tr.length) * 0.5})`; ctx.lineWidth = 1.4;
@@ -2346,29 +2264,9 @@ export function render() {
   }
 
   // explosions
-  for (const bo of booms) {
-    if (refinedStyle) { drawRefinedBoom(bo); continue; }
-    const life = Math.max(0, bo.ttl / 0.5);
-    const fg = ctx.createRadialGradient(bo.x, bo.y, 0, bo.x, bo.y, bo.r * 1.2);
-    fg.addColorStop(0, `rgba(255,240,200,${life})`);
-    fg.addColorStop(0.35, `rgba(255,160,70,${life * 0.9})`);
-    fg.addColorStop(0.8, `rgba(160,50,20,${life * 0.5})`);
-    fg.addColorStop(1, 'rgba(60,20,10,0)');
-    ctx.fillStyle = fg;
-    ctx.beginPath(); ctx.arc(bo.x, bo.y, bo.r * 1.2, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = life * 0.8;
-    ctx.strokeStyle = 'rgba(255,230,190,0.8)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(bo.x, bo.y, bo.r * 1.6, 0, Math.PI * 2); ctx.stroke();
-    for (let k = 0; k < 7; k++) {
-      const ang = k * 0.897 + bo.x;
-      const dd = bo.r * (1.6 + (k % 3) * 0.3);
-      ctx.fillStyle = k % 2 ? '#ffd76e' : '#ff8a4a';
-      ctx.fillRect(bo.x + Math.cos(ang) * dd - 1.5, bo.y + Math.sin(ang) * dd - 1.5, 3, 3);
-    }
-    ctx.globalAlpha = 1;
-  }
+  for (const bo of booms) drawRefinedBoom(bo);
 
-  if (refinedStyle) drawParticles();
+  drawParticles();
 
   // incoming orbital strikes: pulsing target reticle → searing beam at impact
   for (const s of strikes) {
@@ -2418,13 +2316,13 @@ export function render() {
     if (u.owner !== PLAYER && !visible[idx(tileOf(u.x), tileOf(u.y))]) continue;
     const key = `a:${u.def.id}:${u.owner}`;
     let s = sprites.get(key);
-    if (!s) { s = bakeAirSprite(u.def.id, u.owner, refinedStyle); sprites.set(key, s); }
+    if (!s) { s = bakeAirSprite(u.def.id, u.owner); sprites.set(key, s); }
     const bob = Math.sin(T * 2.2 + u.id) * 2;
-    if (refinedStyle && selection.has(u.id)) groundRing(u.x + 4, u.y + 8, u.def.radius + 3, (u.def.radius + 3) * 0.5);
+    if (selection.has(u.id)) groundRing(u.x + 4, u.y + 8, u.def.radius + 3, (u.def.radius + 3) * 0.5);
     // ground shadow, offset from the airframe so the altitude reads
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(u.x + 8, u.y + 10, u.def.radius * 0.9, u.def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    if (refinedStyle && VEHICLE_ART[u.def.id]) {
+    if (VEHICLE_ART[u.def.id]) {
       // baked per heading so the sun stays put as it turns; lifted to altitude
       drawVehicle(u, false, AIR_ALT - bob);
     } else {
@@ -2439,10 +2337,6 @@ export function render() {
     if (sel || u.hp < u.maxHp) {
       const w2 = u.def.radius * 2.2;
       drawHealthBar(u.x - w2 / 2, u.y - AIR_ALT - u.def.radius - 8 + bob, w2, u.hp / u.maxHp);
-    }
-    if (sel && !refinedStyle) {
-      const r2 = u.def.radius + 5;
-      cornersSel(u.x - r2, u.y - AIR_ALT - r2 + bob, r2 * 2, r2 * 2);
     }
   }
 
@@ -2497,28 +2391,19 @@ export function render() {
   if (placement) {
     const def = BUILDINGS[placement.defId];
     const ok = canPlace(PLAYER, placement.defId, placement.tx, placement.ty);
-    if (refinedStyle) {
-      // a soft footprint with faint tile seams, then the ghost on top
-      const gx = placement.tx * TILE, gy = placement.ty * TILE, gw = def.w * TILE, gh = def.h * TILE;
-      const col = ok ? '61,220,132' : '229,72,77';
-      ctx.fillStyle = `rgba(${col},0.16)`;
-      rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.fill();
-      ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      for (let x = 1; x < def.w; x++) { ctx.moveTo(gx + x * TILE, gy + 3); ctx.lineTo(gx + x * TILE, gy + gh - 3); }
-      for (let y = 1; y < def.h; y++) { ctx.moveTo(gx + 3, gy + y * TILE); ctx.lineTo(gx + gw - 3, gy + y * TILE); }
-      ctx.stroke(); ctx.setLineDash([]);
-      ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 1.5;
-      rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.stroke();
-      ctx.globalAlpha = ok ? 0.72 : 0.45;
-    } else {
-      ctx.globalAlpha = 0.45;
-      ctx.fillStyle = ok ? '#3ddc84' : '#e5484d';
-      for (let y = 0; y < def.h; y++)
-        for (let x = 0; x < def.w; x++)
-          ctx.fillRect((placement.tx + x) * TILE + 1, (placement.ty + y) * TILE + 1, TILE - 2, TILE - 2);
-      ctx.globalAlpha = 0.85;
-    }
+    // a soft footprint with faint tile seams, then the ghost on top
+    const gx = placement.tx * TILE, gy = placement.ty * TILE, gw = def.w * TILE, gh = def.h * TILE;
+    const col = ok ? '61,220,132' : '229,72,77';
+    ctx.fillStyle = `rgba(${col},0.16)`;
+    rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.fill();
+    ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (let x = 1; x < def.w; x++) { ctx.moveTo(gx + x * TILE, gy + 3); ctx.lineTo(gx + x * TILE, gy + gh - 3); }
+    for (let y = 1; y < def.h; y++) { ctx.moveTo(gx + 3, gy + y * TILE); ctx.lineTo(gx + gw - 3, gy + y * TILE); }
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = `rgba(${col},0.9)`; ctx.lineWidth = 1.5;
+    rr(ctx, gx + 1, gy + 1, gw - 2, gh - 2, 5); ctx.stroke();
+    ctx.globalAlpha = ok ? 0.72 : 0.45;
     const gs = bldSprite(placement.defId, PLAYER, 1);
     drawBld(gs, placement.tx * TILE, placement.ty * TILE);
     ctx.globalAlpha = 1;
@@ -2544,7 +2429,7 @@ export function render() {
   telemetry.frameDrawn(performance.now() - T * 1000);
   if (telemetry.overlayOn) drawPerfOverlay(vh);
 
-  if (selectBox && refinedStyle) {
+  if (selectBox) {
     const { x, y, w, h } = selectBox, k = Math.min(10, w / 3, h / 3);
     ctx.fillStyle = 'rgba(232,198,106,0.08)'; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = 'rgba(232,198,106,0.55)'; ctx.lineWidth = 1;
@@ -2556,11 +2441,6 @@ export function render() {
     ctx.moveTo(x + w, y + h - k); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - k, y + h);
     ctx.moveTo(x + k, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - k);
     ctx.stroke();
-  } else if (selectBox) {
-    ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = 1;
-    ctx.strokeRect(selectBox.x, selectBox.y, selectBox.w, selectBox.h);
-    ctx.fillStyle = '#ffffff12';
-    ctx.fillRect(selectBox.x, selectBox.y, selectBox.w, selectBox.h);
   }
 }
 
@@ -2574,30 +2454,47 @@ export function renderMinimap() {
   const sx = mm.width / MAP_W, sy = mm.height / MAP_H;
   mmCtx.imageSmoothingEnabled = true;
   mmCtx.drawImage(terrainTex, 0, 0, mm.width, mm.height);
+  // a touch darker than the battlefield so the blips carry
+  mmCtx.fillStyle = 'rgba(8,10,20,0.22)'; mmCtx.fillRect(0, 0, mm.width, mm.height);
   for (let y = 0; y < MAP_H; y++)
     for (let x = 0; x < MAP_W; x++) {
       const i = idx(x, y);
-      if (!explored[i]) { mmCtx.fillStyle = '#000'; mmCtx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5); }
-      else if (crystal[i] > 0) { mmCtx.fillStyle = '#1fa39d'; mmCtx.fillRect(x * sx, y * sy, sx, sy); }
+      if (!explored[i]) { mmCtx.fillStyle = '#070b16'; mmCtx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5); continue; }
+      if (crystal[i] > 0) {
+        mmCtx.fillStyle = visible[i] ? 'rgba(67,243,236,0.85)' : 'rgba(67,243,236,0.45)';
+        mmCtx.fillRect(x * sx + 0.15, y * sy + 0.15, sx * 0.7, sy * 0.7);
+      }
+      if (!visible[i]) { mmCtx.fillStyle = 'rgba(7,11,22,0.45)'; mmCtx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5); }   // remembered, not seen
     }
-  // neutral objectives as diamonds (grey until captured)
+  // neutral objectives: diamonds for vents, triangles for towers (grey until captured)
   for (const n of game.neutrals) {
     if (!explored[idx(n.tx, n.ty)]) continue;
-    const mx = n.tx * sx, my = n.ty * sy;
-    mmCtx.fillStyle = n.owner >= 0 ? TEAM_COLORS[n.owner] : '#b0a890';
+    const mx = (n.tx + 0.5) * sx, my = (n.ty + 0.5) * sy, r = 3.5;
     mmCtx.beginPath();
-    mmCtx.moveTo(mx, my - 3); mmCtx.lineTo(mx + 3, my); mmCtx.lineTo(mx, my + 3); mmCtx.lineTo(mx - 3, my);
-    mmCtx.closePath(); mmCtx.fill();
+    if (n.kind === 'vent') { mmCtx.moveTo(mx, my - r); mmCtx.lineTo(mx + r, my); mmCtx.lineTo(mx, my + r); mmCtx.lineTo(mx - r, my); }
+    else { mmCtx.moveTo(mx, my - r); mmCtx.lineTo(mx + r, my + r * 0.8); mmCtx.lineTo(mx - r, my + r * 0.8); }
+    mmCtx.closePath();
+    mmCtx.fillStyle = n.owner >= 0 ? TEAM_COLORS[n.owner] : '#b8ae98'; mmCtx.fill();
+    mmCtx.strokeStyle = n.contested ? '#ff5a4a' : 'rgba(10,8,6,0.9)'; mmCtx.lineWidth = n.contested ? 1.5 : 1; mmCtx.stroke();
   }
+  // structures: team plates with a dark rim so they stay crisp on any ground
+  mmCtx.lineWidth = 1;
   for (const b of buildings) {
     if (b.owner !== PLAYER && !explored[idx(b.tx, b.ty)]) continue;
+    const bw = Math.max(2.5, b.def.w * sx), bh = Math.max(2.5, b.def.h * sy);
     mmCtx.fillStyle = TEAM_COLORS[b.owner];
-    mmCtx.fillRect(b.tx * sx, b.ty * sy, Math.max(2, b.def.w * sx), Math.max(2, b.def.h * sy));
+    mmCtx.fillRect(b.tx * sx, b.ty * sy, bw, bh);
+    mmCtx.strokeStyle = 'rgba(8,8,12,0.85)';
+    mmCtx.strokeRect(b.tx * sx + 0.5, b.ty * sy + 0.5, bw - 1, bh - 1);
   }
+  // units: round blips, vehicles larger than infantry
   for (const u of units) {
     if (u.owner !== PLAYER && !visible[idx(tileOf(u.x), tileOf(u.y))]) continue;
-    mmCtx.fillStyle = TEAM_COLORS[u.owner];
-    mmCtx.fillRect((u.x / TILE) * sx - 1, (u.y / TILE) * sy - 1, 2.5, 2.5);
+    const r = u.def.tab === 'veh' ? 1.8 : 1.3;
+    mmCtx.beginPath(); mmCtx.arc((u.x / TILE) * sx, (u.y / TILE) * sy, r + 0.7, 0, Math.PI * 2);
+    mmCtx.fillStyle = 'rgba(8,8,12,0.85)'; mmCtx.fill();
+    mmCtx.beginPath(); mmCtx.arc((u.x / TILE) * sx, (u.y / TILE) * sy, r, 0, Math.PI * 2);
+    mmCtx.fillStyle = TEAM_COLORS[u.owner]; mmCtx.fill();
   }
   // alert pings on the minimap — blinking rings
   for (const p of game.pings) {
@@ -2607,7 +2504,18 @@ export function renderMinimap() {
     mmCtx.arc((p.x / TILE) * sx, (p.y / TILE) * sy, 4 + (p.t / 2.2) * 6, 0, Math.PI * 2);
     mmCtx.stroke();
   }
+  // camera: a gold frame with heavier corner brackets
   const { w, h } = viewSize();
-  mmCtx.strokeStyle = '#fffa'; mmCtx.lineWidth = 1;
-  mmCtx.strokeRect((camera.x / TILE) * sx, (camera.y / TILE) * sy, (w / camera.zoom / TILE) * sx, (h / camera.zoom / TILE) * sy);
+  const fx = (camera.x / TILE) * sx, fy = (camera.y / TILE) * sy;
+  const fw = (w / camera.zoom / TILE) * sx, fh = (h / camera.zoom / TILE) * sy;
+  mmCtx.strokeStyle = 'rgba(232,198,106,0.55)'; mmCtx.lineWidth = 1;
+  mmCtx.strokeRect(fx + 0.5, fy + 0.5, fw - 1, fh - 1);
+  const k = Math.min(7, fw / 3, fh / 3);
+  mmCtx.strokeStyle = '#ffe39a'; mmCtx.lineWidth = 2;
+  mmCtx.beginPath();
+  mmCtx.moveTo(fx, fy + k); mmCtx.lineTo(fx, fy); mmCtx.lineTo(fx + k, fy);
+  mmCtx.moveTo(fx + fw - k, fy); mmCtx.lineTo(fx + fw, fy); mmCtx.lineTo(fx + fw, fy + k);
+  mmCtx.moveTo(fx + fw, fy + fh - k); mmCtx.lineTo(fx + fw, fy + fh); mmCtx.lineTo(fx + fw - k, fy + fh);
+  mmCtx.moveTo(fx + k, fy + fh); mmCtx.lineTo(fx, fy + fh); mmCtx.lineTo(fx, fy + fh - k);
+  mmCtx.stroke();
 }

@@ -4,20 +4,13 @@ import * as game from './game';
 import { update, spawnUnit, placeBuilding, buildingCenter, centerOfTile, initGame } from './game';
 import { updateAI, initAI } from './ai';
 import { initInput, updateCamera, centerCameraOn } from './input';
-import { render, renderMinimap, resize, initRenderer, loadSprites, refinedStyle, setRefinedStyle } from './render';
+import { render, renderMinimap, resize, initRenderer, loadSprites } from './render';
 import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted, audioStats } from './audio';
 import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
 import * as campaign from './campaign/runner';
 
 // ---------- boot: UI shell first, world is created on deploy ----------
-
-const graphicsKey = 'nova-graphics';
-try {
-  const saved = localStorage.getItem(graphicsKey);
-  if (!new URLSearchParams(location.search).has('style') && (saved === 'refined' || saved === 'classic'))
-    setRefinedStyle(saved === 'refined');
-} catch { /* private browsing can disable storage */ }
 
 initInput();
 initUI();
@@ -115,27 +108,14 @@ function refreshMuteBtn() {
   muteBtn.textContent = isMuted() ? '🔇' : '🔊';
   pauseMute.textContent = isMuted() ? 'Sound: off' : 'Sound: on';
 }
-const graphicsBtn = document.getElementById('graphicsbtn') as HTMLButtonElement;
-function refreshGraphicsBtn() {
-  graphicsBtn.textContent = `Graphics: ${refinedStyle ? 'Refined' : 'Classic'}`;
-  graphicsBtn.setAttribute('aria-label', graphicsBtn.textContent);
-}
-function toggleGraphics() {
-  setRefinedStyle(!refinedStyle);
-  refreshGraphicsBtn();
-  try { localStorage.setItem(graphicsKey, refinedStyle ? 'refined' : 'classic'); } catch { /* storage may be unavailable */ }
-}
 muteBtn.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
 pauseMute.addEventListener('click', () => { toggleMute(); refreshMuteBtn(); });
-graphicsBtn.addEventListener('click', toggleGraphics);
 window.addEventListener('keydown', e => {
   const target = e.target instanceof Element ? e.target : null;
   if (target?.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
   if (e.key === 'm' || e.key === 'M') { toggleMute(); refreshMuteBtn(); }
-  if (e.key === 'v' || e.key === 'V') toggleGraphics();
 });
 refreshMuteBtn();
-refreshGraphicsBtn();
 
 // pause menu: ☰ opens it (pausing the sim), resume / restart
 const pauseMenu = document.getElementById('pausemenu')!;
