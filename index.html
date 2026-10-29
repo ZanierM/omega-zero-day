@@ -159,6 +159,7 @@
     #selinfo.has-selection #selportrait { display: flex; grid-row: 1 / 3; align-items: center; justify-content: center; width: 44px; height: 44px; overflow: hidden; background: var(--plate-dk); border: 1px solid var(--edge); }
     #selportrait img, #selportrait svg { display: block; width: 100%; height: 100%; object-fit: contain; }
     #selcopy { min-width: 0; overflow: hidden; }
+    .selorder { display: block; color: var(--steel-hi); font-family: var(--head); font-size: var(--type-xs); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
     #selhealth { display: none; grid-column: 2; height: 5px; background: var(--ink); box-shadow: var(--sunk); overflow: hidden; }
     #selinfo.has-selection #selhealth { display: block; }
     #selhealthfill { height: 100%; width: 100%; background: var(--health-good); }
@@ -346,6 +347,13 @@
       -webkit-tap-highlight-color: transparent; user-select: none; }
     .mapbtn:hover { border-color: var(--edge-hi); color: var(--gold-hi); }
     #menubtn { right: calc(8px + env(safe-area-inset-right)); }
+    /* Touch groups float over the map so the cover-screen deck stays short. */
+    #groupbar { display: none; position: absolute; right: calc(8px + env(safe-area-inset-right)); top: calc(60px + env(safe-area-inset-top)); z-index: 6; flex-direction: column; gap: 4px; }
+    .groupbtn { width: 44px; min-height: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: var(--cream); background: var(--plates-dk); border: 2px solid var(--edge); border-radius: 8px; box-shadow: var(--raised); font-family: var(--head); }
+    .groupbtn.saved { color: var(--gold); border-color: var(--edge-hi); }
+    .groupbtn.current { background: var(--plates); box-shadow: var(--sunk); }
+    .groupbtn small { font-size: var(--type-xs); line-height: 1; color: var(--muted); }
+    @media (pointer: coarse) { #groupbar.show { display: flex; } }
 
     /* idle-harvester warning button — under the resource strip, only when idle */
     #idlebtn { display: none; position: absolute; left: calc(8px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top)); z-index: 6;
@@ -391,6 +399,8 @@
     #brieftitle:focus { outline: none; }
     #deploy, #overlay button, #pausebox #resumebtn, #actbtn:not(:disabled) { color: var(--ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold) 48%, var(--edge-hi)); border: 2px solid var(--edge-hi); text-shadow: none; }
     #deploy:hover, #overlay button:hover, #pausebox #resumebtn:hover, #actbtn:not(:disabled):hover { filter: brightness(1.12); color: var(--ink); }
+    #actbtn.halt:not(:disabled) { color: var(--cream); background: var(--plates-dk); border-color: var(--edge); }
+    #actbtn.halt:not(:disabled):hover { color: var(--gold); border-color: var(--edge-hi); }
     #pausebox #restartbtn, #upgbtn:not(:disabled), #abilbtn:not(:disabled) { color: var(--steel-hi); background: linear-gradient(180deg, var(--steel-dk), var(--plate-dk)); border: 2px solid var(--steel); }
     #pausebox #restartbtn:hover, #upgbtn:not(:disabled):hover, #abilbtn:not(:disabled):hover { border-color: var(--steel-hi); color: var(--cream); }
     #pausebox #pausemute, .actbtn:disabled { color: var(--cream); background: var(--plates-dk); border: 2px solid var(--edge); }
@@ -465,7 +475,7 @@
       #powerfill, #toast, .bbtn, .opt { transition: none; }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-DhMldjhI.js"></script>
+  <script type="module" crossorigin src="./assets/index-Be8mN_fm.js"></script>
 </head>
 <body>
   <div id="app" inert>
@@ -484,6 +494,7 @@
     </div>
     <button id="selectmode" class="mapbtn" title="Box-select mode" aria-pressed="false">⛶</button>
     <button id="menubtn" class="mapbtn" title="Menu">☰</button>
+    <div id="groupbar" role="group" aria-label="Control groups"></div>
     <button id="idlebtn" title="Idle harvester (no crystal)">⚠ <span id="idlecount">0</span></button>
     <div id="enemysw"></div>
     <div id="bottombar">
