@@ -3,7 +3,7 @@ import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
-import { BUILDING_ART, VEHICLE_ART, setFineArt, nexusBeacon, extractorLights, fusionCore, spireLight, labLight } from './art';
+import { BUILDING_ART, VEHICLE_ART, TURRET_ART, arcOrb, setFineArt, nexusBeacon, extractorLights, fusionCore, spireLight, labLight } from './art';
 
 // Renderer v4 — Kenney sprite assets on a pre-rendered noise terrain.
 //  * terrain painted once into a big offscreen texture (per-pixel noise, craters, boulders)
@@ -615,26 +615,41 @@ const VEH_ANGLES = 48;
 type VehPart = Scaled & { ox: number; oy: number; ww: number; wh: number };
 // walkers bake fewer headings (each has several gait frames)
 const vehAngles = (defId: string) => VEHICLE_ART[defId]!.frames ? 24 : VEH_ANGLES;
-function vehiclePart(defId: string, owner: number, part: 'hull' | 'turret', i: number, frame = 0): VehPart {
-  const key = `v:${defId}:${owner}:${part}:${i}:${frame}`;
+function rotatedPart(key: string, reach: number, height: number, paint: (g: CanvasRenderingContext2D) => void): VehPart {
   let s = sprites.get(key) as VehPart | undefined;
   if (!s) {
-    const va = VEHICLE_ART[defId]!, k = 3;
-    const ww = va.reach * 2 + 4, wh = ww + va.height;
+    const k = 3, ww = reach * 2 + 4, wh = ww + height;
     const [c, g] = makeCanvas(ww * k, wh * k);
-    g.scale(k, k); g.translate(ww / 2, ww / 2 + va.height);
+    g.scale(k, k); g.translate(ww / 2, ww / 2 + height);
     setFineArt(true);
-    const ang = (i / vehAngles(defId)) * Math.PI * 2;
-    if (part === 'hull') va.hull(g, ang, TEAM_COLORS[owner], frame / (va.frames ?? 1));
-    else va.turret?.(g, ang, TEAM_COLORS[owner]);
+    paint(g);
     setFineArt(false);
     g.setTransform(1, 0, 0, 1, 0, 0);
     gradeWarmCool(c, 0.7);
     outline(c, 'rgba(16,10,8,0.6)', 2);
-    s = c as VehPart; s.k = k; s.ox = ww / 2; s.oy = ww / 2 + va.height; s.ww = ww; s.wh = wh;
+    s = c as VehPart; s.k = k; s.ox = ww / 2; s.oy = ww / 2 + height; s.ww = ww; s.wh = wh;
     sprites.set(key, s);
   }
   return s;
+}
+function vehiclePart(defId: string, owner: number, part: 'hull' | 'turret', i: number, frame = 0): VehPart {
+  const va = VEHICLE_ART[defId]!;
+  const ang = (i / vehAngles(defId)) * Math.PI * 2;
+  return rotatedPart(`v:${defId}:${owner}:${part}:${i}:${frame}`, va.reach, va.height, g => {
+    if (part === 'hull') va.hull(g, ang, TEAM_COLORS[owner], frame / (va.frames ?? 1));
+    else va.turret?.(g, ang, TEAM_COLORS[owner]);
+  });
+}
+// a defence's aiming head, eased toward its target and drawn at its pivot
+function drawDefenceHead(b: Building, px: number, py: number) {
+  const ta = TURRET_ART[b.def.id]!, s = b.def.w * TILE / (b.def.w * 32);
+  const v = vehViz.get(b.id) ?? { hull: b.facing, tur: b.facing };
+  vehViz.set(b.id, v);
+  v.tur = turnToward(v.tur, b.facing, 6 * vizDt);
+  const i = headingIndex(v.tur, VEH_ANGLES);
+  const head = rotatedPart(`d:${b.def.id}:${b.owner}:${i}`, ta.reach, ta.height,
+    g => ta.head(g, (i / VEH_ANGLES) * Math.PI * 2, TEAM_COLORS[b.owner]));
+  ctx.drawImage(head, px + ta.pivot[0] * s - head.ox, py + ta.pivot[1] * s - head.oy, head.ww, head.wh);
 }
 const vehViz = new Map<number, { hull: number, tur: number }>();
 let vizT = 0, vizDt = 0;
@@ -784,8 +799,9 @@ function punch(g: CanvasRenderingContext2D, c: HTMLCanvasElement, amount: number
 // k: the sprite is baked k× larger than world size (refined style) and drawn back down
 export interface BldSprite extends HTMLCanvasElement { ox: number; oy: number; k?: number }
 
-// refined render style (prototype): ?style=refined in the URL, or V in game
-export let refinedStyle = new URLSearchParams(location.search).get('style') === 'refined';
+// refined render style is the default; ?style=classic (or V in game) shows the
+// original chunky pixelated look for comparison
+export let refinedStyle = new URLSearchParams(location.search).get('style') !== 'classic';
 export function setRefinedStyle(v: boolean) {
   refinedStyle = v;
   sprites.clear();
@@ -903,7 +919,7 @@ function bakeBuildingSprite(defId: string, owner: number, level: number): BldSpr
     const ox = (cw - w) / 2;            // footprint offset inside the canvas
     const oy = ch - h - 6 - reachY;
     g.save(); g.translate(ox, oy);
-    drawPad(g, w, h, TEAM_COLORS[owner]);
+    if (!def.isWall) drawPad(g, w, h, TEAM_COLORS[owner]);
     g.restore();
     const bx = cw / 2, by = oy + h - (art ? 0 : 2);
     g.save();
@@ -946,7 +962,7 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   const [c, g] = makeCanvas(cw * k, ch * k);
   g.scale(k, k);
   const ox = (cw - w) / 2, oy = ch - h - 6 - reachY;
-  g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore();
+  if (!def.isWall) { g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore(); }
   const bx = cw / 2, by = oy + h;
   // long low-sun shadow, blurred so it reads as light rather than a decal
   g.save();
@@ -1328,7 +1344,16 @@ function buildingOverlay(b: Building) {
   const px = b.tx * TILE, py = b.ty * TILE;
   const w = b.def.w * TILE, h = b.def.h * TILE;
   const cx = px + w / 2, cy = py + h / 2;
-  switch (b.def.id) {
+  // (classic had no live Skyguard head, so it uses the baked one in both styles)
+  if (TURRET_ART[b.def.id] && (refinedStyle || b.def.id === 'skyguard')) {
+    drawDefenceHead(b, px, py);
+    // ready lamps on the heavy emplacements
+    if (b.def.id === 'bastion' || b.def.id === 'railgun') {
+      const ready = b.cooldown < 0.15, piv = TURRET_ART[b.def.id]!.pivot;
+      const headTop = b.def.id === 'bastion' ? 22 : 20;
+      g2Glow(px + piv[0], py + piv[1] - headTop, 2.5, ready ? (b.def.id === 'bastion' ? 'rgba(255,150,60,0.95)' : 'rgba(32,214,255,0.95)') : 'rgba(40,40,50,0.6)');
+    }
+  } else switch (b.def.id) {
     case 'nexus':
     case 'outpost': {
       // beacon on the tip of the antenna mast (sprite overflows above the plot)
@@ -1386,7 +1411,7 @@ function buildingOverlay(b: Building) {
     }
     case 'arctower': {
       // crackling tesla orb + occasional discharge flicker
-      const cx2 = px + w / 2, orbY = py + h * 0.26 - 1;
+      const orb = arcOrb(w), cx2 = px + orb[0], orbY = py + orb[1];
       const pulse = 0.5 + Math.sin(T * 7 + b.id) * 0.3;
       g2Glow(cx2, orbY, 6 + pulse * 3, `rgba(180,138,255,${0.5 + pulse * 0.3})`);
       if (Math.sin(T * 11 + b.id * 2) > 0.86) {

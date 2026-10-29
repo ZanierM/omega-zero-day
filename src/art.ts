@@ -10,7 +10,7 @@ type Ctx = CanvasRenderingContext2D;
 
 const OUT = '#1a120c';
 
-// refined style (prototype, ?style=refined / V): thin edges tinted from each
+// refined style (the default; ?style=classic / V for the original): thin edges tinted from each
 // surface instead of the heavy black outline, plus extra surface detail where
 // an art function adds it
 let fine = false;
@@ -173,6 +173,33 @@ function speckle(g: Ctx, x0: number, y0: number, x1: number, y1: number, n: numb
   for (let i = 0; i < n; i++) {
     g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.16)' : 'rgba(255,240,215,0.08)';
     g.fillRect(x0 + rnd() * (x1 - x0), y0 + rnd() * (y1 - y0), 0.5 + rnd() * 0.7, 0.5);
+  }
+}
+
+// refined-style weathering for a prism's visible walls: shade where they meet
+// the surface below, a lit top lip, and panel seams every `seams` units
+function detailWalls(g: Ctx, pts: Pt[], z0: number, z1: number, seams = 0, ao = 0.36) {
+  if (!fine) return;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    if (-(b[0] - a[0]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1) <= 0.01) continue;   // faces away
+    if (seams) wallSeams(g, a, b, z0, z1, seams);
+    wallAO(g, a, b, z0, Math.min(6, (z1 - z0) * 0.45), ao);
+    wallRim(g, a, b, z1, 0.28);
+  }
+}
+
+// additive light spill around a lit window or lamp (refined style only)
+function spill(g: Ctx, x: number, y: number, r: number, col: string) {
+  if (!fine) return;
+  g.save(); g.globalCompositeOperation = 'lighter'; glow(g, x, y, r, col); g.restore();
+}
+
+// a thin cable or pipe run with a lit upper edge
+function cable(g: Ctx, pts: Pt[], wid: number, col = '#3a3c44') {
+  for (const [c, w] of [[edgeOf(col), wid + 0.8], [col, wid]] as [string, number][]) {
+    g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
   }
 }
 
@@ -436,12 +463,28 @@ export function drawSolar(g: Ctx, w: number, _h: number, _level: number, team: s
   const s = w / 64; g.scale(s, s);
   // low concrete frame
   prism(g, chamfer(3, 5, 61, 61, 6), 0, 3, CONCRETE_TOP, CONCRETE);
+  if (fine) {
+    detailWalls(g, chamfer(3, 5, 61, 61, 6), 0, 3, 0, 0.3);
+    speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 3);
+    // weather mast at the back corner: anemometer cups and a team beacon
+    cylinder(g, 58, 8, 0.8, 3, 22, '#9a9eaa', HULL);
+    cable(g, [[54, 8 - 21], [62, 8 - 21]], 0.6, '#b8bcc8');
+    for (const x of [54, 62]) { g.fillStyle = '#c4c8d2'; g.beginPath(); g.arc(x, 8 - 21, 1.2, 0, Math.PI * 2); g.fill(); }
+    lamp(g, 58, 8 - 23, team);
+  }
   // back row, inverter, front row
   solarPanel(g, 6, 10, 30, 28);
   solarPanel(g, 34, 10, 58, 28);
   prism(g, [[26, 31], [38, 31], [38, 39], [26, 39]], 3, 12, '#6a6d78', HULL);
+  detailWalls(g, [[26, 31], [38, 31], [38, 39], [26, 39]], 3, 12, 4);
   quad(g, [26, 39 - 10], [38, 39 - 10], [38, 39 - 8], [26, 39 - 8], team, false);
   g.fillStyle = '#7fff8a'; g.fillRect(35, 39 - 6, 2, 2);
+  spill(g, 36, 39 - 5, 4, 'rgba(127,255,138,0.4)');
+  if (fine) {
+    // cable runs from the inverter out to each panel row
+    for (const [x, y] of [[18, 28 - 7], [46, 28 - 7], [18, 38 - 16], [46, 38 - 16]] as Pt[])
+      cable(g, [[32, 35 - 3], [(32 + x) / 2, (35 - 3 + y) / 2 + 2], [x, y]], 0.7, '#2a2c32');
+  }
   solarPanel(g, 6, 38, 30, 56);
   solarPanel(g, 34, 38, 58, 56);
   g.restore();
@@ -459,14 +502,24 @@ export function drawExtractor(g: Ctx, w: number, _h: number, _level: number, tea
   g.save();
   const s = w / 96; g.scale(s, s);
   prism(g, chamfer(3, 4, 93, 62, 8), 0, 5, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 4, 93, 62, 8), 0, 5);
+  if (fine) speckle(g, 6, 4 - 5, 90, 62 - 5, 90, 5);
 
   // smoke stack at the back right
   cylinder(g, 80, 18, 6, 26, 60, '#2a2c32', '#6a6d78');
+  if (fine) {
+    // soot toward the lip and heat glowing in the mouth
+    const sg = g.createLinearGradient(0, 18 - 60, 0, 18 - 48);
+    sg.addColorStop(0, 'rgba(10,8,6,0.55)'); sg.addColorStop(1, 'rgba(10,8,6,0)');
+    g.fillStyle = sg; g.fillRect(74, 18 - 60, 12, 12);
+    spill(g, 80, 18 - 60, 7, 'rgba(255,140,60,0.45)');
+  }
   for (const z of [36, 48]) quad(g, [74, 18 - z - 2], [86, 18 - z - 2], [86, 18 - z + 1], [74, 18 - z + 1], team, false);
   g.fillStyle = '#1a1612'; g.beginPath(); g.arc(80, 18 - 60, 4, 0, Math.PI * 2); g.fill();
 
   // processing hall with a sloped roof
   prism(g, [[34, 12], [90, 12], [90, 56], [34, 56]], 5, 22, null, HULL);
+  detailWalls(g, [[34, 12], [90, 12], [90, 56], [34, 56]], 5, 22, 8);
   quad(g, [34, 12 - 30], [90, 12 - 30], [90, 34 - 22], [34, 34 - 22], '#7c808c');   // rear slope
   quad(g, [34, 34 - 22], [90, 34 - 22], [90, 56 - 22], [34, 56 - 22], HULL_TOP);   // flat front roof
   poly(g, [[90, 12 - 30], [90, 12 - 22], [90, 34 - 22]], shade(HULL, 0.8));
@@ -477,11 +530,28 @@ export function drawExtractor(g: Ctx, w: number, _h: number, _level: number, tea
   hazard(g, 40, 56 - 21, 24, 3, '#e8c66a');
   // side windows
   for (const x of [70, 78]) quad(g, [x, 56 - 17], [x + 5, 56 - 17], [x + 5, 56 - 12], [x, 56 - 12], GLASS_DK);
+  if (fine) {
+    for (const x of [70, 78]) { g.fillStyle = GLASS; g.fillRect(x + 1, 56 - 16, 3, 1.2); spill(g, x + 2.5, 56 - 14.5, 4.5, 'rgba(95,224,240,0.25)'); }
+    // safety railing along the front roof edge
+    cable(g, [[35, 56 - 26], [89, 56 - 26]], 0.5, '#b8bcc8');
+    for (let x = 36; x <= 88; x += 8) cable(g, [[x, 56 - 22], [x, 56 - 26]], 0.5, '#b8bcc8');
+  }
 
   // big storage tank on the left, piped into the hall
   g.fillStyle = OUT; g.fillRect(28, 34 - 18, 8, 5);
   g.fillStyle = '#8a8e9a'; g.fillRect(28, 34 - 17, 8, 3);
   cylinder(g, 18, 34, 14, 5, 34, '#9aa0ac', '#6c717e');
+  if (fine) {
+    // welded ring seams with rivets, and a service ladder up the front
+    for (const z of [13, 21, 29]) {
+      g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.6;
+      g.beginPath(); g.arc(18, 34 - z, 14, 0.05, Math.PI - 0.05); g.stroke();
+      g.strokeStyle = 'rgba(255,240,215,0.14)';
+      g.beginPath(); g.arc(18, 34 - z - 0.7, 14, 0.05, Math.PI - 0.05); g.stroke();
+    }
+    for (const x of [9, 11.5]) cable(g, [[x, 34 + 10.5 - 6], [x, 34 + 10.5 - 33]], 0.5, '#b8bcc8');
+    for (let z = 8; z < 33; z += 3) cable(g, [[9, 34 + 10.5 - z], [11.5, 34 + 10.5 - z]], 0.4, '#b8bcc8');
+  }
   dome(g, 18, 34, 14, 34, '#9aa0ac');
   quad(g, [4, 34 - 26], [32, 34 - 26], [32, 34 - 22], [4, 34 - 22], team, false);
   // crystal level gauge
@@ -496,6 +566,8 @@ export function drawBarracks(g: Ctx, w: number, _h: number, level: number, team:
   g.save();
   const s = w / 64; g.scale(s, s);
   prism(g, chamfer(3, 6, 61, 61, 6), 0, 4, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 6, 61, 61, 6), 0, 4);
+  if (fine) speckle(g, 6, 6 - 4, 58, 61 - 4, 60, 9);
 
   // LV2+: watch post at the back left
   if (level >= 2) {
@@ -507,9 +579,11 @@ export function drawBarracks(g: Ctx, w: number, _h: number, level: number, team:
   // armoured bunker: straight walls, a sloped armour skirt on the front
   const body = chamfer(10, 12, 56, 50, 6);
   prism(g, body, 4, 22, null, '#5d6170');
+  detailWalls(g, body, 4, 22, 7);
   quad(g, [12, 50 - 10], [54, 50 - 10], [56, 55 - 4], [10, 55 - 4], '#4b4f5c');          // skirt
   prism(g, body, 22, 25, null, level >= 3 ? GOLD : team);                                 // trim band
   prism(g, body, 25, 26, '#7e8290', '#5d6170');
+  if (fine) speckle(g, 12, 12 - 26, 54, 50 - 26, 50, 13);
   // roof: hatch, vents, sandbag-style armour blocks along the rim
   prism(g, [[26, 22], [40, 22], [40, 32], [26, 32]], 26, 29, '#5a5d69', HULL);
   for (const x of [14, 46]) quad(g, [x, 40 - 26 - 1], [x + 6, 40 - 26 - 1], [x + 6, 40 - 26 + 2], [x, 40 - 26 + 2], '#3a3c44', false);
@@ -520,6 +594,17 @@ export function drawBarracks(g: Ctx, w: number, _h: number, level: number, team:
   // slit windows either side of the door
   for (const x of [15, 44]) quad(g, [x, 50 - 18], [x + 7, 50 - 18], [x + 7, 50 - 15], [x, 50 - 15], GLASS_DK);
   g.fillStyle = GLASS; g.fillRect(16, 50 - 17, 5, 1); g.fillRect(45, 50 - 17, 5, 1);
+  if (fine) {
+    for (const x of [18.5, 47.5]) spill(g, x, 50 - 16.5, 4.5, 'rgba(95,224,240,0.25)');
+    spill(g, 33, 55 - 13.5, 6, 'rgba(232,198,106,0.35)');
+    // sandbag walls either side of the entrance
+    for (const [x0, n] of [[14, 3], [42, 3]] as [number, number][])
+      for (let row = 0; row < 2; row++) for (let i = 0; i < n - row; i++) {
+        const x = x0 + i * 3.4 + row * 1.7, y = 58.5 - row * 2.2;
+        g.fillStyle = edgeOf('#8a7a5a'); g.beginPath(); g.ellipse(x, y, 1.9, 1.3, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = row ? '#a08e68' : '#8a7a5a'; g.beginPath(); g.ellipse(x, y - 0.3, 1.6, 1, 0, 0, Math.PI * 2); g.fill();
+      }
+  }
 
   flag(g, 52, 16, 26, level >= 3 ? 52 : 44, team);
   // LV3: roof antenna and floodlight
@@ -537,8 +622,15 @@ export function drawFabricator(g: Ctx, w: number, _h: number, level: number, tea
   g.save();
   const s = w / 96; g.scale(s, s);
   prism(g, chamfer(3, 6, 93, 93, 8), 0, 5, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 6, 93, 93, 8), 0, 5);
   // vehicle apron in front of the doors
   quad(g, [32, 93 - 5], [64, 93 - 5], [66, 95], [30, 95], shade(CONCRETE_TOP, 0.85));
+  if (fine) {
+    speckle(g, 6, 6 - 5, 90, 93 - 5, 110, 17);
+    // tyre tracks worn into the apron
+    g.strokeStyle = 'rgba(20,14,10,0.22)'; g.lineWidth = 2.2;
+    for (const x of [40, 56]) { g.beginPath(); g.moveTo(x, 80 - 5); g.quadraticCurveTo(x + 2, 88 - 5, x - 3, 94); g.stroke(); }
+  }
 
   // LV2+: gantry crane over the back right corner
   if (level >= 2) {
@@ -561,7 +653,7 @@ export function drawFabricator(g: Ctx, w: number, _h: number, level: number, tea
   g.closePath();
   const rg = g.createLinearGradient(x0, 0, x1, 0);
   rg.addColorStop(0, '#a3a8b4'); rg.addColorStop(0.4, '#8a8f9c'); rg.addColorStop(1, '#5a5e6a');
-  g.fillStyle = rg; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  g.fillStyle = rg; g.fill(); g.strokeStyle = edgeOf('#5a5e6a'); g.lineWidth = edgeW(); g.stroke();
   // roof ribs and skylights
   g.strokeStyle = 'rgba(26,18,12,0.55)'; g.lineWidth = 1.2;
   for (let y = yb + 8; y < yf; y += 9) {
@@ -577,7 +669,17 @@ export function drawFabricator(g: Ctx, w: number, _h: number, level: number, tea
   xs.forEach(x => g.lineTo(x, yf - zr(x)));
   g.lineTo(x1, yf - 5);
   g.closePath();
-  g.fillStyle = '#6a6e7c'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  g.fillStyle = '#6a6e7c'; g.fill(); g.strokeStyle = edgeOf('#6a6e7c'); g.lineWidth = edgeW(); g.stroke();
+  if (fine) {
+    wallSeams(g, [x0, yf], [x1, yf], 5, zw, 8);
+    wallAO(g, [x0, yf], [x1, yf], 5, 6, 0.38);
+    // roof exhaust vents on either flank
+    for (const vx of [24, 72]) {
+      const vz = zr(vx);
+      cylinder(g, vx, 34, 2.4, vz - 1, vz + 6, '#2a2c32', '#6a6d78');
+      g.fillStyle = '#14110e'; g.beginPath(); g.arc(vx, 34 - vz - 6, 1.6, 0, Math.PI * 2); g.fill();
+    }
+  }
   // team band across the gable and a round vent at its peak
   quad(g, [x0, yf - zw + 2], [x1, yf - zw + 2], [x1, yf - zw + 6], [x0, yf - zw + 6], level >= 3 ? GOLD : team, false);
   g.fillStyle = OUT; g.beginPath(); g.arc(48, yf - zw - 9, 6, 0, Math.PI * 2); g.fill();
@@ -586,6 +688,7 @@ export function drawFabricator(g: Ctx, w: number, _h: number, level: number, tea
   g.beginPath(); g.moveTo(44, yf - zw - 9); g.lineTo(52, yf - zw - 9); g.moveTo(48, yf - zw - 13); g.lineTo(48, yf - zw - 5); g.stroke();
   // roller door with hazard frame
   hazard(g, 30, yf - 23, 36, 3, '#e8c66a');
+  if (fine) for (const x of [27, 69]) lamp(g, x, yf - 21.5, '#ffb02e');
   quad(g, [32, yf - 20], [64, yf - 20], [64, yf - 5], [32, yf - 5], '#3a3d46');
   g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1;
   for (let y = yf - 18; y < yf - 5; y += 3) { g.beginPath(); g.moveTo(33, y); g.lineTo(63, y); g.stroke(); }
@@ -593,6 +696,7 @@ export function drawFabricator(g: Ctx, w: number, _h: number, level: number, tea
   for (const x of [16, 72]) {
     quad(g, [x, yf - 18], [x + 8, yf - 18], [x + 8, yf - 12], [x, yf - 12], GLASS_DK);
     g.fillStyle = GLASS; g.fillRect(x + 1, yf - 16, 6, 2);
+    spill(g, x + 4, yf - 15, 6, 'rgba(95,224,240,0.25)');
   }
   g.restore();
 }
@@ -619,6 +723,8 @@ export function drawFusion(g: Ctx, w: number, _h: number, level: number, team: s
   g.save();
   const s = w / 64; g.scale(s, s);
   prism(g, chamfer(3, 5, 61, 61, 8), 0, 4, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 4);
+  if (fine) speckle(g, 6, 5 - 4, 58, 61 - 4, 60, 29);
 
   // LV2+: radiator fin bank along the back edge
   if (level >= 2) {
@@ -636,11 +742,21 @@ export function drawFusion(g: Ctx, w: number, _h: number, level: number, team: s
   cylinder(g, 32, 38, 20, 4, 12, HULL_TOP, HULL);
   cylinder(g, 32, 38, 20, 12, 15, team, level >= 3 ? GOLD : team);
   cylinder(g, 32, 38, 20, 15, 18, HULL_TOP, HULL);
+  if (fine) {
+    // rivets round the band and a shadow line under it
+    for (let t = 0.15; t < Math.PI; t += 0.26) {
+      const x = 32 + Math.cos(t) * 20, y = 38 + Math.sin(t) * 20 - 13.5;
+      g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(x - 0.3, y + 0.3, 1, 1);
+      g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillRect(x - 0.6, y, 0.9, 0.9);
+    }
+    g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.8;
+    g.beginPath(); g.arc(32, 38 - 11.6, 20, 0.05, Math.PI - 0.05); g.stroke();
+  }
   // vent slots on the drum face
   for (const x of [18, 26, 34, 42]) quad(g, [x, 58 - 10], [x + 4, 58 - 10], [x + 4, 58 - 6], [x, 58 - 6], '#1e1f24', false);
   // emitter ring on the drum top
   g.beginPath(); g.arc(32, 38 - 18, 12, 0, Math.PI * 2);
-  g.fillStyle = '#3a3c44'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  g.fillStyle = '#3a3c44'; g.fill(); g.strokeStyle = edgeOf('#3a3c44'); g.lineWidth = edgeW(); g.stroke();
 
   // back coil pylons, the caged star, front coil pylons
   coilPylon(g, 15, 30, level, team);
@@ -650,9 +766,17 @@ export function drawFusion(g: Ctx, w: number, _h: number, level: number, team: s
   const sg = g.createRadialGradient(sx - 3, sy - 4, 1, sx, sy, 11);
   sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.35, '#ffe9a8'); sg.addColorStop(0.8, '#ffb43c'); sg.addColorStop(1, '#e0702a');
   g.fillStyle = sg; g.beginPath(); g.arc(sx, sy, 11, 0, Math.PI * 2); g.fill();
-  g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  g.strokeStyle = fine ? '#a04a18' : OUT; g.lineWidth = edgeW(); g.stroke();
+  if (fine) {
+    // corona and four faint flares
+    spill(g, sx, sy, 17, 'rgba(255,200,120,0.35)');
+    g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(255,230,170,0.35)'; g.lineWidth = 0.8;
+    g.beginPath();
+    for (const t of [0.4, 2.0, 3.5, 5.1]) { g.moveTo(sx + Math.cos(t) * 12, sy + Math.sin(t) * 12); g.lineTo(sx + Math.cos(t) * 18, sy + Math.sin(t) * 18); }
+    g.stroke(); g.restore();
+  }
   // containment straps across the star
-  g.strokeStyle = OUT; g.lineWidth = 2;
+  g.strokeStyle = OUT; g.lineWidth = fine ? 1.5 : 2;
   g.beginPath(); g.ellipse(sx, sy, 11, 4, 0, 0, Math.PI); g.stroke();
   g.beginPath(); g.ellipse(sx, sy, 4, 11, 0, -Math.PI / 2, Math.PI / 2); g.stroke();
   g.strokeStyle = STEEL; g.lineWidth = 1;
@@ -674,10 +798,13 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
   g.save();
   const s = w / 64; g.scale(s, s);
   prism(g, chamfer(3, 5, 61, 61, 8), 0, 4, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 4);
+  if (fine) speckle(g, 6, 5 - 4, 58, 61 - 4, 60, 31);
 
   // base block with a team band
   const base = chamfer(10, 14, 54, 56, 8);
   prism(g, base, 4, 15, null, '#5d6170');
+  detailWalls(g, base, 4, 15, 7);
   prism(g, base, 15, 18, null, team);
   prism(g, base, 18, 20, HULL_TOP, HULL);
   // entrance and base windows
@@ -686,18 +813,20 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
   for (const x of [15, 43]) {
     quad(g, [x, 56 - 13], [x + 6, 56 - 13], [x + 6, 56 - 9], [x, 56 - 9], GLASS_DK);
     g.fillStyle = GLASS; g.fillRect(x + 1, 56 - 12, 4, 1);
+    spill(g, x + 3, 56 - 11, 4.5, 'rgba(95,224,240,0.25)');
   }
   // sensor dish on the base roof
   cylinder(g, 48, 24, 3, 20, 26, '#6a6d78', HULL);
   g.save(); g.translate(48, 24 - 29); g.rotate(0.45);
   g.beginPath(); g.ellipse(0, 0, 7, 3.5, 0, 0, Math.PI * 2);
-  g.fillStyle = '#c4c8d2'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 2; g.stroke();
+  g.fillStyle = '#c4c8d2'; g.fill(); g.strokeStyle = edgeOf('#8a8f9c'); g.lineWidth = edgeW(); g.stroke();
   g.fillStyle = '#7a7f8c'; g.beginPath(); g.ellipse(1, 1, 4, 1.8, 0, 0, Math.PI * 2); g.fill();
   g.restore();
 
   // shaft with a lit window column and side buttress fins
   const shaft = chamfer(21, 24, 43, 44, 5);
   prism(g, shaft, 20, 52, null, '#5d6170');
+  detailWalls(g, shaft, 20, 52, 5, 0.3);
   for (let z = 26; z <= 46; z += 6) {
     quad(g, [29, 44 - z - 3], [35, 44 - z - 3], [35, 44 - z], [29, 44 - z], GLASS_DK, false);
     g.fillStyle = GLASS; g.fillRect(30, 44 - z - 2, 4, 1.2);
@@ -712,6 +841,7 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
   for (let x = 23; x <= 37; x += 7) {
     quad(g, [x, 47 - 60], [x + 4, 47 - 60], [x + 4, 47 - 56], [x, 47 - 56], GLASS_DK, false);
     g.fillStyle = GLASS; g.fillRect(x + 0.5, 47 - 59, 3, 1.2);
+    spill(g, x + 2, 47 - 58, 4, 'rgba(95,224,240,0.3)');
   }
   prism(g, deck, 61, 62, HULL_TOP, HULL);
 
@@ -720,6 +850,14 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
   poly(g, [[29, 34 - 74], [35, 34 - 74], [32, 34 - 84]], STEEL);
   g.fillStyle = OUT; g.beginPath(); g.arc(32, 34 - 84, 2.6, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#ff6a5a'; g.beginPath(); g.arc(32, 34 - 84, 1.6, 0, Math.PI * 2); g.fill();
+  if (fine) {
+    // guy wires from the spike down to the deck, aviation lights on its corners
+    g.strokeStyle = 'rgba(200,205,215,0.45)'; g.lineWidth = 0.4;
+    g.beginPath();
+    for (const x of [19, 45]) { g.moveTo(32, 34 - 80); g.lineTo(x, 40 - 62); }
+    g.stroke();
+    for (const x of [19.5, 44.5]) { g.fillStyle = '#ff6a5a'; g.fillRect(x - 0.6, 44 - 62.6, 1.2, 1.2); spill(g, x, 44 - 62, 3, 'rgba(255,90,80,0.5)'); }
+  }
   g.restore();
 }
 
@@ -737,6 +875,8 @@ export function drawLab(g: Ctx, w: number, _h: number, _level: number, team: str
   g.save();
   const s = w / 64; g.scale(s, s);
   prism(g, chamfer(3, 5, 61, 61, 6), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 6), 0, 3, 0, 0.3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 37);
 
   // exhaust stack at the back of the lab block
   cylinder(g, 12, 18, 4, 3, 36, '#6a6d78', '#5a5e6a');
@@ -746,8 +886,10 @@ export function drawLab(g: Ctx, w: number, _h: number, _level: number, team: str
   // lab block: walls, team band, cap, roof vents
   const block = chamfer(6, 10, 34, 50, 4);
   prism(g, block, 3, 18, null, '#5d6170');
+  detailWalls(g, block, 3, 18, 7);
   prism(g, block, 18, 20, null, team);
   prism(g, block, 20, 22, HULL_TOP, HULL);
+  if (fine) speckle(g, 8, 10 - 22, 32, 50 - 22, 40, 41);
   for (const vy of [18, 32]) prism(g, [[20, vy], [29, vy], [29, vy + 6], [20, vy + 6]], 22, 25, '#3a3c44', HULL);
   // airlock door with a hazard header, and a lit window
   hazard(g, 9, 50 - 17, 12, 2.5, GOLD);
@@ -755,6 +897,8 @@ export function drawLab(g: Ctx, w: number, _h: number, _level: number, team: str
   g.fillStyle = BIO; g.fillRect(14, 50 - 11, 2, 2);
   quad(g, [24, 50 - 15], [31, 50 - 15], [31, 50 - 9], [24, 50 - 9], GLASS_DK);
   g.fillStyle = BIO; g.fillRect(25, 50 - 12, 5, 2);
+  spill(g, 27.5, 50 - 11, 5, 'rgba(125,255,154,0.3)');
+  spill(g, 15, 50 - 10, 4, 'rgba(125,255,154,0.3)');
 
   // greenhouse dome on a hull ring, specimens visible through the glass
   cylinder(g, 47, 30, 12, 3, 8, HULL_TOP, HULL);
@@ -772,12 +916,178 @@ export function drawLab(g: Ctx, w: number, _h: number, _level: number, team: str
   g.restore();
 
   // specimen vats in front of the dome, glowing culture fluid
+  if (fine) cable(g, [[34, 46 - 10], [37, 50 - 10], [40, 50 - 10]], 1.2, '#4a4d56');   // feed pipe from the lab
   for (const vx of [40, 52]) {
     cylinder(g, vx, 52, 4.5, 3, 16, '#9aa0ac', BIO_DK);
     quad(g, [vx - 3, 52 - 13], [vx + 3, 52 - 13], [vx + 3, 52 - 6], [vx - 3, 52 - 6], BIO, false);
     g.fillStyle = 'rgba(255,255,255,0.6)'; g.fillRect(vx - 2, 52 - 12, 1, 5);
     glow(g, vx, 52 - 10, 7, 'rgba(125,255,154,0.35)');
+    if (fine) {
+      g.fillStyle = 'rgba(230,255,235,0.75)';
+      for (const [bx, by] of [[0.8, 8], [-0.6, 10.5], [1.6, 11.8]] as Pt[]) { g.beginPath(); g.arc(vx + bx, 52 - by, 0.55, 0, Math.PI * 2); g.fill(); }
+    }
   }
+  g.restore();
+}
+
+// ---------------- Sensor Array ----------------
+// the radar dish itself is the live overlay, spinning on top of the mast
+
+export function drawSensor(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  prism(g, chamfer(2, 4, 30, 30, 4), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 4, 30, 30, 4), 0, 2, 0, 0.3);
+  // whip antenna at the back corner
+  cylinder(g, 26, 8, 0.6, 2, 20, '#9a9eaa', HULL);
+  g.fillStyle = '#ff6a5a'; g.fillRect(25.4, 8 - 21, 1.2, 1.2);
+  // equipment housing
+  const hut: Pt[] = [[7, 12], [25, 12], [25, 25], [7, 25]];
+  prism(g, hut, 2, 6, HULL_TOP, HULL);
+  detailWalls(g, hut, 2, 6, 6);
+  quad(g, [7, 25 - 5], [25, 25 - 5], [25, 25 - 4.2], [7, 25 - 4.2], team, false);
+  for (const x of [9, 20]) quad(g, [x, 25 - 3.6], [x + 3, 25 - 3.6], [x + 3, 25 - 2.4], [x, 25 - 2.4], '#1e1f24', false);
+  // mast up to the dish
+  cylinder(g, 16, 20, 1.6, 6, 10.4, '#6a6d78', HULL);
+  g.restore();
+}
+
+// ---------------- Repair Yard ----------------
+
+export function drawRepairYard(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 6), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 6), 0, 3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 70, 43);
+  // back of the yard: tool racks and an air tank
+  const rack: Pt[] = [[12, 7], [32, 7], [32, 11], [12, 11]];
+  prism(g, rack, 3, 12, '#6a6d78', '#4a4d56');
+  detailWalls(g, rack, 3, 12, 5);
+  for (let x = 14; x < 31; x += 3) quad(g, [x, 11 - 10], [x + 1.2, 11 - 10], [x + 1.2, 11 - 5], [x, 11 - 5], '#b8bcc8', false);
+  cylinder(g, 49, 11, 4, 3, 13, '#9aa0ac', '#6c717e');
+  dome(g, 49, 11, 4, 13, '#9aa0ac');
+  quad(g, [45, 11 - 9], [53, 11 - 9], [53, 11 - 7.5], [45, 11 - 7.5], team, false);
+  // the service bay marked out on the slab
+  g.strokeStyle = 'rgba(61,220,132,0.75)'; g.lineWidth = 1.2; g.setLineDash([3, 2]);
+  g.strokeRect(15, 17 - 3, 34, 34); g.setLineDash([]);
+  g.strokeStyle = 'rgba(61,220,132,0.4)';
+  g.beginPath(); g.moveTo(26, 34 - 3); g.lineTo(38, 34 - 3); g.moveTo(32, 28 - 3); g.lineTo(32, 40 - 3); g.stroke();
+  // gantry crane spanning the bay
+  for (const x0 of [7, 52]) {
+    const leg: Pt[] = [[x0, 31], [x0 + 5, 31], [x0 + 5, 36], [x0, 36]];
+    prism(g, leg, 3, 30, '#6a6d78', '#5d6170');
+    detailWalls(g, leg, 3, 30, 0, 0.3);
+    quad(g, [x0, 36 - 20], [x0 + 5, 36 - 20], [x0 + 5, 36 - 17], [x0, 36 - 17], team, false);
+  }
+  const beam: Pt[] = [[7, 31], [57, 31], [57, 36], [7, 36]];
+  prism(g, beam, 26, 31, GOLD, '#b8923e');
+  for (let x = 9; x < 56; x += 5) quad(g, [x, 36 - 30], [x + 2.5, 36 - 30], [x + 1.5, 36 - 27], [x - 1, 36 - 27], 'rgba(16,10,6,0.75)', false);
+  // trolley, hoist line and a welding spark on the arm
+  prism(g, [[29, 30], [36, 30], [36, 37], [29, 37]], 22, 26, '#848894', HULL);
+  cable(g, [[32.5, 37 - 22], [32.5, 37 - 12]], 0.5, '#2a2c32');
+  g.fillStyle = '#ffffff'; g.fillRect(32, 37 - 12.5, 1, 1);
+  spill(g, 32.5, 37 - 12, 7, 'rgba(160,255,200,0.5)');
+  for (const x of [9.5, 54.5]) lamp(g, x, 33 - 32, '#3ddc84');
+  g.restore();
+}
+
+// ---------------- Skyport ----------------
+
+export function drawSkyport(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 70, 47);
+  // fuel tanks at the back left
+  for (const tx of [9, 17]) {
+    cylinder(g, tx, 10, 3.4, 3, 11, '#9aa0ac', '#6c717e');
+    dome(g, tx, 10, 3.4, 11, '#9aa0ac');
+  }
+  // control tower at the back right with a glazed cab
+  const tower: Pt[] = [[49, 5], [59, 5], [59, 15], [49, 15]];
+  prism(g, tower, 3, 22, null, '#5d6170');
+  detailWalls(g, tower, 3, 22, 5);
+  prism(g, [[48, 4], [60, 4], [60, 16], [48, 16]], 22, 27, '#848894', GLASS_DK);
+  quad(g, [48, 16 - 26], [60, 16 - 26], [60, 16 - 24.6], [48, 16 - 26 + 1.4], GLASS, false);
+  spill(g, 54, 16 - 24.5, 6, 'rgba(95,224,240,0.3)');
+  cylinder(g, 56, 9, 0.6, 27, 34, '#9a9eaa', HULL);
+  g.fillStyle = '#ff6a5a'; g.fillRect(55.4, 9 - 35, 1.2, 1.2);
+  // raised landing deck with its markings and edge lights
+  cylinder(g, 30, 35, 22, 3, 6, '#565a64', HULL);
+  const dy = 35 - 6;
+  g.strokeStyle = GOLD; g.lineWidth = 1.2; g.setLineDash([4, 3]);
+  g.beginPath(); g.arc(30, dy, 18, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+  g.strokeStyle = team; g.lineWidth = 2;
+  g.beginPath(); g.arc(30, dy, 10, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = 'rgba(235,238,245,0.85)';
+  g.fillRect(25, dy - 6, 2.2, 12); g.fillRect(32.8, dy - 6, 2.2, 12); g.fillRect(25, dy - 1.1, 10, 2.2);   // H
+  for (let k = 0; k < 16; k++) {
+    const t = (k / 16) * Math.PI * 2, x = 30 + Math.cos(t) * 20.5, y = dy + Math.sin(t) * 20.5;
+    const col = k % 2 ? team : '#ffffff';
+    g.fillStyle = col; g.fillRect(x - 0.7, y - 0.7, 1.4, 1.4);
+    spill(g, x, y, 2.4, k % 2 ? 'rgba(77,184,255,0.35)' : 'rgba(255,255,255,0.3)');
+  }
+  if (fine) speckle(g, 12, dy - 18, 48, dy + 18, 40, 53);
+  // windsock on the front corner
+  flag(g, 58, 58, 3, 18, team);
+  g.restore();
+}
+
+// ---------------- Orbital Uplink ----------------
+
+export function drawUplink(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 4, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 4);
+  if (fine) speckle(g, 6, 5 - 4, 58, 61 - 4, 60, 59);
+  // back capacitor banks
+  const capacitor = (x: number, y: number) => {
+    cylinder(g, x, y, 3.4, 4, 15, '#6a6d78', HULL);
+    g.fillStyle = '#5fe0f0'; g.beginPath(); g.arc(x, y - 15, 2.2, 0, Math.PI * 2); g.fill();
+    spill(g, x, y - 15, 6, 'rgba(95,224,240,0.45)');
+  };
+  capacitor(9, 11); capacitor(55, 11);
+  // octagonal base with a team band
+  const base = chamfer(13, 17, 51, 53, 8);
+  prism(g, base, 4, 11, null, '#5d6170');
+  detailWalls(g, base, 4, 11, 6);
+  prism(g, base, 11, 13, null, team);
+  prism(g, base, 13, 14, HULL_TOP, HULL);
+  // yoke arms holding the dish
+  for (const x0 of [19, 42]) { const arm: Pt[] = [[x0, 31], [x0 + 3, 31], [x0 + 3, 37], [x0, 37]]; prism(g, arm, 14, 28, '#848894', TANK); }
+  // the dish, tilted at the sky: back shell, then the bowl with its ribs
+  const cx = 32, cy = 34 - 30, rx = 19, ry = 13;
+  g.fillStyle = '#4a4d56'; g.beginPath(); g.ellipse(cx, cy + 3, rx - 1, ry - 1, -0.12, 0, Math.PI * 2); g.fill();
+  // concave: the inner wall facing the north-west sun (south-east side) is lit,
+  // the far inner wall falls into shade
+  const bowl = g.createLinearGradient(cx - rx, cy - ry, cx + rx * 0.6, cy + ry);
+  bowl.addColorStop(0, '#5e636e'); bowl.addColorStop(0.45, '#9da2ae'); bowl.addColorStop(1, '#eef0f4');
+  g.beginPath(); g.ellipse(cx, cy, rx, ry, -0.12, 0, Math.PI * 2);
+  g.fillStyle = bowl; g.fill();
+  g.strokeStyle = '#c4c8d2'; g.lineWidth = 1.8; g.stroke();                                   // raised rim
+  g.strokeStyle = edgeOf('#7a7f8c'); g.lineWidth = edgeW();
+  g.beginPath(); g.ellipse(cx, cy, rx + 0.9, ry + 0.9, -0.12, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = 'rgba(40,44,52,0.3)'; g.lineWidth = 0.6;
+  g.beginPath();
+  for (let k = 0; k < 10; k++) { const t = (k / 10) * Math.PI * 2; g.moveTo(cx, cy); g.lineTo(cx + Math.cos(t) * rx * 0.97, cy + Math.sin(t) * ry * 0.97); }
+  g.stroke();
+  g.beginPath(); g.ellipse(cx, cy, rx * 0.55, ry * 0.55, -0.12, 0, Math.PI * 2); g.stroke();
+  // emitter on a tripod at the focus
+  const fx = cx, fy = cy - 20;
+  cable(g, [[cx - rx * 0.8, cy + 2], [fx, fy]], 0.8, '#9a9eaa');
+  cable(g, [[cx + rx * 0.8, cy + 2], [fx, fy]], 0.8, '#9a9eaa');
+  cable(g, [[cx, cy - ry * 0.85], [fx, fy]], 0.8, '#9a9eaa');
+  prism(g, [[fx - 2.5, fy + 18], [fx + 2.5, fy + 18], [fx + 2.5, fy + 23], [fx - 2.5, fy + 23]], 18, 22.5, '#6a6d78', '#3a3c44');   // emitter housing
+  g.save(); g.globalCompositeOperation = 'lighter';
+  glow(g, fx, fy - 1, 14, 'rgba(120,230,255,0.6)');
+  g.restore();
+  g.fillStyle = '#ffffff'; g.beginPath(); g.arc(fx, fy - 1, 1.8, 0, Math.PI * 2); g.fill();
+  // front capacitor banks and warning lights
+  capacitor(9, 55); capacitor(55, 55);
+  for (const x of [14, 50]) { g.fillStyle = '#ff6a5a'; g.fillRect(x - 0.7, 53 - 14.7, 1.4, 1.4); spill(g, x, 53 - 14, 3, 'rgba(255,90,80,0.5)'); }
   g.restore();
 }
 
@@ -1121,6 +1431,198 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   pioneer:   { hull: drawPioneerHull,   reach: 20, height: 18 },
 };
 
+// ---------------- defences ----------------
+// Bases are ordinary building art; the aiming heads are TURRET_ART, baked per
+// heading like vehicle turrets and drawn live at the pivot.
+
+// low armoured plinth with a team band, shared by the gun emplacements
+function plinth(g: Ctx, pts: Pt[], z0: number, z1: number, team: string) {
+  prism(g, pts, z0, z1 - 2, null, '#5d6170');
+  detailWalls(g, pts, z0, z1 - 2, 5);
+  prism(g, pts, z1 - 2, z1 - 1, null, team);
+  prism(g, pts, z1 - 1, z1, HULL_TOP, HULL);
+}
+
+// ---- Pulse Turret (1×1)
+
+export function drawPulseTurret(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
+  plinth(g, chamfer(6, 8, 26, 26, 5), 2, 7, team);
+  for (const [x, y] of [[9, 11], [23, 11]] as Pt[]) { g.fillStyle = '#ffb02e'; g.fillRect(x - 0.7, y - 7.7, 1.4, 1.4); spill(g, x, y - 7, 2.5, 'rgba(255,176,46,0.45)'); }
+  box(g, 0, 22, 26, 28, 29.5, 2, 5, '#6a6d78', '#4a4d56');                                  // ammo crate
+  deckPlate(g, 0, 5, 23, 26.6, 27, 27.6, GOLD);
+  g.restore();
+}
+function drawPulseHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 5, 7, 8.6, HULL_TOP, HULL);
+  const away = Math.sin(a) < 0;
+  const guns = () => {
+    barrels(g, a, [-1.6, 1.6], 3.5, 12.5, 9.6, 11, 1.1);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    for (const y of [-1.6, 1.6]) { const [px, py] = at(12.8, y, a); glow(g, px, py - 10.3, 2.2, 'rgba(95,224,240,0.6)'); }
+    g.restore();
+  };
+  if (away) guns();
+  prism(g, rot([[-5, -4], [2.5, -4], [5, -2], [5, 2], [2.5, 4], [-5, 4]], a), 8.6, 12, '#848894', TANK);
+  deckPlate(g, a, 12, -4.5, -3, -2.8, 3, team);
+  deckPlate(g, a, 12, 1.5, -1.2, 3.8, 1.2, GLASS_DK, true);
+  if (!away) guns();
+}
+
+// ---- Rail Cannon (2×2)
+
+export function drawRailCannon(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 61);
+  const coil = (x: number, y: number) => {
+    cylinder(g, x, y, 3, 3, 13, '#6a6d78', HULL);
+    for (const z of [6, 9]) { g.strokeStyle = COPPER; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y - z, 3, 0, Math.PI); g.stroke(); }
+    g.fillStyle = '#5fe0f0'; g.beginPath(); g.arc(x, y - 13, 1.8, 0, Math.PI * 2); g.fill();
+    spill(g, x, y - 13, 5, 'rgba(95,224,240,0.45)');
+  };
+  coil(12, 13); coil(52, 13);
+  plinth(g, chamfer(11, 13, 53, 57, 10), 3, 12, team);
+  coil(12, 56); coil(52, 56);
+  g.restore();
+}
+function drawRailHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 9, 12, 14, HULL_TOP, HULL);
+  const away = Math.sin(a) < 0;
+  const rails = () => {
+    for (const y of [-2.7, 2.7]) box(g, a, 7, y - 0.9, 33, y + 0.9, 15.5, 18, '#b8bcc8', '#5a5d69');
+    deckPlate(g, a, 16.6, 8, -1.6, 32, 1.6, 'rgba(95,224,240,0.55)');
+    for (const x of [13, 19, 25]) box(g, a, x, -3.8, x + 1.6, 3.8, 15, 18.6, COPPER, '#8a4e22');
+    box(g, a, 31.5, -4, 34, 4, 15, 18.6, '#6a6d78', '#3a3c44');
+  };
+  if (away) rails();
+  prism(g, rot([[-9, -7], [5, -7], [8.5, -4], [8.5, 4], [5, 7], [-9, 7], [-10.5, 4.5], [-10.5, -4.5]], a), 14, 20, '#848894', TANK);
+  deckPlate(g, a, 20, -9, -5.5, -6, 5.5, team);
+  for (const y of [-3, 0, 3]) deckPlate(g, a, 20, -4, y - 0.5, 4, y + 0.5, 'rgba(0,0,0,0.28)');
+  if (!away) rails();
+}
+
+// ---- Arc Tower (1×1): a static tesla pylon; the orb's crackle is live
+
+export function arcOrb(w: number): Pt {
+  const s = w / 32;
+  return [16 * s, (19 - 23) * s];
+}
+export function drawArcTower(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  const VIOLET = '#4a4066';
+  prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
+  plinth(g, chamfer(8, 10, 24, 26, 4), 2, 6, team);
+  prism(g, chamfer(12, 15, 20, 23, 2), 6, 19, '#5a5070', VIOLET);
+  detailWalls(g, chamfer(12, 15, 20, 23, 2), 6, 19, 0, 0.3);
+  for (const z of [9, 12.5, 16]) cylinder(g, 16, 19, 4.8, z, z + 1.3, '#8a7fb4', '#6f639a');   // insulators
+  const [ox, oy] = [16, 19 - 23];
+  const og = g.createRadialGradient(ox - 1.5, oy - 1.5, 0.5, ox, oy, 4.5);
+  og.addColorStop(0, '#f2e3ff'); og.addColorStop(0.5, '#b48aff'); og.addColorStop(1, '#4a2a80');
+  g.fillStyle = og; g.beginPath(); g.arc(ox, oy, 4.3, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = edgeOf('#4a2a80'); g.lineWidth = edgeW(); g.stroke();
+  g.restore();
+}
+
+// ---- Bastion Battery (2×2)
+
+export function drawBastion(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 64; g.scale(s, s);
+  prism(g, chamfer(3, 5, 61, 61, 8), 0, 3, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 3);
+  if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 67);
+  // round fort with a team band and merlons on the parapet
+  cylinder(g, 32, 34, 25, 3, 9, HULL_TOP, '#5d6170');
+  cylinder(g, 32, 34, 25, 9, 10.5, team, team);
+  cylinder(g, 32, 34, 25, 10.5, 12, '#7e8290', '#5d6170');
+  for (let k = 0; k < 9; k++) {
+    const t = 0.15 + (k / 8) * (Math.PI - 0.3), x = 32 + Math.cos(t) * 23, y = 34 + Math.sin(t) * 23;
+    prism(g, rot([[-2.2, -1.8], [2.2, -1.8], [2.2, 1.8], [-2.2, 1.8]], t + Math.PI / 2).map(([px, py]) => [px + x, py + y] as Pt), 12, 14.5, '#848894', '#5d6170');
+  }
+  for (const x of [14, 50]) { g.fillStyle = '#ffb02e'; g.fillRect(x - 0.8, 55 - 8.8, 1.6, 1.6); spill(g, x, 55 - 8, 3, 'rgba(255,176,46,0.45)'); }
+  g.restore();
+}
+function drawBastionHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 12, 12, 15, HULL_TOP, HULL);
+  const away = Math.sin(a) < 0;
+  const guns = () => {
+    barrels(g, a, [-5.2, -1.75, 1.75, 5.2], 8, 27, 16.4, 18.6, 2);
+    box(g, a, 26, -6.8, 29, 6.8, 16, 19, '#6a6d78', '#3a3c44');
+  };
+  if (away) guns();
+  prism(g, rot([[-11, -9], [5, -9], [10, -5], [10, 5], [5, 9], [-11, 9], [-13, 5.5], [-13, -5.5]], a), 15, 22, '#848894', TANK);
+  deckPlate(g, a, 22, -11.5, -6.5, -8, 6.5, team);
+  deckPlate(g, a, 22, 3, -7.5, 7.5, -4.5, GLASS_DK, true);
+  for (const y of [-4, -1, 2, 5]) deckPlate(g, a, 22, -6, y - 0.5, 1, y + 0.5, 'rgba(0,0,0,0.28)');
+  if (!away) guns();
+}
+
+// ---- Skyguard AA (1×1)
+
+export function drawSkyguard(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
+  detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
+  cylinder(g, 16, 18, 10, 2, 5.5, HULL_TOP, '#5d6170');
+  cylinder(g, 16, 18, 10, 5.5, 6.5, team, team);
+  cylinder(g, 16, 18, 10, 6.5, 7, '#7e8290', '#5d6170');
+  g.restore();
+}
+function drawSkyguardHead(g: Ctx, a: number, team: string) {
+  cylinder(g, 0, 0, 4.5, 7, 9, HULL_TOP, HULL);
+  // twin missile pods either side of a sensor block, tubes open to the sky
+  for (const y of [-4.5, 4.5]) {
+    box(g, a, -4, y - 2.8, 4.5, y + 2.8, 9, 15, '#848894', TANK);
+    for (const [dx, dy] of [[-1.5, -1.2], [-1.5, 1.2], [1.8, -1.2], [1.8, 1.2]] as Pt[]) {
+      deckPlate(g, a, 15, dx - 1, y + dy - 0.9, dx + 1, y + dy + 0.9, '#14110e');
+      deckPlate(g, a, 15, dx - 0.5, y + dy - 0.45, dx + 0.5, y + dy + 0.45, '#ff8c3a');
+    }
+  }
+  box(g, a, -2.5, -1.6, 3.5, 1.6, 9, 13, '#6a6d78', '#4a4d56');
+  deckPlate(g, a, 13, 1.5, -1.2, 3.5, 1.2, GLASS, true);
+  deckPlate(g, a, 13, -2.5, -1.4, -1, 1.4, team);
+}
+
+// ---- walls (1×1 segments that butt together into a line)
+
+function drawWallSegment(g: Ctx, w: number, team: string, heavy: boolean) {
+  g.save();
+  const s = w / 32; g.scale(s, s);
+  const side = heavy ? '#4d535e' : '#6a6e7a', top = heavy ? '#6d737e' : '#8a8f9c', zt = heavy ? 15 : 11;
+  prism(g, [[0, 12], [32, 12], [32, 27], [0, 27]], 0, 2, CONCRETE_TOP, CONCRETE);          // footing
+  const body: Pt[] = [[1, 14], [31, 14], [31, 25], [1, 25]];
+  prism(g, body, 2, zt, top, side);
+  detailWalls(g, body, 2, zt, heavy ? 10 : 15);
+  quad(g, [1, 25 - zt + 3], [31, 25 - zt + 3], [31, 25 - zt + 4.2], [1, 25 - zt + 4.2], team, false);
+  for (const x of [4, 28]) for (const z of [4.5, zt - 1.5]) { g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(x - 0.5, 25 - z - 0.5, 1, 1); }
+  if (heavy) {
+    // armour ribs on the cap and amber hazard corners
+    for (const x of [8, 16, 24]) quad(g, [x - 1, 14 - zt], [x + 1, 14 - zt], [x + 1, 25 - zt], [x - 1, 25 - zt], '#3a3f48', false);
+    for (const x of [1, 28]) quad(g, [x, 25 - zt], [x + 3, 25 - zt], [x + 3, 23 - zt], [x, 23 - zt], '#ffb02e', false);
+  }
+  g.restore();
+}
+export function drawWall(g: Ctx, w: number, _h: number, _level: number, team: string) { drawWallSegment(g, w, team, false); }
+export function drawHeavyWall(g: Ctx, w: number, _h: number, _level: number, team: string) { drawWallSegment(g, w, team, true); }
+
+// aiming heads by building id: pivot in footprint units (scaled by width/32 per tile)
+export interface TurretArt { head: (g: Ctx, a: number, team: string) => void; pivot: Pt; reach: number; height: number }
+export const TURRET_ART: Partial<Record<string, TurretArt>> = {
+  turret:   { head: drawPulseHead,    pivot: [16, 17], reach: 14, height: 14 },
+  railgun:  { head: drawRailHead,     pivot: [32, 35], reach: 36, height: 22 },
+  bastion:  { head: drawBastionHead,  pivot: [32, 34], reach: 30, height: 24 },
+  skyguard: { head: drawSkyguardHead, pivot: [16, 18], reach: 10, height: 17 },
+};
+
 // custom art by building id; anything not listed keeps the pack sprite
 export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number, level: number, team: string) => void>> = {
   nexus: drawNexus,
@@ -1132,4 +1634,15 @@ export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number,
   fusion: drawFusion,
   spire: drawSpire,
   lab: drawLab,
+  sensor: drawSensor,
+  repairyard: drawRepairYard,
+  skyport: drawSkyport,
+  uplink: drawUplink,
+  turret: drawPulseTurret,
+  railgun: drawRailCannon,
+  arctower: drawArcTower,
+  bastion: drawBastion,
+  skyguard: drawSkyguard,
+  wall: drawWall,
+  heavywall: drawHeavyWall,
 };
