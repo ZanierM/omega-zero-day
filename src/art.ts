@@ -10,7 +10,7 @@ type Ctx = CanvasRenderingContext2D;
 
 const OUT = '#1a120c';
 
-// refined style (the default; ?style=classic / V for the original): thin edges tinted from each
+// fine art (every in-game bake sets it): thin edges tinted from each
 // surface instead of the heavy black outline, plus extra surface detail where
 // an art function adds it
 let fine = false;

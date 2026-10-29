@@ -11,7 +11,7 @@ import {
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting, controlGroupIds, saveControlGroup, recallControlGroup } from './input';
 import { sfx, duckMusic } from './audio';
-import { defenceIconUrl, bakeAirSprite, artIconUrl, unitIconUrl, onStyleChange } from './render';
+import { defenceIconUrl, bakeAirSprite, artIconUrl, unitIconUrl } from './render';
 
 const creditsEl = document.getElementById('credits')!;
 const powerFill = document.getElementById('powerfill')!;
@@ -155,7 +155,6 @@ function activateTab(t: Tab) {
 
 export function initUI() {
   // icons are baked in the current render style; re-bake them when it flips
-  onStyleChange(() => { iconCache.clear(); shownPortrait = ''; rebuildGrid(); });
   for (const key of ['1', '2', '3']) {
     const el = document.createElement('button');
     el.type = 'button';

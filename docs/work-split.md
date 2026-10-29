@@ -20,6 +20,8 @@ edits the other's files and branches merge cleanly.
 
 **Campaign Act I (Claude, `campaign-act1`):** new `src/campaign/` (runner + mission data). Cross-file changes: `index.html` has a Skirmish / Campaign mode switch, the mission list and transmission in the briefing (`.skirmish-only` hides the skirmish copy), a `#comms` box and an `#objtracker`, and an `#againbtn` id on the end-screen button. `src/ui.ts` drives the comms box, tracker and mission end text, and filters the build bar through `techAllowed`. `src/main.ts` has `startMission()` and the mode switch. `src/save.ts` saves the mission run state. `src/config.ts` gained a fifth team colour and faction name (the Hollow). Keep these when reworking the briefing or the deck.
 
+**Small cross-file change (Claude, `polish-round`):** the classic art style is gone (the user's call): no `?style=classic`, no V key, no Graphics button in the pause menu, and `render.ts` no longer exports `refinedStyle`, `setRefinedStyle` or `onStyleChange`. The duplicate DOM order ring (`#ordermarker` and `markOrder` in `input.ts`) is removed; orders are marked by the canvas marker in `render.ts`.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---
