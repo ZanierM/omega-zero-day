@@ -216,7 +216,7 @@ function renderMissions() {
   }).join('');
   const m = campaign.MISSIONS.find(x => x.id === selectedMission)!;
   missionBrief.innerHTML = `<div class="optlabel">Transmission · ${m.code} ${m.title}</div>`
-    + m.briefing.map(p => `<p>${p}</p>`).join('')
+    + `<div class="transmission"><img src="portraits/varga.webp" alt="Admiral Varga"><div>${m.briefing.map(p => `<p>${p}</p>`).join('')}</div></div>`
     + `<ul class="objectives">${m.goals.map(g => `<li>${g}</li>`).join('')}</ul>`;
 }
 function setMode(m: typeof mode) {
@@ -308,9 +308,11 @@ setInterval(() => {
 // Dev helpers, handy in the browser console while balancing
 import * as inputMod from './input';
 import * as mapMod from './map';
+import * as configMod from './config';
 (window as any).novaDebug = game;
 (window as any).novaInput = inputMod;
 (window as any).novaMap = mapMod;
+(window as any).novaCfg = configMod;
 
 // Fast-forward the simulation by N seconds (e.g. novaStep(30) in the console)
 (window as any).novaStep = (seconds: number) => {

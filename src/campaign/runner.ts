@@ -31,11 +31,12 @@ let def: MissionDef | null = null;
 // ---------- comms ----------
 export interface CommLine { who: Speaker; text: string }
 export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'reyes';
-export const SPEAKERS: Record<Speaker, { name: string; role: string; color: string }> = {
-  varga:   { name: 'Adm. Ines Varga',   role: 'Ark-fleet command',    color: '#e8c66a' },
-  okoye:   { name: 'Sgt. Mara Okoye',   role: 'Helion ground lead',   color: '#4db8ff' },
-  lind:    { name: 'Dr. Teodor Lind',   role: 'Flux engineering',     color: '#43f3ec' },
-  kessler: { name: 'Marshal Kessler',   role: 'Kessler Collective',   color: '#e58a3a' },
+// portrait: file in public/portraits (speakers without one get a lettered badge)
+export const SPEAKERS: Record<Speaker, { name: string; role: string; color: string; portrait?: string }> = {
+  varga:   { name: 'Adm. Ines Varga',   role: 'Ark-fleet command',    color: '#e8c66a', portrait: 'varga.webp' },
+  okoye:   { name: 'Sgt. Mara Okoye',   role: 'Helion ground lead',   color: '#4db8ff', portrait: 'okoye.webp' },
+  lind:    { name: 'Dr. Teodor Lind',   role: 'Flux engineering',     color: '#43f3ec', portrait: 'lind.webp' },
+  kessler: { name: 'Marshal Kessler',   role: 'Kessler Collective',   color: '#e58a3a', portrait: 'kessler.webp' },
   reyes:   { name: 'Speaker Ama Reyes', role: 'Verdant Pact',         color: '#57c46a' },
   seren:   { name: 'Unknown signal',    role: 'source: under the crust', color: '#bfeef2' },
 };

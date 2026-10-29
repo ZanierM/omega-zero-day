@@ -630,8 +630,10 @@ function updateCampaignUI() {
       const deck = document.getElementById('bottombar')?.getBoundingClientRect();
       if (deck) comms.style.setProperty('--deck-h', `${Math.round(innerHeight - deck.top)}px`);
       comms.className = line.who;
-      commsBadge.textContent = line.who === 'seren' ? '?' : sp.name.split(' ').pop()![0];
       commsBadge.style.background = sp.color;
+      commsBadge.style.borderColor = sp.color;
+      if (sp.portrait) commsBadge.innerHTML = `<img src="portraits/${sp.portrait}" alt="">`;
+      else commsBadge.textContent = line.who === 'seren' ? '?' : sp.name.split(' ').pop()![0];
       commsWho.style.color = sp.color;
       commsWho.innerHTML = `${sp.name}<small>${sp.role}</small>`;
       commsText.textContent = line.text;
