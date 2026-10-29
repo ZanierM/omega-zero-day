@@ -20,6 +20,20 @@
     /* ---- theme: riveted gunmetal plates, bronze trim, gold lettering ---- */
     :root {
       --ink: #0c0d0f;          /* recessed wells */
+      /* command deck: deep space over the bronze frame — three star layers at
+         different spacings (so the tiling doesn't show), two faint nebulae and
+         a trace of warm dust from the dying sun */
+      --space:
+        radial-gradient(circle at 22% 30%, rgba(255,250,235,0.9) 0 0.7px, transparent 1.3px) 0 0 / 137px 83px,
+        radial-gradient(circle at 68% 64%, rgba(190,215,255,0.75) 0 0.6px, transparent 1.2px) 0 0 / 97px 71px,
+        radial-gradient(circle at 41% 78%, rgba(255,214,180,0.6) 0 0.9px, transparent 1.6px) 0 0 / 223px 127px,
+        radial-gradient(circle at 85% 18%, rgba(255,255,255,0.95) 0 1px, transparent 2px) 0 0 / 311px 149px,
+        radial-gradient(ellipse 55% 150% at 16% 0%, rgba(98,66,170,0.34), transparent 70%),
+        radial-gradient(ellipse 45% 130% at 88% 100%, rgba(28,120,165,0.3), transparent 70%),
+        radial-gradient(ellipse 40% 90% at 55% 45%, rgba(210,96,58,0.09), transparent 70%),
+        linear-gradient(180deg, #0f1526, #070a12);
+      --space-well: rgba(7,10,20,0.78);
+      --space-tab: rgba(12,17,32,0.62);
       --well: #16181b;
       --plate: #34383e;
       --plate-dk: #25282d;
@@ -104,15 +118,15 @@
     /* ---- bottom command deck: plated console ---- */
     #bottombar { display: flex; flex-direction: column; position: relative;
       padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-      background: var(--plates); border-top: 4px solid var(--edge-hi);
+      background: var(--space); border-top: 4px solid var(--edge-hi);
       box-shadow: 0 -6px 16px rgba(0,0,0,0.55), inset 0 2px 0 #3a2c18, inset 0 3px 0 rgba(255,236,200,0.1); }
 
     /* category tabs: rounded folder tabs sitting on the deck */
-    #tabsbar { display: flex; gap: 4px; padding: 6px 10px 0; border-bottom: 2px solid rgba(0,0,0,0.35); overflow-x: auto; }
+    #tabsbar { display: flex; gap: 4px; padding: 6px 10px 0; border-bottom: 1px solid rgba(156,122,68,0.35); overflow-x: auto; }
     .htab { padding: 6px 14px 5px; font-size: 13px; font-weight: 800; color: var(--muted); cursor: pointer; white-space: nowrap;
-      background: rgba(0,0,0,0.22); border: 2px solid transparent; border-bottom: none; border-radius: 10px 10px 0 0; }
+      background: var(--space-tab); border: 2px solid transparent; border-bottom: none; border-radius: 10px 10px 0 0; }
     .htab:hover { color: var(--cream); }
-    .htab.active { color: var(--gold); background: var(--plates-dk); border-color: var(--edge); }
+    .htab.active { color: var(--gold); background: var(--space-well); border-color: var(--edge); }
     .htab.locked { opacity: 0.4; }
 
     #hudrow { display: flex; align-items: stretch; gap: 10px; padding: 9px 10px 10px; min-height: 0; }
@@ -147,7 +161,7 @@
 
     /* right console: selection readout + action buttons */
     #infopanel { width: 270px; display: flex; flex-direction: column; gap: 6px; }
-    #selinfo { flex: 1; min-height: 0; padding: 7px 11px; background: var(--well); border: 2px solid #3c3122; border-radius: 10px;
+    #selinfo { flex: 1; min-height: 0; padding: 7px 11px; background: var(--space-well); border: 2px solid #3c3122; border-radius: 10px;
       box-shadow: var(--sunk); font-size: 12px; color: var(--muted); line-height: 1.45; overflow: hidden; }
     #selinfo b { color: var(--cream); font-family: var(--head); font-size: 14px; font-weight: 800; }
     #selinfo.has-selection { display: grid; grid-template-columns: 44px minmax(0,1fr); grid-template-rows: minmax(0,auto) 5px; align-content: start; gap: 3px 7px; }
@@ -461,7 +475,7 @@
       #powerfill, #toast, .bbtn, .opt { transition: none; }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-sLrZyoLv.js"></script>
+  <script type="module" crossorigin src="./assets/index-Bgqo7foV.js"></script>
 </head>
 <body>
   <div id="app" inert>
