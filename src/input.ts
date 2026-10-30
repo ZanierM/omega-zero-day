@@ -1,4 +1,4 @@
-import { TILE, PLAYER, BUILDINGS } from './config';
+import { TILE, PLAYER, BUILDINGS, SLOTS } from './config';
 import { MAP_W, MAP_H } from './map';
 import {
   units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding, packBuilding, translocate,
@@ -6,7 +6,7 @@ import {
   jumpTargetAlert, starvedHarvesters, activateAbility, visible, explored,
 } from './game';
 import { crystal, idx, inBounds } from './map';
-import { sfx } from './audio';
+import { sfx, voice } from './audio';
 
 export const camera = { x: 0, y: 0, zoom: 1 };
 export const MIN_ZOOM = 0.5, MAX_ZOOM = 2.4;
@@ -89,6 +89,11 @@ function zoomAt(factor: number, screenX: number, screenY: number) {
   clampCamera();
 }
 
+// the units you just picked up answer (one voice for the group, and only for fighting units)
+function greet() {
+  const u = selectedUnits().find(x => !x.def.harvester);
+  if (u) voice('select', SLOTS[PLAYER], u.def.tab === 'veh');
+}
 function selectedUnits(): Unit[] {
   const out: Unit[] = [];
   for (const id of selection) {
@@ -227,6 +232,7 @@ export function initInput() {
       lastMouseUnit = hit && hit.kind === 'unit' ? hit.id : -1;
       lastMouseClick = now;
     }
+    greet();
     dragStart = null;
     selectBox = null;
   });
@@ -383,6 +389,7 @@ export function initInput() {
       }
       selectBox = null;
       if (selection.size) sfx('click');
+      greet();
       return;
     }
     selectBox = null;
@@ -423,6 +430,7 @@ export function initInput() {
         selection.clear();
         selection.add(hit.id);
       }
+      greet();
       lastTapId = hit.kind === 'unit' ? hit.id : -1;
     } else if (selection.size > 0) {
       rightClick(); // move / attack / harvest / set rally

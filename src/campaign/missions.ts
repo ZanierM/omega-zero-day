@@ -18,7 +18,8 @@ export interface Objective {
 }
 export interface Trigger { id: string; when: (c: Ctx) => boolean; run: (c: Ctx) => void }
 export interface MissionDef {
-  id: string; act: 1 | 2 | 3; code: string; title: string; tagline: string;
+  id: string; act: 0 | 1 | 2 | 3; code: string; title: string; tagline: string;
+  optional?: boolean;   // the boot camp: listed first, but nothing waits on it
   briefing: string[]; goals: string[];
   seed: number; enemies: number; crystalMul?: number; credits: number;
   size?: number;                           // map size override (tiles)
@@ -56,6 +57,79 @@ function harvesterWarning(c: Ctx, ev: GameEvent) {
     c.say('okoye', 'We lost a harvester. Another Extractor brings a replacement. The fleet can\'t wait.');
   }
 }
+
+// ---------------------------------------------------------------------------
+// Boot camp (optional): the controls, one step at a time, on a small quiet map
+const bootCamp: MissionDef = {
+  id: 'boot', act: 0, code: 'B', title: 'Boot Camp', tagline: 'Learn the ground before you hold it', optional: true,
+  briefing: [
+    'Lantern, Okoye. Before Varga drops you anywhere that matters, you learn the ground. Small yard, one Kessler outpost on the hill, nobody in a hurry.',
+    'I\'ll talk you through it a step at a time. Skip it if you\'ve done this before; Depot Six is open either way.',
+  ],
+  goals: ['Move a squad', 'Build power, an Extractor and a Barracks', 'Take a vent', 'Knock out the Kessler outpost'],
+  seed: 4242, enemies: 1, size: 48, credits: 2500,
+  allowed: BASE_TECH,
+  setup(c) {
+    nexusAtBase(c);
+    const b = c.base(PLAYER), k = c.base(KESSLER);
+    c.spawn(['trooper', 'trooper', 'trooper'], PLAYER, b.tx + 1, b.ty + 5, 'squad');
+    // the marker: a little way out toward the middle
+    c.run.vars.mx = Math.round(b.tx + (k.tx - b.tx) * 0.25); c.run.vars.my = Math.round(b.ty + (k.ty - b.ty) * 0.25);
+    c.place('outpost', KESSLER, k.tx, k.ty);
+    c.spawn(['trooper', 'trooper'], KESSLER, k.tx + 1, k.ty + 3, 'post');
+  },
+  intro(c) {
+    c.say('okoye', 'First, your squad. Drag a box around them to select them, or tap one. Double-tap selects every unit of that type.');
+    c.say('okoye', 'Now right-click the ground by the marker to move them there. On a touch screen, just tap where you want them.');
+  },
+  update(c, dt) {
+    const v = c.run.vars;
+    if (!c.done('move') && (v.pingT = (v.pingT ?? 0) - dt) <= 0) { v.pingT = 4; c.ping(v.mx, v.my, '#e8c66a'); }
+  },
+  objectives: [
+    { id: 'move', text: 'Select your squad and move it to the marker', check: c => units.filter(u => u.owner === PLAYER && u.def.id === 'trooper' && Math.hypot(u.x / 32 - c.run.vars.mx, u.y / 32 - c.run.vars.my) < 3.5).length >= 2 },
+    { id: 'solar', text: 'Build a Solar Array (Structures tab)', hidden: true, check: c => c.buildingsOf(PLAYER, 'solar').length > 0 },
+    { id: 'extractor', text: 'Build an Extractor beside the crystal', hidden: true, check: c => c.buildingsOf(PLAYER, 'extractor').length > 0 },
+    { id: 'flux', text: c => `Deliver flux: ${Math.min(500, Math.round(c.flux()))} / 500`, hidden: true, check: c => c.flux() >= 500 },
+    { id: 'barracks', text: c => `Build a Barracks and train Troopers: ${Math.min(3, Math.max(0, units.filter(u => u.owner === PLAYER && u.def.id === 'trooper').length - (c.run.vars.t0 ?? 3)))} / 3`, hidden: true,
+      check: c => c.buildingsOf(PLAYER, 'barracks').length > 0 && units.filter(u => u.owner === PLAYER && u.def.id === 'trooper').length - (c.run.vars.t0 ?? 3) >= 3 },
+    { id: 'vent', text: 'Capture a flux vent', hidden: true, check: () => ventsHeld(PLAYER) >= 1 },
+    { id: 'outpost', text: 'Destroy the Kessler outpost', hidden: true, check: c => c.buildingsOf(KESSLER).length === 0 },
+  ],
+  triggers: [
+    { id: 'move', when: c => c.done('move'), run: c => {
+      c.show('solar');
+      c.say('okoye', 'Good. Everything here runs on power. Open the Structures tab at the bottom, pick the Solar Array, then click (or tap) a spot next to your HQ.');
+    } },
+    { id: 'solar', when: c => c.done('solar'), run: c => {
+      c.show('extractor');
+      c.say('okoye', 'Lights on. Now an Extractor, right next to the blue crystal. It comes with a harvester that mines on its own and brings the flux home.');
+    } },
+    { id: 'extractor', when: c => c.done('extractor'), run: c => {
+      c.show('flux');
+      c.say('okoye', 'Flux pays for everything. Watch the counter top left climb as the harvester unloads.');
+    } },
+    { id: 'flux', when: c => c.done('flux'), run: c => {
+      c.run.vars.t0 = units.filter(u => u.owner === PLAYER && u.def.id === 'trooper').length;
+      c.show('barracks');
+      c.say('okoye', 'Now soldiers. Build a Barracks, then queue three Troopers from the Infantry tab. You can queue several at once.');
+    } },
+    { id: 'barracks', when: c => c.done('barracks'), run: c => {
+      c.show('vent');
+      const n = c.vents().sort((p, q) => Math.hypot(p.tx - c.base(PLAYER).tx, p.ty - c.base(PLAYER).ty) - Math.hypot(q.tx - c.base(PLAYER).tx, q.ty - c.base(PLAYER).ty))[0];
+      if (n) { c.ping(n.tx, n.ty, '#43f3ec'); c.reveal(n.tx, n.ty, 4); }
+      c.say('okoye', 'See the vent I marked? Stand troops on it and keep enemies off until the ring fills. A vent pays flux every second you hold it.');
+    } },
+    { id: 'vent', when: c => c.done('vent'), run: c => {
+      c.show('outpost');
+      const k = c.base(KESSLER); c.ping(k.tx, k.ty, '#e58a3a'); c.reveal(k.tx, k.ty, 6);
+      c.say('okoye', 'Last thing. Kessler\'s outpost on the hill. Select your troops and right-click it (or tap it) to attack. Press A then click to attack-move: they\'ll fight anything on the way.');
+    } },
+  ],
+  win: c => c.done('outpost'),
+  endWin: { title: 'Ready', text: 'Okoye: "That\'s the job, Lantern. Power, flux, soldiers, ground. Everything else is just more of it, under fire. Depot Six is waiting."' },
+  endLose: { title: 'Back to the yard', text: 'Okoye: "Happens to everyone the first time. Again."' },
+};
 
 // ---------------------------------------------------------------------------
 // I-1 · Cold Drop
@@ -944,4 +1018,4 @@ const zeroDay: MissionDef = {
   endLose: { title: 'Zero Day', text: 'Helios goes before the beacon is lit. There is no corridor, no fleet, no dawn. Only light.' },
 };
 
-export const MISSIONS: MissionDef[] = [coldDrop, fluxLines, ironWeather, sparks, greenTide, resonanceM, meridian, kesslersWall, zeroDay];
+export const MISSIONS: MissionDef[] = [bootCamp, coldDrop, fluxLines, ironWeather, sparks, greenTide, resonanceM, meridian, kesslersWall, zeroDay];
