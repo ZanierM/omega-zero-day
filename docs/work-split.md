@@ -28,6 +28,8 @@ edits the other's files and branches merge cleanly.
 
 **The Keepers (Claude, `keepers`):** new `src/keepers.ts` (their AI) and `src/keeper-art.ts`. Cross-file: `index.html` adds "The Keepers: Absent / Arrive" (`#keeperopts`); `src/main.ts` lands them in `startGame`; `src/ui.ts` shows a mission's `endEliminated` text when the base is wiped out. New portrait `public/portraits/keeper.webp`. `hostile()` in `config.ts` makes the Hollow, the brood and the Keepers allies.
 
+**Play as any faction (Claude, `play-as`):** `config.ts` now has a per-match faction table (`SLOTS`, `setSlots`, `kindOf`, `canMake`, `producersOf`, faction bonuses); `TEAM_COLORS` and `FACTION_NAMES` are rewritten in place per match. Cross-file: `index.html` adds the `#factionopts` "Play as" picker; `src/main.ts` builds it and seats the factions in `startGame`; `src/ui.ts` lists the player faction's tech, shows bonus prices (`costFor`) and hides empty tabs. **For the UI agent:** the power pill shows "0 spare" when playing the brood or the Keepers (no power); hide it when `kindOf(PLAYER) !== 'human'`.
+
 **Base branch from round 2 on: `main`.** `reskin-gunmetal`, `reskin-ui` and `reskin-world` were merged into `main` (PRs #1–#3). Each agent cuts a fresh branch from `main` per round and opens a PR back to `main`.
 
 ---

@@ -3,7 +3,7 @@
 // the objective list and comms queue, and tracks campaign progress.
 // Everything it remembers lives in `run`, which is plain data so it saves.
 
-import { PLAYER, TILE, FACTION_NAMES, BUILDINGS } from '../config';
+import { PLAYER, TILE, FACTION_NAMES, BUILDINGS, resetSlots } from '../config';
 import * as game from '../game';
 import {
   units, buildings, players, spawnUnit, placeBuilding, issueOrder, centerOfTile, buildingCenter,
@@ -214,6 +214,7 @@ function install(d: MissionDef, r: RunState) {
 export function setupMission(id: string) {
   const d = MISSIONS.find(m => m.id === id);
   if (!d) throw new Error(`Unknown mission ${id}`);
+  resetSlots();   // the campaign is always Helion's story
   seedMap(d.seed);
   generateMap(d.enemies, d.crystalMul ?? 1, d.size);
   initGame(d.enemies);

@@ -1,4 +1,4 @@
-import { PLAYER, TILE, BROOD, KEEPERS } from './config';
+import { PLAYER, TILE, BROOD, KEEPERS, FACTIONS, FactionId, setSlots, resetSlots, kindOf } from './config';
 import { generateMap, startBases } from './map';
 import * as game from './game';
 import { update, spawnUnit, placeBuilding, buildingCenter, centerOfTile, initGame } from './game';
@@ -29,10 +29,18 @@ let started = false;
 let deploying = false;
 let difficulty: import('./ai').Difficulty = 'normal';
 
-interface SkirmishOpts { credits: number; crystalMul: number; nova: number; brood?: boolean; keepers?: boolean }
+interface SkirmishOpts { credits: number; crystalMul: number; nova: number; brood?: boolean; keepers?: boolean; faction?: FactionId }
 
 async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 5000, crystalMul: 1, nova: 0 }) {
   campaign.endRun();
+  // who sits where: you take slot 0 as your faction; if that's a faction an AI would
+  // have played, Helion stands in for it
+  const slots: FactionId[] = ['helion', 'kessler', 'verdant', 'ashen', 'hollow', 'brood', 'keepers'];
+  const mine = opts.faction ?? 'helion';
+  const dup = slots.indexOf(mine);
+  if (dup > 0 && dup < 4) slots[dup] = 'helion';
+  slots[0] = mine;
+  setSlots(slots);
   generateMap(numEnemies, opts.crystalMul);
   initGame(numEnemies);
   game.setSupernova(opts.nova);
@@ -43,6 +51,16 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
   const bases = startBases; // randomized by generateMap
   for (let owner = 0; owner < bases.length; owner++) {
     const b = bases[owner];
+    // an alien player starts as its faction does: a Heart and skitters, or a Beacon and an escort
+    if (owner === PLAYER && kindOf(PLAYER) !== 'human') {
+      const brood = kindOf(PLAYER) === 'brood';
+      const core = placeBuilding(brood ? 'heart' : 'beacon', PLAYER, b.x, b.y);
+      const c = buildingCenter(core);
+      const escort = brood ? ['skitter', 'skitter', 'skitter', 'skitter', 'skitter', 'skitter', 'spitter', 'spitter'] : ['acolyte', 'acolyte', 'acolyte', 'lancer'];
+      escort.forEach((id, k) => spawnUnit(id, PLAYER, c.x + Math.cos(k * 0.8) * TILE * 2.6, c.y + TILE * 2.4 + Math.sin(k * 0.8) * TILE));
+      centerCameraOn(c.x, c.y);
+      continue;
+    }
     const hq = placeBuilding('nexus', owner, b.x, b.y);
     // starting forces around each HQ
     const cx = hq.tx + 1, cy = hq.ty + 1;
@@ -114,6 +132,35 @@ function saveNow() { if (started && !game.gameOver) writeSave(difficulty); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
 window.addEventListener('pagehide', saveNow);
 
+// play-as picker: one card per playable faction
+const factionOpts = document.getElementById('factionopts')!;
+const PLAYABLE: FactionId[] = ['helion', 'kessler', 'verdant', 'ashen', 'brood', 'keepers'];
+factionOpts.innerHTML = PLAYABLE.map((f, i) => {
+  const F = FACTIONS[f];
+  return `<button class="opt${i === 0 ? ' sel' : ''}${F.kind !== 'human' ? ' alien' : ''}" type="button" role="radio" aria-checked="${i === 0}" data-f="${f}">`
+    + `<b><i style="background:${F.color};color:${F.color}"></i>${F.name}</b><span>${F.blurb}</span></button>`;
+}).join('');
+function syncAlienOptions() {
+  // you can't also fight yourself
+  const f = (factionOpts.querySelector('.opt.sel') as HTMLElement | null)?.dataset.f;
+  // the opponent buttons name who you'll actually face (Helion stands in for your faction)
+  const foes = (['kessler', 'verdant', 'ashen'] as FactionId[]).map(x => (x === f ? 'helion' : x));
+  document.querySelectorAll<HTMLElement>('#aiopts .opt span').forEach((sp, i) => {
+    sp.textContent = (i ? '+ ' : '') + FACTIONS[foes[i]].name + (i === 1 ? ' · 76×76' : i === 2 ? ' · 90×90' : '');
+  });
+  for (const [row, id] of [['broodopts', 'brood'], ['keeperopts', 'keepers']] as const) {
+    const on = document.querySelector(`#${row} .opt[data-v="1"]`) as HTMLButtonElement, off = document.querySelector(`#${row} .opt[data-v="0"]`) as HTMLButtonElement;
+    on.disabled = f === id;
+    if (f === id && on.classList.contains('sel')) { on.classList.remove('sel'); off.classList.add('sel'); }
+  }
+}
+factionOpts.addEventListener('click', e => {
+  const btn = e.target instanceof Element ? e.target.closest<HTMLElement>('.opt') : null;
+  if (!btn) return;
+  factionOpts.querySelectorAll('.opt').forEach(b => { b.classList.toggle('sel', b === btn); b.setAttribute('aria-checked', String(b === btn)); });
+  syncAlienOptions();
+});
+
 // faction-count + difficulty selectors: segmented buttons (delegated)
 for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts', 'broodopts', 'keeperopts']) {
   document.getElementById(id)!.addEventListener('click', e => {
@@ -182,7 +229,9 @@ deployBtn.addEventListener('click', async () => {
   difficulty = (dsel?.dataset.d ?? 'normal') as import('./ai').Difficulty;
   const pick = (id: string, def: number) =>
     Number((document.querySelector(`#${id} .opt.sel`) as HTMLElement | null)?.dataset.v ?? def);
-  const opts = { credits: pick('creditopts', 5000), crystalMul: pick('crystalopts', 1), nova: pick('novaopts', 0), brood: pick('broodopts', 0) === 1, keepers: pick('keeperopts', 0) === 1 };
+  const faction = ((document.querySelector('#factionopts .opt.sel') as HTMLElement | null)?.dataset.f ?? 'helion') as FactionId;
+  const opts = { credits: pick('creditopts', 5000), crystalMul: pick('crystalopts', 1), nova: pick('novaopts', 0),
+    brood: pick('broodopts', 0) === 1 && faction !== 'brood', keepers: pick('keeperopts', 0) === 1 && faction !== 'keepers', faction };
   try {
     initAudio(); // must start from a user gesture (browser autoplay rules)
     if (mode === 'campaign') await startMission(selectedMission);

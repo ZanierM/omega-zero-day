@@ -148,24 +148,24 @@ export const UNITS: Record<string, UnitDef> = {
   colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2, ability: ABILITIES.stomp,
                desc: 'Superheavy siege platform. The ground remembers where it walked. Requires Weapons II.' },
   // ---- the Keepers: the Vey's makers, come back to judge (AI only) ----
-  acolyte:   { id: 'acolyte',   name: 'Acolyte',        tab: 'inf', cost: 300,  buildTime: 1,  hp: 130,  speed: 2.4, damage: 17,  range: 5.5, reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 3, spriteH: 28, nonBuildable: true, shield: 90, antiAir: true,
+  acolyte:   { id: 'acolyte',   name: 'Acolyte',        tab: 'inf', cost: 300,  buildTime: 6,  hp: 130,  speed: 2.4, damage: 17,  range: 5.5, reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 3, spriteH: 28, nonBuildable: true, shield: 90, antiAir: true,
                desc: 'Tall, unhurried, wrapped in light. Its rifle is a thread of the sun.' },
-  lancer:    { id: 'lancer',    name: 'Lancer',         tab: 'veh', cost: 650,  buildTime: 1,  hp: 260,  speed: 4.6, damage: 46,  range: 3.2, reload: 1.5, vision: 7, radius: 13, model: 'car', mstep: 3, spriteH: 32, nonBuildable: true, shield: 160,
+  lancer:    { id: 'lancer',    name: 'Lancer',         tab: 'veh', cost: 650,  buildTime: 9,  hp: 260,  speed: 4.6, damage: 46,  range: 3.2, reload: 1.5, vision: 7, radius: 13, model: 'car', mstep: 3, spriteH: 32, nonBuildable: true, shield: 160,
                desc: 'A gold skimmer that runs down armour and pins it with a lance of light.' },
-  luminar:   { id: 'luminar',   name: 'Luminar',        tab: 'veh', cost: 550,  buildTime: 1,  hp: 180,  speed: 3.2, damage: 8,   range: 4,   reload: 1.0, vision: 9, radius: 11, model: 'drone', mstep: 3, spriteH: 28, nonBuildable: true, air: true, antiAir: true, shield: 140, shieldAura: { radius: 4.5, rate: 18 },
+  luminar:   { id: 'luminar',   name: 'Luminar',        tab: 'veh', cost: 550,  buildTime: 9,  hp: 180,  speed: 3.2, damage: 8,   range: 4,   reload: 1.0, vision: 9, radius: 11, model: 'drone', mstep: 3, spriteH: 28, nonBuildable: true, air: true, antiAir: true, shield: 140, shieldAura: { radius: 4.5, rate: 18 },
                desc: 'A floating orb in a cage of rings. It pours light back into the shields around it.' },
-  monolith:  { id: 'monolith',  name: 'Monolith',       tab: 'veh', cost: 1600, buildTime: 1,  hp: 900,  speed: 1.2, damage: 95,  range: 9,   reload: 3.2, vision: 9, radius: 18, model: 'mech', mstep: 3, spriteH: 56, nonBuildable: true, shield: 700,
+  monolith:  { id: 'monolith',  name: 'Monolith',       tab: 'veh', cost: 1600, buildTime: 20,  hp: 900,  speed: 1.2, damage: 95,  range: 9,   reload: 3.2, vision: 9, radius: 18, model: 'mech', mstep: 3, spriteH: 56, nonBuildable: true, shield: 700,
                desc: 'A walking obelisk. When it opens, the light it fires can cut a building in half.' },
   // ---- the Vey brood: crystal grown through flesh (AI only) ----
-  skitter:   { id: 'skitter',   name: 'Skitter',        tab: 'inf', cost: 110,  buildTime: 1,  hp: 95,   speed: 3.6, damage: 9,   range: 1.4, reload: 0.45, vision: 6, radius: 7,  model: 'soldier', mstep: 2, spriteH: 18, nonBuildable: true, crystalRegen: 3,
+  skitter:   { id: 'skitter',   name: 'Skitter',        tab: 'inf', cost: 110,  buildTime: 3,  hp: 95,   speed: 3.6, damage: 9,   range: 1.4, reload: 0.45, vision: 6, radius: 7,  model: 'soldier', mstep: 2, spriteH: 18, nonBuildable: true, crystalRegen: 3,
                desc: 'Six legs, a crystal spine, too many of them. They pour out of the pods.' },
-  spitter:   { id: 'spitter',   name: 'Spitter',        tab: 'inf', cost: 240,  buildTime: 1,  hp: 150,  speed: 2.5, damage: 26,  range: 5.5, reload: 1.8, vision: 7, radius: 9,  model: 'soldier', mstep: 2, spriteH: 22, nonBuildable: true, weapon: 'shell', splash: 0.7, antiAir: true,
+  spitter:   { id: 'spitter',   name: 'Spitter',        tab: 'inf', cost: 240,  buildTime: 5,  hp: 150,  speed: 2.5, damage: 26,  range: 5.5, reload: 1.8, vision: 7, radius: 9,  model: 'soldier', mstep: 2, spriteH: 22, nonBuildable: true, weapon: 'shell', splash: 0.7, antiAir: true,
                desc: 'Swells its glowing throat and spits a gob of crystal acid.' },
-  carapace:  { id: 'carapace',  name: 'Carapace',       tab: 'veh', cost: 600,  buildTime: 1,  hp: 720,  speed: 2.0, damage: 48,  range: 1.8, reload: 1.3, vision: 5, radius: 14, model: 'mech', mstep: 2, spriteH: 30, nonBuildable: true, crystalRegen: 8,
+  carapace:  { id: 'carapace',  name: 'Carapace',       tab: 'veh', cost: 600,  buildTime: 10,  hp: 720,  speed: 2.0, damage: 48,  range: 1.8, reload: 1.3, vision: 5, radius: 14, model: 'mech', mstep: 2, spriteH: 30, nonBuildable: true, crystalRegen: 8,
                desc: 'A walking shell of crystal plate over meat. It rams armour until something gives.' },
-  moth:      { id: 'moth',      name: 'Lumen Moth',     tab: 'veh', cost: 520,  buildTime: 1,  hp: 230,  speed: 4.2, damage: 18,  range: 3.5, reload: 0.7, vision: 9, radius: 12, model: 'drone', mstep: 3, spriteH: 26, nonBuildable: true, air: true, antiAir: true,
+  moth:      { id: 'moth',      name: 'Lumen Moth',     tab: 'veh', cost: 520,  buildTime: 9,  hp: 230,  speed: 4.2, damage: 18,  range: 3.5, reload: 0.7, vision: 9, radius: 12, model: 'drone', mstep: 3, spriteH: 26, nonBuildable: true, air: true, antiAir: true,
                desc: 'Translucent wings veined with light. It drifts over walls and burns what is underneath.' },
-  behemoth:  { id: 'behemoth',  name: 'Behemoth',       tab: 'veh', cost: 1700, buildTime: 1,  hp: 2100, speed: 1.3, damage: 110, range: 8.5, reload: 3.6, vision: 8, radius: 22, model: 'mech', mstep: 3, spriteH: 60, nonBuildable: true, weapon: 'shell', splash: 1.7, crystalRegen: 15,
+  behemoth:  { id: 'behemoth',  name: 'Behemoth',       tab: 'veh', cost: 1700, buildTime: 22,  hp: 2100, speed: 1.3, damage: 110, range: 8.5, reload: 3.6, vision: 8, radius: 22, model: 'mech', mstep: 3, spriteH: 60, nonBuildable: true, weapon: 'shell', splash: 1.7, crystalRegen: 15,
                desc: 'A hill that walks. The crystal on its back fires like a mortar.' },
   // ---- the Hollow (campaign): the Meridian's descendants, grown through with the Vey's crystal ----
   shardkin:  { id: 'shardkin',  name: 'Shardkin',       tab: 'inf', cost: 0,    buildTime: 1,  hp: 150,  speed: 2.7, damage: 15,  range: 2.4, reload: 0.7, vision: 6, radius: 8,  model: 'soldier', mstep: 2, spriteH: 26, nonBuildable: true, crystalRegen: 6,
@@ -224,23 +224,23 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   // ---- the Keepers: arrive in light, never built (AI only) ----
   beacon:    { id: 'beacon',    name: 'Keeper Beacon',  tab: 'build', cost: 0,    buildTime: 1,  hp: 2200, power: 0,    w: 3, h: 3, vision: 10, nonBuildable: true, shield: 1400,
                desc: 'A spire of pale gold that sings at the sky. Whatever the Keepers send comes down its light.' },
-  sanctum:   { id: 'sanctum',   name: 'Sanctum',        tab: 'build', cost: 700,  buildTime: 1,  hp: 900,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 600,
+  sanctum:   { id: 'sanctum',   name: 'Sanctum',        tab: 'build', cost: 700,  buildTime: 14,  hp: 900,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 600,
                desc: 'A ring of floating stones around a held breath of light. Arrivals come faster while it stands.' },
-  shrine:    { id: 'shrine',    name: 'Shrine',         tab: 'build', cost: 450,  buildTime: 1,  hp: 700,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 400,
+  shrine:    { id: 'shrine',    name: 'Shrine',         tab: 'build', cost: 450,  buildTime: 10,  hp: 700,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 400,
                desc: 'It listens to the crystal and is fed by it. Gently.' },
-  obelisk:   { id: 'obelisk',   name: 'Ward Obelisk',   tab: 'def',   cost: 500,  buildTime: 1,  hp: 650,  power: 0,    w: 1, h: 1, vision: 9,  nonBuildable: true, shield: 450,
+  obelisk:   { id: 'obelisk',   name: 'Ward Obelisk',   tab: 'def',   cost: 500,  buildTime: 9,  hp: 650,  power: 0,    w: 1, h: 1, vision: 9,  nonBuildable: true, shield: 450,
                turret: { damage: 42, range: 7.5, reload: 1.4, antiAir: true },
                desc: 'A floating blade of gold that turns its light on intruders.' },
   // ---- the Vey brood: grown, not built (AI only) ----
   heart:     { id: 'heart',     name: 'Brood Heart',    tab: 'build', cost: 0,    buildTime: 1,  hp: 3200, power: 0,    w: 3, h: 3, vision: 9,  nonBuildable: true, bloom: 8,
                desc: 'A mound of flesh and crystal the size of a bunker, beating. Everything the brood is grows out from it.' },
-  broodpod:  { id: 'broodpod',  name: 'Brood Pod',      tab: 'build', cost: 450,  buildTime: 1,  hp: 950,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 4,
+  broodpod:  { id: 'broodpod',  name: 'Brood Pod',      tab: 'build', cost: 450,  buildTime: 14,  hp: 950,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 4,
                desc: 'A cluster of glowing egg-sacs. Things move inside.' },
-  veinwell:  { id: 'veinwell',  name: 'Vein Well',      tab: 'build', cost: 350,  buildTime: 1,  hp: 750,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 3,
+  veinwell:  { id: 'veinwell',  name: 'Vein Well',      tab: 'build', cost: 350,  buildTime: 10,  hp: 750,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 3,
                desc: 'Roots sunk into the crystal, drinking flux straight from the ground.' },
-  bloomnode: { id: 'bloomnode', name: 'Bloom Node',     tab: 'build', cost: 120,  buildTime: 1,  hp: 320,  power: 0,    w: 1, h: 1, vision: 6,  nonBuildable: true, bloom: 5,
+  bloomnode: { id: 'bloomnode', name: 'Bloom Node',     tab: 'build', cost: 120,  buildTime: 4,  hp: 320,  power: 0,    w: 1, h: 1, vision: 6,  nonBuildable: true, bloom: 5,
                desc: 'A bulb on a stalk that pushes the living ground further out.' },
-  spinespire:{ id: 'spinespire',name: 'Spine Spire',    tab: 'def',   cost: 400,  buildTime: 1,  hp: 700,  power: 0,    w: 1, h: 1, vision: 8,  nonBuildable: true, bloom: 2,
+  spinespire:{ id: 'spinespire',name: 'Spine Spire',    tab: 'def',   cost: 400,  buildTime: 9,  hp: 700,  power: 0,    w: 1, h: 1, vision: 8,  nonBuildable: true, bloom: 2,
                turret: { damage: 32, range: 6.5, reload: 1.1, antiAir: true },
                desc: 'A crystal-tipped stalk that flings shards at anything walking on the bloom.' },
 };
@@ -332,7 +332,60 @@ export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes
 export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2', '#b46cff', '#ffd27a'];   // 4 = the Hollow (campaign), 5 = the Vey brood, 6 = the Keepers
 export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow', 'The Vey Brood', 'The Keepers'];
-export const BROOD = 5, KEEPERS = 6;
-/** The Vey's own (the Hollow, the brood, the Keepers who made it) never fight each other. */
-export const isVey = (o: number) => o === 4 || o === BROOD || o === KEEPERS;
-export const hostile = (a: number, b: number) => a !== b && !(isVey(a) && isVey(b));
+export const BROOD = 5, KEEPERS = 6;   // the AI slots the aliens use
+
+// ---- factions: who sits in each owner slot this match ----
+// Slots are fixed numbers (0 is always the player); which faction holds each one
+// is set per match, so the player can be any faction. TEAM_COLORS and
+// FACTION_NAMES are rewritten in place to match.
+export type FactionId = 'helion' | 'kessler' | 'verdant' | 'ashen' | 'hollow' | 'brood' | 'keepers';
+export type FactionKind = 'human' | 'hollow' | 'brood' | 'keepers';
+export const FACTIONS: Record<FactionId, { name: string; color: string; kind: FactionKind; blurb: string }> = {
+  helion:  { name: 'Helion Dynamics',    color: '#4db8ff', kind: 'human',   blurb: 'Balanced. Harvesters work 20% faster.' },
+  kessler: { name: 'Kessler Collective', color: '#e58a3a', kind: 'human',   blurb: 'Armour. Vehicles and defences 15% tougher, turrets hit harder.' },
+  verdant: { name: 'Verdant Pact',       color: '#57c46a', kind: 'human',   blurb: 'Infantry. Troops 20% cheaper and faster to train; vents fall quicker.' },
+  ashen:   { name: 'Ashen Syndicate',    color: '#a7abb8', kind: 'human',   blurb: 'Raids. Fast vehicles and aircraft 20% quicker and 10% cheaper.' },
+  hollow:  { name: 'The Hollow',         color: '#bfeef2', kind: 'hollow',  blurb: '' },
+  brood:   { name: 'The Vey Brood',      color: '#b46cff', kind: 'brood',   blurb: 'Grow on your bloom, hatch swarms, feed from Vein Wells. No harvesters.' },
+  keepers: { name: 'The Keepers',        color: '#ffd27a', kind: 'keepers', blurb: 'Few, shielded, costly. Units arrive by light; Shrines feed you.' },
+};
+const DEFAULT_SLOTS: FactionId[] = ['helion', 'kessler', 'verdant', 'ashen', 'hollow', 'brood', 'keepers'];
+export const SLOTS: FactionId[] = [...DEFAULT_SLOTS];
+export function setSlots(slots: FactionId[]) {
+  SLOTS.splice(0, SLOTS.length, ...slots);
+  SLOTS.forEach((f, i) => { TEAM_COLORS[i] = FACTIONS[f].color; FACTION_NAMES[i] = FACTIONS[f].name; });
+}
+export const resetSlots = () => setSlots(DEFAULT_SLOTS);
+export const kindOf = (o: number): FactionKind => FACTIONS[SLOTS[o] ?? 'helion']?.kind ?? 'human';
+/** The Vey's own (the Hollow, the brood, the Keepers who made it) never fight each other; the player fights everyone. */
+export const isVey = (o: number) => kindOf(o) !== 'human';
+export const hostile = (a: number, b: number) => a !== b && (a === PLAYER || b === PLAYER || !(isVey(a) && isVey(b)));
+
+// what each kind of faction can make (humans: everything not marked nonBuildable)
+const BROOD_TECH = new Set(['broodpod', 'veinwell', 'bloomnode', 'spinespire', 'skitter', 'spitter', 'carapace', 'moth', 'behemoth']);
+const KEEPER_TECH = new Set(['sanctum', 'shrine', 'obelisk', 'acolyte', 'lancer', 'luminar', 'monolith']);
+export function canMake(owner: number, id: string): boolean {
+  const k = kindOf(owner);
+  if (k === 'brood') return BROOD_TECH.has(id);
+  if (k === 'keepers') return KEEPER_TECH.has(id);
+  if (k === 'hollow') return false;
+  const d = (BUILDINGS as Record<string, { nonBuildable?: boolean }>)[id] ?? (UNITS as Record<string, { nonBuildable?: boolean }>)[id];
+  return !!UPGRADES[id] || (!!d && !d.nonBuildable);
+}
+// which structures turn out a faction's units (and where they appear)
+export function producersOf(owner: number, tab: 'inf' | 'veh', air = false): string[] {
+  const k = kindOf(owner);
+  if (k === 'brood') return ['broodpod', 'heart'];
+  if (k === 'keepers') return ['sanctum', 'beacon'];
+  return tab === 'inf' ? ['barracks'] : air ? ['skyport', 'fab'] : ['fab'];
+}
+
+// human faction bonuses (also applied to the AI playing that faction)
+export interface FactionBonus { harvest?: number; infCost?: number; infTime?: number; capture?: number; vehHp?: number; defHp?: number; turretDmg?: number; fast?: string[]; fastSpeed?: number; fastCost?: number }
+export const BONUS: Partial<Record<FactionId, FactionBonus>> = {
+  helion:  { harvest: 1.2 },
+  kessler: { vehHp: 1.15, defHp: 1.15, turretDmg: 1.1 },
+  verdant: { infCost: 0.8, infTime: 0.8, capture: 1.4 },
+  ashen:   { fast: ['raider', 'ranger', 'gunship', 'bomber', 'warden'], fastSpeed: 1.2, fastCost: 0.9 },
+};
+export const bonusOf = (o: number): FactionBonus => BONUS[SLOTS[o]] ?? {};

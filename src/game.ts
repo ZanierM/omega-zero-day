@@ -5,6 +5,7 @@ import {
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
   VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES, BROOD, KEEPERS, hostile,
+  kindOf, canMake, producersOf, bonusOf, SLOTS, setSlots, FactionId,
   VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
 import * as telemetry from './telemetry';
@@ -73,6 +74,7 @@ export type Entity = Unit | Building;
 
 export interface QueueItem {
   defId: string;
+  paid?: number;      // what it cost (refunded on cancel)
   kind: 'building' | 'unit' | 'upgrade';
   total: number;      // build time seconds
   remaining: number;
@@ -159,7 +161,7 @@ function updateBloom() {
   let any = false;
   for (const b of buildings) {
     const r = b.def.bloom;
-    if (!r || b.owner !== BROOD) continue;
+    if (!r || kindOf(b.owner) !== 'brood') continue;
     any = true;
     const cx = b.tx + b.def.w / 2, cy = b.ty + b.def.h / 2;
     for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
@@ -178,7 +180,7 @@ function updateBloom() {
 }
 const bloomNeighbour = (x: number, y: number) =>
   [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => inBounds(x + dx, y + dy) && bloom[idx(x + dx, y + dy)] >= BLOOM_SOLID)
-  || buildings.some(b => b.owner === BROOD && x >= b.tx - 1 && x <= b.tx + b.def.w && y >= b.ty - 1 && y <= b.ty + b.def.h);
+  || buildings.some(b => kindOf(b.owner) === 'brood' && x >= b.tx - 1 && x <= b.tx + b.def.w && y >= b.ty - 1 && y <= b.ty + b.def.h);
 
 // columns of light where the Keepers translocate something (drawn by render.ts)
 export const lightColumns: { x: number; y: number; born: number }[] = [];
@@ -214,7 +216,7 @@ export const mission = {
 export function resetMission() {
   mission.active = false; mission.tick = null; mission.checkEnd = null; mission.corridor = true; mission.allowed = null; mission.resonance = false;
 }
-export const techAllowed = (owner: number, id: string) => owner !== PLAYER || !mission.allowed || mission.allowed.has(id);
+export const techAllowed = (owner: number, id: string) => canMake(owner, id) && (owner !== PLAYER || !mission.allowed || mission.allowed.has(id));
 
 export type GameEvent =
   | { type: 'destroyed'; e: Entity }
@@ -350,6 +352,7 @@ function upLevel(owner: number, line: string): number {
   return n;
 }
 export function weaponMult(owner: number) { return 1 + upLevel(owner, 'wpn') * WPN_BONUS; }
+const bldHp = (owner: number, def: BuildingDef) => Math.round(def.hp * (def.tab === 'def' ? bonusOf(owner).defHp ?? 1 : 1));
 export function armorMult(owner: number) { return 1 + upLevel(owner, 'arm') * ARM_BONUS; }
 export function turretMult(owner: number) { return 1 + upLevel(owner, 'def') * DEF_BONUS; }
 
@@ -357,7 +360,7 @@ export function turretMult(owner: number) { return 1 + upLevel(owner, 'def') * D
 
 export function spawnUnit(defId: string, owner: number, px: number, py: number): Unit {
   const def = UNITS[defId];
-  const hp = Math.round(def.hp * armorMult(owner));
+  const hp = Math.round(def.hp * armorMult(owner) * (def.tab === 'veh' ? bonusOf(owner).vehHp ?? 1 : 1));
   const u: Unit = {
     id: nextId++, kind: 'unit', def, owner, x: px, y: py, hp, maxHp: hp,
     // small random initial cooldown so armies don't fire in perfect lockstep
@@ -402,8 +405,10 @@ export function unitSpeed(u: Unit): number {
     if (a.immobile) return 0;
     if (a.speedMul) return u.def.speed * a.speedMul;
   }
-  // the brood moves faster over its own living ground
-  if (u.owner === BROOD && !u.def.air && onBloom(tileOf(u.x), tileOf(u.y))) return u.def.speed * 1.2;
+  // the brood moves faster over its own living ground; Ashen tune their fast movers
+  if (kindOf(u.owner) === 'brood' && !u.def.air && onBloom(tileOf(u.x), tileOf(u.y))) return u.def.speed * 1.2;
+  const fb = bonusOf(u.owner);
+  if (fb.fast?.includes(u.def.id)) return u.def.speed * (fb.fastSpeed ?? 1);
   return u.def.speed;
 }
 export function unitRange(u: Unit): number {
@@ -468,7 +473,8 @@ export function canPlace(owner: number, defId: string, tx: number, ty: number, r
       if (!inBounds(x, y)) return false;
       const i = idx(x, y);
       if (terrain[i] !== 0 || occupied[i] !== -1 || crystal[i] > 0) return false;
-      if (owner !== BROOD && bloom[i] >= BLOOM_SOLID) return false;   // living ground won't take a foundation
+      // living ground won't take anyone else's foundation, and the brood grows only on it
+      if (kindOf(owner) === 'brood' ? bloom[i] < BLOOM_SOLID : bloom[i] >= BLOOM_SOLID) return false;
       for (const u of units) {
         if (tileOf(u.x) === x && tileOf(u.y) === y) return false;
       }
@@ -489,7 +495,7 @@ export function canPlace(owner: number, defId: string, tx: number, ty: number, r
 export function placeBuilding(defId: string, owner: number, tx: number, ty: number): Building {
   const def = BUILDINGS[defId];
   const b: Building = {
-    id: nextId++, kind: 'building', def, owner, tx, ty, hp: def.hp, maxHp: def.hp, level: 1, upgrading: null, repairing: false, sh: def.shield ?? 0, shT: 99,
+    id: nextId++, kind: 'building', def, owner, tx, ty, hp: bldHp(owner, def), maxHp: bldHp(owner, def), level: 1, upgrading: null, repairing: false, sh: def.shield ?? 0, shT: 99,
     charge: def.superweapon ? def.superweapon.charge : 0, cooldown: 0,
     rallyX: (tx + def.w / 2) * TILE, rallyY: (ty + def.h + 1) * TILE, facing: Math.PI / 2,
   };
@@ -535,7 +541,7 @@ function destroy(e: Entity) {
   const p = entityPos(e);
   booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
   if (e.owner === PLAYER || audible(p.x, p.y)) {
-    if (e.owner === BROOD) sfxAt('squelch', p.x, p.y, e.kind === 'building' ? 1.6 : 1);   // flesh, not metal
+    if (kindOf(e.owner) === 'brood') sfxAt('squelch', p.x, p.y, e.kind === 'building' ? 1.6 : 1);   // flesh, not metal
     else if (e.kind === 'building') sfxAt('explodeBuilding', p.x, p.y, e.def.isWall ? 0.5 : 1.3);
     else if (UNIT_ARMOR[e.def.id] !== 'infantry') sfxAt('explodeVehicle', p.x, p.y);
   }
@@ -633,11 +639,10 @@ export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
     return !players[owner].queues.ups.some(q => q.defId === defId);
   }
   const def = tab === 'inf' || tab === 'veh' ? UNITS[defId] : BUILDINGS[defId];
-  if (!def || (def as UnitDef).nonBuildable) return false;
+  if (!def) return false;
   if (def.prereq && !hasBuilding(owner, def.prereq)) return false;
   if (def.prereqUp && !players[owner].upgrades.has(def.prereqUp)) return false;
-  if (tab === 'inf' && !hasBuilding(owner, 'barracks')) return false;
-  if (tab === 'veh' && !hasBuilding(owner, 'fab')) return false;
+  if ((tab === 'inf' || tab === 'veh') && !producersOf(owner, tab).some(id => hasBuilding(owner, id))) return false;
   if (atBuildLimit(owner, tab, defId)) return false;
   return true;
 }
@@ -656,8 +661,7 @@ export function requirementText(owner: number, tab: Tab, defId: string): string 
   }
   const def = tab === 'inf' || tab === 'veh' ? UNITS[defId] : BUILDINGS[defId];
   if (!def) return null;
-  if (tab === 'inf' && !hasBuilding(owner, 'barracks')) return 'Requires a Barracks';
-  if (tab === 'veh' && !hasBuilding(owner, 'fab')) return 'Requires a Fabricator';
+  if ((tab === 'inf' || tab === 'veh') && !producersOf(owner, tab).some(id => hasBuilding(owner, id))) return `Requires a ${BUILDINGS[producersOf(owner, tab)[0]].name}`;
   if (def.prereq && !hasBuilding(owner, def.prereq)) return `Requires ${BUILDINGS[def.prereq].name}`;
   if (def.prereqUp && !players[owner].upgrades.has(def.prereqUp)) return `Requires ${UPGRADES[def.prereqUp].name} research`;
   if (atBuildLimit(owner, tab, defId)) return `Limit ${(def as any).limit} — one already built`;
@@ -669,15 +673,26 @@ export function startProduction(owner: number, defId: string, tab: Tab): boolean
   if (!prereqMet(owner, tab, defId)) return false;
   const kind = tab === 'ups' ? 'upgrade' : (tab === 'inf' || tab === 'veh') ? 'unit' : 'building';
   const def = kind === 'building' ? BUILDINGS[defId] : kind === 'unit' ? UNITS[defId] : UPGRADES[defId];
-  if (p.credits < def.cost) {
+  const cost = costFor(owner, defId, tab), time = def.buildTime * timeMulFor(owner, tab);
+  if (p.credits < cost) {
     if (owner === PLAYER) { toast('Insufficient flux'); sfx('error'); }
     return false;
   }
   if (p.queues[tab].length >= 9) return false; // sane queue cap
-  p.credits -= def.cost;
-  p.queues[tab].push({ defId, kind, total: def.buildTime, remaining: def.buildTime, ready: false });
+  p.credits -= cost;
+  p.queues[tab].push({ defId, kind, total: time, remaining: time, ready: false, paid: cost });
   return true;
 }
+/** What this faction pays for something (faction bonuses applied). */
+export function costFor(owner: number, defId: string, tab: Tab): number {
+  const def = tab === 'ups' ? UPGRADES[defId] : tab === 'inf' || tab === 'veh' ? UNITS[defId] : BUILDINGS[defId];
+  const b = bonusOf(owner);
+  let k = 1;
+  if (tab === 'inf' && b.infCost) k *= b.infCost;
+  if (b.fast?.includes(defId) && b.fastCost) k *= b.fastCost;
+  return Math.round(def.cost * k);
+}
+const timeMulFor = (owner: number, tab: Tab) => (tab === 'inf' ? bonusOf(owner).infTime ?? 1 : 1);
 
 // remove the LAST queued instance of defId from a tab (full refund)
 export function cancelProduction(owner: number, tab: Tab, defId: string): boolean {
@@ -685,7 +700,7 @@ export function cancelProduction(owner: number, tab: Tab, defId: string): boolea
   const q = p.queues[tab];
   for (let i = q.length - 1; i >= 0; i--) {
     if (q[i].defId === defId) {
-      p.credits += defFor(q[i]).cost;
+      p.credits += q[i].paid ?? defFor(q[i]).cost;
       q.splice(i, 1);
       return true;
     }
@@ -700,7 +715,7 @@ export function queuedCount(owner: number, tab: Tab, defId: string): number {
 function finishUnit(owner: number, defId: string) {
   const def = UNITS[defId];
   // aircraft launch from the Skyport; everything else from its factory type
-  const src = (def.air ? buildings.find(b => b.owner === owner && b.def.id === 'skyport') : undefined)
+  const src = producersOf(owner, def.tab, !!def.air).map(id => buildings.find(b => b.owner === owner && b.def.id === id)).find(Boolean)
            ?? buildings.find(b => b.owner === owner && b.def.produces === def.tab);
   if (!src) return; // factory died — unit is lost (credits were spent, like RA2)
   const spot = nearestTile(src.tx + Math.floor(src.def.w / 2), src.ty + src.def.h, 10,
@@ -965,7 +980,7 @@ function updateHarvester(u: Unit, dt: number) {
     const near = nearestTile(tileOf(u.x), tileOf(u.y), 1, (x, y) => crystal[idx(x, y)] > 0);
     if (!near) { u.harvestState = 'toField'; return; }
     const i = idx(near.x, near.y);
-    const take = Math.min(HARVEST_RATE * dt, crystal[i], HARVESTER_CAPACITY - u.cargo);
+    const take = Math.min(HARVEST_RATE * (bonusOf(u.owner).harvest ?? 1) * dt, crystal[i], HARVESTER_CAPACITY - u.cargo);
     crystal[i] -= take;
     u.cargo += take;
     if (mission.resonance) addResonance(near.x, near.y, take * RES_PER_FLUX);
@@ -1172,7 +1187,7 @@ function step(dt: number) {
       b.facing = Math.atan2(tp.y - c.y, tp.x - c.x);
       if (b.cooldown === 0) {
         b.cooldown = b.def.turret.reload;
-        const dmg = b.def.turret.damage * turretMult(b.owner) * (1 + BLD_UPGRADE_DMG * (b.level - 1));
+        const dmg = b.def.turret.damage * turretMult(b.owner) * (bonusOf(b.owner).turretDmg ?? 1) * (1 + BLD_UPGRADE_DMG * (b.level - 1));
         fireAt(b, t, dmg, b.owner === 0 ? '#7fd4ff' : '#ff8080');
       }
     }
@@ -1287,7 +1302,7 @@ function step(dt: number) {
     const nearCrystal = (u: Unit, r: number) => !!nearestTile(tileOf(u.x), tileOf(u.y), r, (x, y) => crystal[idx(x, y)] > 0);
     for (const u of units) {
       if (u.def.crystalRegen && u.hp < u.maxHp && nearCrystal(u, 2)) u.hp = Math.min(u.maxHp, u.hp + u.def.crystalRegen * 0.5);
-      if (u.owner === BROOD && u.hp < u.maxHp && onBloom(tileOf(u.x), tileOf(u.y))) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.012);   // the ground feeds it
+      if (kindOf(u.owner) === 'brood' && u.hp < u.maxHp && onBloom(tileOf(u.x), tileOf(u.y))) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.012);   // the ground feeds it
       const aura = u.def.healAura;
       if (!aura) continue;
       const rate = aura.rate * 0.5 * (nearCrystal(u, 3) ? 2 : 1);
@@ -1298,6 +1313,10 @@ function step(dt: number) {
     }
   }
   if (mission.resonance) updateVey(dt);
+  // a player brood feeds through its Vein Wells, a player Keeper host through its Shrines
+  const pk = kindOf(PLAYER);
+  if (pk === 'brood') players[PLAYER].credits += (12 + 7 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'veinwell').length) * dt;
+  else if (pk === 'keepers') players[PLAYER].credits += (14 + 10 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'shrine').length) * dt;
   bloomTick -= dt;
   if (bloomTick <= 0) { bloomTick = 1.5; updateBloom(); }
 
@@ -1314,7 +1333,7 @@ function step(dt: number) {
       const o = [...present][0];
       if (n.owner !== o) {
         if (n.progOwner !== o) { n.progOwner = o; n.prog = 0; }
-        n.prog += dt;
+        n.prog += dt * (bonusOf(o).capture ?? 1);
         if (n.prog >= CAPTURE_TIME) {
           const was = n.owner;
           n.owner = o; n.prog = 0; n.progOwner = -1;
@@ -1427,7 +1446,7 @@ function updateCorridor(dt: number) {
   const need = ventsNeeded();
   let leader = -1;
   // only factions with a fleet can ride the corridor: the brood and the Hollow just hold the ground
-  for (let o = 0; o < numPlayers; o++) if (o !== BROOD && o !== KEEPERS && o !== 4 && ventsHeld(o) >= need) leader = o;
+  for (let o = 0; o < numPlayers; o++) if (kindOf(o) === 'human' && ventsHeld(o) >= need) leader = o;
   if (leader !== corridor.owner) {
     const was = corridor.owner;
     corridor.owner = leader; corridor.held = 0;
@@ -1459,7 +1478,7 @@ export interface GameSnapshot {
   explored: number[]; novaTotal: number; novaLeft: number; flareTimer: number;
   neutrals: Neutral[]; stats: typeof stats;
   corridor?: { owner: number; held: number };
-  resonance?: number[]; tunnels?: Tunnel[]; bloom?: number[];
+  resonance?: number[]; tunnels?: Tunnel[]; bloom?: number[]; slots?: FactionId[];
 }
 export function snapshotGame(): GameSnapshot {
   const plain = <T extends { def: { id: string } }>(e: T) => { const { def, ...rest } = e; return { ...rest, defId: def.id }; };
@@ -1470,7 +1489,7 @@ export function snapshotGame(): GameSnapshot {
     buildings: buildings.filter(b => b.hp > 0).map(b => plain(b)),
     explored: Array.from(explored), novaTotal, novaLeft, flareTimer,
     neutrals: neutrals.map(n => ({ ...n })), stats: { ...stats }, corridor: { ...corridor },
-    resonance: Array.from(resonance), tunnels: tunnels.map(t => ({ ...t })), bloom: Array.from(bloom),
+    resonance: Array.from(resonance), tunnels: tunnels.map(t => ({ ...t })), bloom: Array.from(bloom), slots: [...SLOTS],
   };
 }
 export function restoreGame(s: GameSnapshot) {
@@ -1490,6 +1509,7 @@ export function restoreGame(s: GameSnapshot) {
   tremorAt.clear(); quake = 0;
   tunnels.length = 0; if (s.tunnels) tunnels.push(...s.tunnels);
   bloom = s.bloom ? Uint8Array.from(s.bloom) : new Uint8Array(MAP_W * MAP_H);
+  if (s.slots) setSlots(s.slots);
   for (const p of s.buildings) {
     const { defId, ...rest } = p;
     const b: Building = { ...rest, def: BUILDINGS[defId] };

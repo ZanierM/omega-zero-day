@@ -1,11 +1,11 @@
 import {
   BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, VET_NAME,
-  FACTION_NAMES,
+  FACTION_NAMES, SLOTS,
 } from './config';
 import * as campaign from './campaign/runner';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
-  gameOver, endReason, corridor, techAllowed, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
+  gameOver, endReason, corridor, techAllowed, costFor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
@@ -253,8 +253,8 @@ function defsFor(tab: Tab) {
   // a campaign mission only shows the tech it has cleared
   const ok = (id: string) => techAllowed(PLAYER, id);
   if (tab === 'ups') return Object.values(UPGRADES).filter(d => ok(d.id));
-  if (tab === 'inf' || tab === 'veh') return Object.values(UNITS).filter(d => d.tab === tab && !d.nonBuildable && ok(d.id));
-  return Object.values(BUILDINGS).filter(d => d.tab === tab && !NON_BUILDABLE.has(d.id) && !d.nonBuildable && ok(d.id));
+  if (tab === 'inf' || tab === 'veh') return Object.values(UNITS).filter(d => d.tab === tab && ok(d.id));
+  return Object.values(BUILDINGS).filter(d => d.tab === tab && !NON_BUILDABLE.has(d.id) && ok(d.id));
 }
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -282,15 +282,16 @@ function rebuildGrid() {
     el.type = 'button';
     el.className = 'bbtn';
     const desc = (def as any).desc ?? '';
-    el.setAttribute('aria-label', `${def.name}, ${def.cost} flux. ${desc}`);
-    el.innerHTML = `${iconHtml(activeTab, def.id)}<span class="nm">${def.name}</span><span class="cost"><span class="resource-gem" aria-hidden="true">◈</span>${def.cost}</span><span class="prog"></span><span class="count"></span>`;
+    const cost = costFor(PLAYER, def.id, activeTab);   // faction bonuses change prices
+    el.setAttribute('aria-label', `${def.name}, ${cost} flux. ${desc}`);
+    el.innerHTML = `${iconHtml(activeTab, def.id)}<span class="nm">${def.name}</span><span class="cost"><span class="resource-gem" aria-hidden="true">◈</span>${cost}</span><span class="prog"></span><span class="count"></span>`;
     let held = false;
     let timer = 0;
-    el.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') showTip(el, def.name, desc, def.cost); });
+    el.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') showTip(el, def.name, desc, cost); });
     el.addEventListener('pointerleave', () => { clearTimeout(timer); hideTip(); });
-    el.addEventListener('focus', () => showTip(el, def.name, desc, def.cost));
+    el.addEventListener('focus', () => showTip(el, def.name, desc, cost));
     el.addEventListener('blur', hideTip);
-    el.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') timer = window.setTimeout(() => { held = true; showTip(el, def.name, desc, def.cost); }, 450); });
+    el.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') timer = window.setTimeout(() => { held = true; showTip(el, def.name, desc, cost); }, 450); });
     el.addEventListener('pointerup', () => clearTimeout(timer));
     el.addEventListener('pointercancel', () => { clearTimeout(timer); hideTip(); });
     el.addEventListener('click', () => { if (held) { held = false; return; } hideTip(); onBtnClick(def.id); });
@@ -617,10 +618,16 @@ const objTracker = document.getElementById('objtracker')!;
 const objTitle = document.getElementById('objtitle')!;
 const objList = document.getElementById('objlist')!;
 comms.addEventListener('click', () => campaign.skipComm());
-let shownComm: object | null = null, shownObjs = '', shownMission: object | null = null;
+let shownComm: object | null = null, shownObjs = '', shownTech = '';
+// a faction with nothing in a tab (the brood and Keepers have no research) doesn't show it
+function refreshTabs() {
+  tabBtns.forEach((btn, t) => { btn.hidden = defsFor(t).length === 0; });
+  if (!defsFor(activeTab).length) { const first = CATEGORIES.find(t => defsFor(t).length); if (first) activateTab(first); }
+}
 function updateCampaignUI() {
   const m = campaign.activeMission();
-  if (m !== shownMission) { shownMission = m; rebuildGrid(); }   // the build bar follows the mission's tech list
+  const tech = (m?.id ?? '') + SLOTS[PLAYER];
+  if (tech !== shownTech) { shownTech = tech; refreshTabs(); rebuildGrid(); }   // the build bar follows the mission's and faction's tech
   const line = campaign.currentComm();
   if (line !== shownComm) {   // only touch the DOM when the line changes
     shownComm = line;
