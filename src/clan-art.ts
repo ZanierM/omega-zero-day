@@ -6,9 +6,11 @@
 
 import {
   OUT, shade, edgeOf, poly, chamfer, prism, cylinder, dome, glow, spill, quad, rot, at, box, deckPlate, wheel, barrels, detailWalls,
-  soldierArt, VEHICLE_ART, BUILDING_ART, TURRET_ART,
+  VEHICLE_ART, BUILDING_ART, TURRET_ART,
 } from './art';
-import type { Pt, Ctx, SoldierSpec, Limb } from './art';
+import type { Pt, Ctx } from './art';
+import { drawRig, stride, shadow } from './rig';
+import type { Tone, V3, Part } from './rig';
 
 const WOOD = '#6e5238', WOOD_TOP = '#94724e', WOOD_DK = '#4a3624';
 const HIDE = '#9c8160', HIDE_DK = '#6e5a42';
@@ -29,6 +31,67 @@ function gable(g: Ctx, x0: number, y0: number, x1: number, y1: number, z: number
   }
   g.strokeStyle = edgeOf(col); g.lineWidth = 1.2; g.beginPath(); g.moveTo(x0, ym - zr); g.lineTo(x1, ym - zr); g.stroke();
 }
+// a roof that reads as made: the same gable, then the front slope worked over
+// in thatch rows (with a ragged fringe), patched hides (stitched), or
+// corrugated scrap tin (rust-streaked); a shadow under the eave and crossed
+// ridge poles at both ends
+type RoofKind = 'thatch' | 'hide' | 'tin';
+const THATCH = ['#6e5a32', '#8e7444', '#b09456', '#c8ac6a'];
+function roof(g: Ctx, x0: number, y0: number, x1: number, y1: number, z: number, zr: number, kind: RoofKind, team: string) {
+  const ym = (y0 + y1) / 2, base = kind === 'thatch' ? '#9a8048' : kind === 'hide' ? HIDE : '#7a7268';
+  gable(g, x0, y0, x1, y1, z, zr, base);
+  const top = ym - zr, eave = y1 - z;
+  // the wall in shadow under the eave
+  const sg = g.createLinearGradient(0, eave, 0, eave + 5); sg.addColorStop(0, 'rgba(20,12,6,0.55)'); sg.addColorStop(1, 'rgba(20,12,6,0)');
+  g.fillStyle = sg; g.fillRect(x0 + 2, eave, x1 - x0 - 4, 5);
+  g.save(); g.beginPath(); g.moveTo(x0, top); g.lineTo(x1, top); g.lineTo(x1, eave); g.lineTo(x0, eave); g.closePath(); g.clip();
+  let r = (x0 * 31 + y0 * 17) | 0; const rnd = () => (r = (r * 16807 + 11) % 2147483647) / 2147483647;
+  if (kind === 'thatch') {
+    for (let y = top + 1; y < eave; y += 2.6) for (let x = x0; x < x1; x += 1.1) {
+      g.strokeStyle = THATCH[Math.floor(rnd() * 4)]; g.lineWidth = 0.7;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 0.8, y + 2.6 + rnd()); g.stroke();
+    }
+    for (let y = top + 2.6; y < eave; y += 5.2) { g.fillStyle = 'rgba(40,26,10,0.28)'; g.fillRect(x0, y, x1 - x0, 0.7); }   // the courses
+  } else if (kind === 'hide') {
+    const tones = [HIDE, HIDE_DK, '#b09470', '#8a6e50'];
+    for (let y = top; y < eave; y += 7) for (let x = x0 - 3; x < x1; x += 9) {
+      const w = 8 + rnd() * 4, h = 6 + rnd() * 3, ox = rnd() * 3;
+      poly(g, [[x + ox, y], [x + ox + w, y + rnd()], [x + ox + w - 1, y + h], [x + ox + 1, y + h - rnd()]], tones[Math.floor(rnd() * 4)], false);
+      g.strokeStyle = 'rgba(40,24,12,0.55)'; g.lineWidth = 0.5; g.setLineDash([0.8, 0.9]);
+      g.beginPath(); g.moveTo(x + ox, y + 0.5); g.lineTo(x + ox + w, y + 0.5); g.moveTo(x + ox + w - 0.5, y); g.lineTo(x + ox + w - 1.5, y + h); g.stroke(); g.setLineDash([]);
+    }
+  } else {
+    for (let x = x0; x < x1; x += 2) { g.fillStyle = (x - x0) % 4 < 2 ? 'rgba(255,240,220,0.14)' : 'rgba(10,8,6,0.22)'; g.fillRect(x, top, 1, eave - top); }
+    for (let k = 0; k < (x1 - x0) / 8; k++) {
+      const x = x0 + rnd() * (x1 - x0), y = top + rnd() * (eave - top) * 0.6, l = 4 + rnd() * 10;
+      const rg = g.createLinearGradient(0, y, 0, y + l); rg.addColorStop(0, 'rgba(150,72,30,0.55)'); rg.addColorStop(1, 'rgba(150,72,30,0)');
+      g.fillStyle = rg; g.fillRect(x, y, 1.6 + rnd() * 2, l);
+    }
+    // two sheets that don't match, nailed over holes
+    for (let k = 0; k < 2; k++) { const x = x0 + 6 + rnd() * (x1 - x0 - 20), y = top + 3 + rnd() * (eave - top - 12); poly(g, [[x, y], [x + 10, y + 1], [x + 9, y + 8], [x, y + 7]], k ? RUST : '#8a8a84'); }
+  }
+  g.restore();
+  // a ragged fringe along the eave for thatch and hide
+  if (kind !== 'tin') for (let x = x0; x < x1; x += 1.6) { g.fillStyle = kind === 'thatch' ? THATCH[(x * 7 | 0) % 3] : HIDE_DK; g.fillRect(x, eave - 0.4, 1.1, 1 + ((x * 13 | 0) % 3) * 0.6); }
+  // crossed poles over each end of the ridge, and the ridge pole itself
+  g.strokeStyle = WOOD_DK; g.lineWidth = 2.2; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x0 + 1, top + 1); g.lineTo(x1 - 1, top + 1); g.stroke();
+  for (const x of [x0 + 2, x1 - 2]) {
+    g.strokeStyle = WOOD_DK; g.lineWidth = 1.8; g.beginPath(); g.moveTo(x - 3, top + 4); g.lineTo(x + 3, top - 5); g.moveTo(x + 3, top + 4); g.lineTo(x - 3, top - 5); g.stroke();
+    g.strokeStyle = WOOD_TOP; g.lineWidth = 0.7; g.stroke();
+  }
+  g.fillStyle = team; g.beginPath(); g.moveTo(x1 - 2, top - 5); g.lineTo(x1 + 4, top - 3.5); g.lineTo(x1 - 2, top - 2); g.fill();   // a rag of clan colour tied on
+}
+// a wall of stacked logs on the south face, round log-ends at the corners, on a course of fieldstone
+function logWall(g: Ctx, x0: number, x1: number, y: number, z0: number, z1: number) {
+  quad(g, [x0, y - z1], [x1, y - z1], [x1, y - z0], [x0, y - z0], WOOD);
+  for (let z = z0 + 3; z < z1; z += 2.8) {
+    g.fillStyle = 'rgba(20,12,6,0.45)'; g.fillRect(x0, y - z, x1 - x0, 0.7);
+    g.fillStyle = 'rgba(255,220,170,0.14)'; g.fillRect(x0, y - z - 1.6, x1 - x0, 0.6);
+    for (const x of [x0 - 0.6, x1 + 0.6]) { g.fillStyle = WOOD_DK; g.beginPath(); g.ellipse(x, y - z + 1.2, 1.3, 1.3, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#b08a5c'; g.beginPath(); g.ellipse(x, y - z + 1.2, 0.7, 0.7, 0, 0, Math.PI * 2); g.fill(); }
+  }
+  for (let x = x0 - 1; x < x1 + 1; x += 3.2) { g.fillStyle = (x | 0) % 2 ? STONE : STONE_TOP; g.beginPath(); g.ellipse(x + 1.4, y - z0 - 0.6, 1.7, 1.2, 0, 0, Math.PI * 2); g.fill(); }
+}
 // trampled earth under a camp: no slab, just ground worn bare
 function yard(g: Ctx, x0: number, y0: number, x1: number, y1: number) {
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2, ry = (y1 - y0) / 2;
@@ -36,12 +99,19 @@ function yard(g: Ctx, x0: number, y0: number, x1: number, y1: number) {
   gr.addColorStop(0, 'rgba(70,52,34,0.5)'); gr.addColorStop(0.7, 'rgba(70,52,34,0.28)'); gr.addColorStop(1, 'rgba(70,52,34,0)');
   g.fillStyle = gr; g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); g.fill();
 }
-// a cone tent on a ground point
+// a cone tent on a ground point: hide panels with seams, a team band, the poles crossing out of the top, the flap open
 function tent(g: Ctx, x: number, y: number, r: number, h: number, col: string, team: string) {
-  poly(g, [[x - r, y], [x, y - h], [x + r, y], [x + r * 0.6, y + r * 0.35], [x - r * 0.6, y + r * 0.35]], col);
+  g.fillStyle = 'rgba(20,12,6,0.35)'; g.beginPath(); g.ellipse(x + 2, y + 1, r * 1.1, r * 0.45, 0, 0, Math.PI * 2); g.fill();
+  const tg = g.createLinearGradient(x - r, 0, x + r, 0); tg.addColorStop(0, shade(col, 1.18)); tg.addColorStop(0.5, col); tg.addColorStop(1, shade(col, 0.7));
+  poly(g, [[x - r, y], [x, y - h], [x + r, y], [x + r * 0.6, y + r * 0.35], [x - r * 0.6, y + r * 0.35]], tg);
+  g.strokeStyle = 'rgba(40,24,12,0.45)'; g.lineWidth = 0.5;
+  for (const f of [-0.6, -0.2, 0.25, 0.65]) { g.beginPath(); g.moveTo(x, y - h); g.lineTo(x + r * f, y + r * 0.3 * (1 - Math.abs(f))); g.stroke(); }   // panel seams
   poly(g, [[x - r * 0.25, y + r * 0.28], [x, y - h * 0.45], [x + r * 0.25, y + r * 0.28]], '#1c140c', false);   // the flap, open
+  fireGlow(g, x, y + r * 0.1, r * 0.5);
   poly(g, [[x - r * 0.72, y - h * 0.28], [x + r * 0.72, y - h * 0.28], [x + r * 0.62, y - h * 0.18], [x - r * 0.62, y - h * 0.18]], team, false);
-  g.strokeStyle = WOOD_DK; g.lineWidth = 1; g.beginPath(); g.moveTo(x - 1.5, y - h - 3); g.lineTo(x, y - h); g.lineTo(x + 2, y - h - 4); g.stroke();
+  g.strokeStyle = WOOD_DK; g.lineWidth = 1.2; g.lineCap = 'round';
+  for (const [dx, dy] of [[-3, -5], [0, -6], [3, -4.5]]) { g.beginPath(); g.moveTo(x, y - h + 1); g.lineTo(x + dx, y - h + dy); g.stroke(); }
+  smoke(g, x + 1, y - h - 4, 2);
 }
 // a tattered pennant on a crooked pole
 function banner(g: Ctx, x: number, y: number, h: number, team: string) {
@@ -80,79 +150,114 @@ function sandbags(g: Ctx, x0: number, y: number, n: number, rows: number) {
 }
 
 // ---------------- infantry ----------------
+// Built on the creature rig like the aliens, so they move and dress like people
+// rather than machined troopers: a cloth poncho or cloak over a tunic, a face
+// wrap, a hat or hood, old guns held at the hip.
 
-const CLAN_LEGS: [string, string, string, string] = ['#7a6a52', '#5e503e', '#4a3a2a', '#33281c'];   // patched canvas trousers, scuffed boots
-const longRifle = (len: number, bob: number, y = 2.4): Limb[] => [
-  { x0: 0.5, y0: y - 0.7, x1: 3.2, y1: y + 0.7, z0: 6.8 + bob + 3.4, z1: 6.8 + bob + 5, top: '#a8906c', side: '#8a7454' },      // wrapped forearm
-  { x0: -1.5, y0: y - 0.6, x1: 2, y1: y + 0.6, z0: 6.8 + bob + 3.6, z1: 6.8 + bob + 5.2, top: '#a8743e', side: '#7a5028' },    // wooden stock
-  { x0: 2, y0: y - 0.45, x1: len, y1: y + 0.45, z0: 6.8 + bob + 4.2, z1: 6.8 + bob + 5.2, top: '#6e6a62', side: '#46423c' },
-];
-const bedroll = (bob: number): Limb => ({ x0: -4.2, y0: -2.6, x1: -2.2, y1: 2.6, z0: 6.8 + bob + 4, z1: 6.8 + bob + 6.6, top: '#a89870', side: '#7a6a4a' });
-// a wide-brimmed hat, drawn flat over the head wrap: the brim, then a low crown
-function hat(g: Ctx, a: number, bob: number) {
-  const [x, y] = at(0.2, 0, a), z = 6.8 + bob + 11;
-  g.fillStyle = '#5e462c'; g.beginPath(); g.ellipse(x, y - z + 0.6, 4.6, 2.1, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#8a6a44'; g.beginPath(); g.ellipse(x, y - z, 4.4, 1.9, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#7a5c3a'; g.beginPath(); g.ellipse(x, y - z - 1.2, 2.4, 1.6, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = 'rgba(255,230,190,0.25)'; g.beginPath(); g.ellipse(x - 1.2, y - z - 0.4, 2, 0.7, -0.2, 0, Math.PI * 2); g.fill();
-}
-// salvaged welding goggles, two amber lenses facing forward
-function goggles(g: Ctx, a: number, bob: number, col = 'rgba(255,190,90,0.95)') {
-  for (const sd of [-0.9, 0.9]) { const [x, y] = at(2.6, sd, a); g.fillStyle = '#2a241c'; g.fillRect(x - 0.9, y - 6.8 - bob - 10.9, 1.8, 1.4); g.fillStyle = col; g.fillRect(x - 0.6, y - 6.8 - bob - 10.7, 1.2, 1); }
-}
+const TROUSER: Tone = { dk: '#3e3424', mid: '#6a5a40', lt: '#8e7c5a', hi: '#b0a080' };
+const BOOT: Tone = { dk: '#1e160e', mid: '#3a2c1e', lt: '#5a4430', hi: '#7a6048' };
+const SKIN: Tone = { dk: '#5a3a28', mid: '#8a5e44', lt: '#b8866a', hi: '#dcb090' };
+const TUNIC: Tone = { dk: '#4a3c2a', mid: '#7a6446', lt: '#a08a66', hi: '#c8b48c' };
+const CLOTH: Tone = { dk: '#4e4232', mid: '#86745a', lt: '#ac9a7a', hi: '#d0c0a0' };
+const FUR: Tone = { dk: '#3a2c1e', mid: '#6a5236', lt: '#94784e', hi: '#bca070' };
+const HAT: Tone = { dk: '#3e2c1a', mid: '#6e5234', lt: '#94744a', hi: '#b89a6a' };
+const WOODT: Tone = { dk: '#4a3018', mid: '#7a5028', lt: '#a8743e', hi: '#c89a62' };
+const IRONT: Tone = { dk: '#24201c', mid: '#46423c', lt: '#6e6a62', hi: '#9a968e' };
 
-const SCAV: SoldierSpec = {
-  armour: '#8a7254', armourTop: '#b89c74', build: 0.95, helmet: '#b8a480', visor: null, legs: CLAN_LEGS,
-  extra: bob => [bedroll(bob), ...longRifle(9.5, bob)],
-  glow: (g, a, bob) => { goggles(g, a, bob); hat(g, a, bob); },
+interface Kit { cloak: Tone; cloakTo: number; cloakW: number; head: (P: Part[], z: number) => void; gun: (P: Part[], z: number) => void; bulk?: number; back?: (P: Part[], z: number) => void }
+// a walking figure: legs and boots, a tunic, a cloak hanging from the shoulders, arms forward to the gun
+function clansman(g: Ctx, a: number, team: string, phase: number, k: Kit) {
+  const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * 0.5, b = k.bulk ?? 1, P: Part[] = [];
+  shadow(g, 1, 1.5, 6.5 * b, 3);
+  for (const sd of [-1, 1]) {
+    const [sw, lift] = stride(phase, sd, 1.8, 1);
+    const hip: V3 = [0, sd * 1.2 * b, 7 + bob], knee: V3 = [0.6 + sw * 0.5, sd * 1.3 * b, 3.8 + lift], foot: V3 = [sw, sd * 1.3 * b, 0.8 + lift];
+    P.push({ k: 'limb', a: hip, b: knee, w: 1.9 * b, w2: 1.5 * b, t: TROUSER }, { k: 'limb', a: knee, b: foot, w: 1.5 * b, w2: 1.2 * b, t: TROUSER });
+    P.push({ k: 'blob', c: [foot[0] + 0.5, foot[1], foot[2] - 0.2], rx: 1.2, ry: 0.8, t: BOOT });
+  }
+  const z = 7 + bob;
+  P.push({ k: 'blob', c: [0, 0, z + 3.2], rx: 2.3 * b, ry: 3 * b, t: TUNIC });
+  P.push({ k: 'band', a: [0.9, -1.9 * b, z + 5], b: [1.1, 1.9 * b, z + 1.2], w: 0.7, col: '#3a2a1a' });     // a strap across the chest
+  P.push({ k: 'cloth', c: [-0.2, 0, z + 5.6], r0: 2.2 * b, z1: z + 5.6 - k.cloakTo, r1: k.cloakW * b, t: k.cloak, trim: team });
+  k.back?.(P, z);
+  // arms reach forward to the weapon, held at the hip
+  for (const sd of [-1, 1]) {
+    const sh: V3 = [0.2, sd * 2.3 * b, z + 5], el: V3 = [1.5, sd * 2.4 * b, z + 3], hand: V3 = [sd > 0 ? 3 : 4.8, 1.1, z + 3.4];
+    P.push({ k: 'limb', a: sh, b: el, w: 1.4 * b, w2: 1.2 * b, t: k.cloak }, { k: 'limb', a: el, b: hand, w: 1.2 * b, w2: 1, t: SKIN });
+  }
+  k.gun(P, z);
+  P.push({ k: 'blob', c: [0.3, 0, z + 7.6], rx: 1.5, ry: 1.7, t: SKIN });
+  P.push({ k: 'band', a: [1.2, -1.1, z + 7.2], b: [1.3, 1.1, z + 7.2], w: 1.2, col: '#8a7a5e' });     // a face wrap over nose and mouth
+  k.head(P, z);
+  drawRig(g, a, P);
+}
+// an old long gun: a wooden stock and a dark barrel, lying forward from the hip
+const rifle = (len: number, scope = false) => (P: Part[], z: number) => {
+  P.push({ k: 'limb', a: [0.6, 1.1, z + 3], b: [3.4, 1.1, z + 3.5], w: 1.3, w2: 1.1, t: WOODT });
+  P.push({ k: 'limb', a: [3.4, 1.1, z + 3.5], b: [3.4 + len, 1.1, z + 4.2], w: 0.75, w2: 0.6, t: IRONT });
+  if (scope) P.push({ k: 'limb', a: [3.2, 1.1, z + 4.5], b: [6.4, 1.1, z + 4.9], w: 0.8, w2: 0.8, t: { dk: '#6a4a1a', mid: '#a87a32', lt: '#d8aa52', hi: '#ffe090' } });
 };
-const HARPOONER: SoldierSpec = {
-  armour: '#7e6a54', armourTop: '#ac9478', build: 1.08, helmet: '#9a8466', visor: null, legs: CLAN_LEGS,
-  extra: bob => [
-    { x0: -4.6, y0: -2.6, x1: -2.2, y1: 2.6, z0: 6.8 + bob + 1, z1: 6.8 + bob + 5.8, top: '#d0b884', side: '#9a8458' },          // a coil of line on the back
-    { x0: -3, y0: 1.9, x1: 8.5, y1: 3.8, z0: 6.8 + bob + 5.5, z1: 6.8 + bob + 7.8, top: IRON_TOP, side: IRON },                   // the gun, over the shoulder
-    { x0: -1, y0: 1.7, x1: 1.5, y1: 4, z0: 6.8 + bob + 5.2, z1: 6.8 + bob + 8.2, top: '#a8743e', side: '#7a5028' },               // its wooden grip
-    { x0: 8.5, y0: 2.2, x1: 11.5, y1: 3.4, z0: 6.8 + bob + 6, z1: 6.8 + bob + 7.3, top: '#e0d8c8', side: '#9a9488' },             // the barb
-    { x0: 10.2, y0: 1.6, x1: 10.9, y1: 4, z0: 6.8 + bob + 6.1, z1: 6.8 + bob + 7.2, top: '#e0d8c8', side: '#9a9488' },            // its flukes
-  ],
+const goggles = (col: string) => (P: Part[], z: number) => { for (const sd of [-0.6, 0.6]) P.push({ k: 'glow', c: [1.6, sd, z + 8], r: 1, col }); };
+const brimHat = (P: Part[], z: number) => { P.push({ k: 'plate', c: [0.2, 0, z + 8.8], rx: 3.6, ry: 3.6, h: 0.7, t: HAT }, { k: 'blob', c: [0.1, 0, z + 9.8], rx: 1.7, ry: 1.2, t: HAT }); };
+const hood = (t: Tone) => (P: Part[], z: number) => { P.push({ k: 'blob', c: [-0.3, 0, z + 8.4], rx: 2, ry: 2.2, t }); };
+
+const SCAV: Kit = {
+  cloak: CLOTH, cloakTo: 4.6, cloakW: 3.8, gun: rifle(7),
+  head: (P, z) => { goggles('rgba(255,190,90,0.95)')(P, z); brimHat(P, z); },
+  back: (P, z) => P.push({ k: 'limb', a: [-2.6, -2.4, z + 5.6], b: [-2.6, 2.4, z + 5.6], w: 2.2, w2: 2.2, t: { dk: '#5a4a32', mid: '#8a7656', lt: '#b0a080', hi: '#d0c4a4' } }),   // a bedroll
 };
-const FIREBRAND: SoldierSpec = {
-  armour: '#946c48', armourTop: '#c0946a', build: 1, helmet: '#7a5e44', visor: null, legs: CLAN_LEGS,
-  extra: bob => [
-    { x0: -2.6, y0: -3.6, x1: 2.4, y1: -2.6, z0: 6.8 + bob + 2, z1: 6.8 + bob + 5.2, top: '#5a9a6a', side: '#3a7a4a' },            // a bandolier of bottles
-    { x0: -2.6, y0: 2.6, x1: 2.4, y1: 3.6, z0: 6.8 + bob + 2, z1: 6.8 + bob + 5.2, top: '#9a7a3a', side: '#6a5222' },              // and of rags
-    { x0: 2, y0: 2.6, x1: 3.4, y1: 4, z0: 6.8 + bob + 6, z1: 6.8 + bob + 9.5, top: '#6aa87a', side: '#4a7a5a' },                   // one in hand
-  ],
-  glow: (g, a, bob) => { goggles(g, a, bob, 'rgba(255,140,60,0.95)'); const [x, y] = at(2.7, 3.3, a); fireGlow(g, x, y - 6.8 - bob - 10.5, 4); },
+const HARPOONER: Kit = {
+  cloak: FUR, cloakTo: 3, cloakW: 3.6, bulk: 1.15,
+  gun: (P, z) => {   // a harpoon gun on the shoulder, its barb out front, a coil of line on the back
+    P.push({ k: 'limb', a: [-2.4, 1.8, z + 6.4], b: [3, 1.8, z + 6.8], w: 2.2, w2: 2, t: IRONT });
+    P.push({ k: 'limb', a: [3, 1.8, z + 6.8], b: [6.8, 1.8, z + 7], w: 0.8, w2: 0.5, t: { dk: '#8a8478', mid: '#c0b8a8', lt: '#e0d8c8', hi: '#fff' } });
+    for (const sd of [-1, 1]) P.push({ k: 'limb', a: [6.4, 1.8, z + 7], b: [5.4, 1.8 + sd * 1.3, z + 7.3], w: 0.5, w2: 0.3, t: { dk: '#8a8478', mid: '#c0b8a8', lt: '#e0d8c8', hi: '#fff' } });
+    P.push({ k: 'blob', c: [-2.8, -0.6, z + 4.6], rx: 1.8, ry: 1.8, t: { dk: '#7a6a44', mid: '#b09a68', lt: '#d8c290', hi: '#f0e0b0' } });
+  },
+  head: (P, z) => { P.push({ k: 'blob', c: [0.2, 0, z + 8.9], rx: 1.7, ry: 1.1, t: FUR }); goggles('rgba(255,190,90,0.9)')(P, z); },
 };
-const LONGSHOT: SoldierSpec = {
-  armour: '#76684e', armourTop: '#a08e6c', build: 0.92, helmet: '#4e4434', visor: null, legs: CLAN_LEGS,   // a dark head wrap
-  extra: bob => [
-    { x0: -3.8, y0: -3.8, x1: 1, y1: 3.8, z0: 6.8 + bob + 0.3, z1: 6.8 + bob + 6.8, top: '#8a7a5a', side: '#62563e' },             // ragged cloak
-    ...longRifle(14, bob),
-    { x0: 3.5, y0: 1.9, x1: 6.5, y1: 2.9, z0: 6.8 + bob + 5.2, z1: 6.8 + bob + 6.3, top: '#c8a050', side: '#8a6a2a' },               // brass scope
-  ],
-  glow: (g, a, bob) => { const [x, y] = at(6.6, 2.4, a); g.fillStyle = 'rgba(255,220,140,0.9)'; g.fillRect(x - 0.4, y - 6.8 - bob - 5.8, 0.8, 0.8); },
+const FIREBRAND: Kit = {
+  cloak: { dk: '#4a3018', mid: '#7e5430', lt: '#a8784a', hi: '#c89a6a' }, cloakTo: 4, cloakW: 3.4,
+  gun: (P, z) => {   // a bottle bandolier, and one bottle lit in hand
+    P.push({ k: 'band', a: [1, 1.9, z + 5.4], b: [1.2, -1.9, z + 1.6], w: 0.9, col: '#4a3a24' });
+    for (const t of [0.2, 0.45, 0.7]) P.push({ k: 'glow', c: [1.25, 1.9 - t * 3.8, z + 5.4 - t * 3.8], r: 0.7, col: 'rgba(110,200,130,0.8)' });
+    P.push({ k: 'limb', a: [3.2, 2.6, z + 3.6], b: [3.4, 2.6, z + 6.2], w: 1.1, w2: 0.7, t: { dk: '#2a5a3a', mid: '#4a8a5a', lt: '#7ac08a', hi: '#c0f0c8' } });
+    P.push({ k: 'glow', c: [3.4, 2.6, z + 6.8], r: 3.2, col: 'rgba(255,150,60,0.9)' });
+  },
+  head: (P, z) => { hood({ dk: '#3a2414', mid: '#664228', lt: '#8e6440', hi: '#b08660' })(P, z); goggles('rgba(255,140,60,0.95)')(P, z); },
 };
+const LONGSHOT: Kit = {
+  cloak: { dk: '#3a3628', mid: '#625c44', lt: '#86805e', hi: '#a8a07a' }, cloakTo: 9.5, cloakW: 4.4, gun: rifle(10.5, true),
+  head: (P, z) => { hood({ dk: '#2a2618', mid: '#4a4430', lt: '#6a6248', hi: '#8a8262' })(P, z); P.push({ k: 'glow', c: [6.6, 1.1, z + 4.9], r: 0.8, col: 'rgba(255,220,140,0.9)' }); },
+};
+const drawScav = (g: Ctx, a: number, team: string, phase = 0) => clansman(g, a, team, phase, SCAV);
+const drawHarpooner = (g: Ctx, a: number, team: string, phase = 0) => clansman(g, a, team, phase, HARPOONER);
+const drawFirebrand = (g: Ctx, a: number, team: string, phase = 0) => clansman(g, a, team, phase, FIREBRAND);
+const drawLongshot = (g: Ctx, a: number, team: string, phase = 0) => clansman(g, a, team, phase, LONGSHOT);
 
 // ---------------- the pack beast ----------------
-// A shaggy, horned hauler native to the crust. Drawn facing +x at offset x0.
+// A shaggy, horned hauler native to the crust, on the rig: four thick legs in a
+// walking gait, a long-haired body and hump, a clan blanket, a low horned head.
+const SHAG: Tone = { dk: '#3e2c1c', mid: '#6e5236', lt: '#9a7a52', hi: '#c0a074' };
 function beast(g: Ctx, a: number, x0: number, y0: number, phase: number, team: string) {
-  const t = phase * Math.PI * 2;
-  const legs: [number, number, number][] = [[x0 + 4, y0 - 2.6, 0], [x0 + 4, y0 + 2.6, Math.PI], [x0 - 3, y0 - 2.6, Math.PI], [x0 - 3, y0 + 2.6, 0]];
-  const back = legs.filter(l => Math.sin(a) * (l[1] - y0) < 0 || (Math.abs(Math.sin(a)) < 0.2 && l[1] < y0));
-  const front = legs.filter(l => !back.includes(l));
-  const leg = ([x, y, ph]: [number, number, number]) => { const sw = Math.sin(t + ph) * 1.6, lift = Math.max(0, Math.cos(t + ph)) * 0.8; box(g, a, x + sw - 0.8, y - 0.8, x + sw + 0.8, y + 0.8, lift, 6.5, '#4a3a2a', '#3a2a1c'); };
-  back.forEach(leg);
-  box(g, a, x0 - 5.5, y0 - 3.2, x0 + 6, y0 + 3.2, 5.5, 10, '#8a6e4e', '#6a5038');                 // shaggy body
-  const [hx, hy] = at(x0 + 1.5, y0, a); dome(g, hx, hy, 3.8, 9.5, '#94785a');                      // hump
-  deckPlate(g, a, 10.2, x0 - 4, y0 - 3.3, x0 - 1, y0 + 3.3, team);                                   // a clan blanket
-  box(g, a, x0 + 6, y0 - 1.8, x0 + 9.5, y0 + 1.8, 6, 9.5, '#7a5e42', '#5a4430');                    // head
-  for (const s of [-1, 1]) {                                                                        // horns
-    const [p0x, p0y] = at(x0 + 7, y0 + s * 1.8, a), [p1x, p1y] = at(x0 + 5.5, y0 + s * 4, a);
-    g.strokeStyle = '#d8ccb0'; g.lineWidth = 1.2; g.lineCap = 'round'; g.beginPath(); g.moveTo(p0x, p0y - 9.5); g.quadraticCurveTo(p1x, p1y - 12, p1x + Math.cos(a) * 2, p1y - 13); g.stroke();
+  const P: Part[] = [];
+  for (const [i, x] of [x0 + 4, x0 - 3].entries()) for (const sd of [-1, 1]) {
+    const [sw, lift] = stride(phase, (i + (sd > 0 ? 0 : 1)) % 2 ? 1 : -1, 1.6, 0.9);
+    const top: V3 = [x, y0 + sd * 2.2, 6.6], knee: V3 = [x + sw * 0.5 + 0.4, y0 + sd * 2.3, 3.2 + lift], hoof: V3 = [x + sw, y0 + sd * 2.3, 0.4 + lift];
+    P.push({ k: 'limb', a: top, b: knee, w: 2.2, w2: 1.6, t: SHAG }, { k: 'limb', a: knee, b: hoof, w: 1.5, w2: 1.2, t: SHAG });
+    P.push({ k: 'blob', c: [hoof[0] + 0.2, hoof[1], hoof[2] - 0.1], rx: 1, ry: 0.7, t: BOOT });
   }
-  front.forEach(leg);
+  P.push({ k: 'blob', c: [x0, y0, 8], rx: 6.4, ry: 3.6, t: SHAG });
+  P.push({ k: 'blob', c: [x0 + 2, y0, 10.4], rx: 3.4, ry: 2.4, t: SHAG });                                          // the hump
+  P.push({ k: 'plate', c: [x0 - 2.2, y0, 10.2], rx: 2.4, ry: 3.4, h: 0.8, t: { dk: shade(team, 0.45), mid: shade(team, 0.7), lt: team, hi: shade(team, 1.3) } });   // a clan blanket
+  P.push({ k: 'cloth', c: [x0, y0, 7.4], r0: 3.6, z1: 4.6, r1: 4.2, t: SHAG, trim: 'rgba(0,0,0,0)' });               // long hair hanging down the flanks
+  P.push({ k: 'limb', a: [x0 + 5.4, y0, 8.6], b: [x0 + 8, y0, 7.4], w: 2.6, w2: 2.2, t: SHAG });                    // the neck, carried low
+  P.push({ k: 'blob', c: [x0 + 8.6, y0, 7.2], rx: 2, ry: 1.8, t: { dk: '#2e2216', mid: '#5a4230', lt: '#7e5e42', hi: '#a07e5c' } });
+  for (const sd of [-1, 1]) {
+    const h0: V3 = [x0 + 8.4, y0 + sd * 1.2, 8.4], h1: V3 = [x0 + 7.2, y0 + sd * 3.2, 9.6], h2: V3 = [x0 + 8.6, y0 + sd * 3.6, 11.2];
+    P.push({ k: 'limb', a: h0, b: h1, w: 1, w2: 0.8, t: { dk: '#8a7e66', mid: '#c0b498', lt: '#e0d6bc', hi: '#fff8e8' } }, { k: 'limb', a: h1, b: h2, w: 0.8, w2: 0.3, t: { dk: '#8a7e66', mid: '#c0b498', lt: '#e0d6bc', hi: '#fff8e8' } });
+  }
+  drawRig(g, a, P);
 }
 // the traces from a beast's shoulders back to the cart
 function traces(g: Ctx, a: number, xb: number, xc: number, z: number) {
@@ -281,8 +386,9 @@ function drawHall(g: Ctx, w: number, _h: number, level: number, team: string) {
   }
   const body: Pt[] = [[14, 26], [82, 26], [82, 72], [14, 72]];
   timber(g, body, 2, 26);
-  // roof: hide over timber, with a colony hull plate laid along the ridge
-  gable(g, 10, 22, 86, 76, 26, 48, HIDE, 6);
+  logWall(g, 14, 82, 72, 2, 26);
+  // roof: thatch over timber, with a colony hull plate laid along the ridge
+  roof(g, 10, 22, 86, 76, 26, 48, 'thatch', team);
   quad(g, [30, 49 - 48 - 1], [66, 49 - 48 - 1], [66, 49 - 48 + 5], [30, 49 - 48 + 5], '#8e8a80');
   g.fillStyle = 'rgba(40,50,70,0.5)'; g.font = '700 4px system-ui, sans-serif'; g.fillText('HDC-07', 40, 4);   // a company serial, painted over
   for (const x of [34, 62]) cylinder(g, x, 50, 1.6, 44, 52, '#3a3632', '#2a2624');               // smoke holes
@@ -323,6 +429,7 @@ function drawSmelter(g: Ctx, w: number, _h: number, _level: number, team: string
   const furnace: Pt[] = [[12, 16], [50, 16], [50, 52], [12, 52]];
   prism(g, furnace, 2, 24, STONE_TOP, STONE);
   detailWalls(g, furnace, 2, 24, 5, 0.3);
+  roof(g, 10, 12, 52, 56, 24, 34, 'tin', team);
   quad(g, [24, 52 - 14], [38, 52 - 14], [38, 52 - 3], [24, 52 - 3], '#24140a');
   fireGlow(g, 31, 52 - 8, 10);
   cylinder(g, 18, 22, 4, 24, 46, STONE_TOP, STONE);
@@ -349,7 +456,8 @@ function drawLonghouse(g: Ctx, w: number, _h: number, level: number, team: strin
   yard(g, 3, 8, 61, 61);
   const body: Pt[] = [[10, 22], [54, 22], [54, 50], [10, 50]];
   timber(g, body, 1.5, 16);
-  gable(g, 7, 18, 57, 54, 16, 30, HIDE_DK, 5);
+  logWall(g, 10, 54, 50, 1.5, 16);
+  roof(g, 7, 18, 57, 54, 16, 30, 'hide', team);
   quad(g, [26, 50 - 13], [36, 50 - 13], [36, 50 - 1.5], [26, 50 - 1.5], '#1c140c');
   fireGlow(g, 31, 50 - 5, 5);
   quad(g, [24, 50 - 15], [38, 50 - 15], [38, 50 - 13], [24, 50 - 13], team, false);
@@ -392,6 +500,7 @@ function drawForge(g: Ctx, w: number, _h: number, _level: number, team: string) 
   const hearth: Pt[] = [[10, 18], [40, 18], [40, 44], [10, 44]];
   prism(g, hearth, 1.5, 18, STONE_TOP, STONE);
   detailWalls(g, hearth, 1.5, 18, 4, 0.3);
+  roof(g, 8, 14, 42, 48, 18, 26, 'tin', team);
   quad(g, [16, 44 - 12], [34, 44 - 12], [34, 44 - 3], [16, 44 - 3], '#2a1206');
   fireGlow(g, 25, 44 - 7, 9);
   cylinder(g, 32, 22, 3.5, 18, 40, STONE_TOP, STONE);
@@ -511,10 +620,10 @@ function drawMine(g: Ctx, w: number, _h: number, _level: number, team: string) {
 // ---------------- registration ----------------
 
 Object.assign(VEHICLE_ART, {
-  scav:       soldierArt(SCAV, 13, 20),
-  harpooner:  soldierArt(HARPOONER, 12, 22),
-  firebrand:  soldierArt(FIREBRAND, 10, 22),
-  longshot:   soldierArt(LONGSHOT, 15, 20),
+  scav:       { hull: drawScav,      reach: 12, height: 20, frames: 4, turn: 10 },
+  harpooner:  { hull: drawHarpooner, reach: 12, height: 20, frames: 4, turn: 10 },
+  firebrand:  { hull: drawFirebrand, reach: 10, height: 20, frames: 4, turn: 10 },
+  longshot:   { hull: drawLongshot,  reach: 16, height: 20, frames: 4, turn: 10 },
   technical:  { hull: drawTechnicalHull,  turret: drawTechnicalTurret,  reach: 16, height: 16 },
   rustbucket: { hull: drawRustbucketHull, turret: drawRustbucketTurret, reach: 22, height: 20 },
   mortar:     { hull: drawMortarHull,     reach: 18, height: 20, frames: 4 },
