@@ -221,6 +221,11 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'Rapid-discharge lightning emitter. Requires Defence Grid I.' },
   bastion:   { id: 'bastion',   name: 'Bastion Battery', tab: 'def',  cost: 3500, buildTime: 18, hp: 1400, power: -60,  w: 2, h: 2, vision: 10, prereq: 'railgun', prereqUp: 'def2', turret: { damage: 150, range: 9, reload: 3.0 }, sprite: 'bld_silo', upgradable: true,
                desc: 'Quad-cannon fortress emplacement. Requires Defence Grid II.' },
+  // ---- campaign landmarks ----
+  meridian:  { id: 'meridian',  name: 'The Meridian',   tab: 'build', cost: 0,    buildTime: 1,  hp: 5000, power: 0,    w: 4, h: 3, vision: 7,  nonBuildable: true,
+               desc: 'The first colony ship, two hundred years in the ground. The Hollow were born in her.' },
+  lanternshaft:{ id: 'lanternshaft', name: 'Lantern Shaft', tab: 'build', cost: 0, buildTime: 1,  hp: 3200, power: 0,    w: 3, h: 3, vision: 7,  nonBuildable: true,
+               desc: 'Project Lantern: Helion\'s deep tap into the heart of the Vey. Something down there is still bleeding light.' },
   // ---- the Keepers: arrive in light, never built (AI only) ----
   beacon:    { id: 'beacon',    name: 'Keeper Beacon',  tab: 'build', cost: 0,    buildTime: 1,  hp: 2200, power: 0,    w: 3, h: 3, vision: 10, nonBuildable: true, shield: 1400,
                desc: 'A spire of pale gold that sings at the sky. Whatever the Keepers send comes down its light.' },
@@ -359,7 +364,12 @@ export const resetSlots = () => setSlots(DEFAULT_SLOTS);
 export const kindOf = (o: number): FactionKind => FACTIONS[SLOTS[o] ?? 'helion']?.kind ?? 'human';
 /** The Vey's own (the Hollow, the brood, the Keepers who made it) never fight each other; the player fights everyone. */
 export const isVey = (o: number) => kindOf(o) !== 'human';
-export const hostile = (a: number, b: number) => a !== b && (a === PLAYER || b === PLAYER || !(isVey(a) && isVey(b)));
+// campaign alliances (e.g. the Hollow beside you if you protected the Meridian)
+const ALLIES = new Set<string>();
+export function setAllied(a: number, b: number, on: boolean) { const k = a < b ? `${a},${b}` : `${b},${a}`; if (on) ALLIES.add(k); else ALLIES.delete(k); }
+export const clearAllies = () => ALLIES.clear();
+export const hostile = (a: number, b: number) => a !== b && !ALLIES.has(a < b ? `${a},${b}` : `${b},${a}`)
+  && (a === PLAYER || b === PLAYER || !(isVey(a) && isVey(b)));
 
 // what each kind of faction can make (humans: everything not marked nonBuildable)
 const BROOD_TECH = new Set(['broodpod', 'veinwell', 'bloomnode', 'spinespire', 'skitter', 'spitter', 'carapace', 'moth', 'behemoth']);

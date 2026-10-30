@@ -149,6 +149,8 @@ Nothing starts until this draft is signed off. The plan keeps the current file o
 - Act II added: the Hollow as a faction (Shardkin, Burrower, Choir; tunnel mouths), Vey resonance (tremors, crystal storms, dark vents), comms-box choices (Vessa's deal), the shielded Uplink and its relays.
 - **The Keepers** (the Vey's makers) arrive in II-6 *Resonance*, making it a three-way fight with Kessler; also a skirmish option.
 - Changes from the plan: II-6 is *Resonance* (the Uplink mission, with the Report and Okoye's question), so the Meridian choice moves to Act III as planned (mission 7).
+- **Act III** (III-7 Meridian, III-8 Kessler's Wall, III-9 Zero Day). Campaign flags carry choices forward: `labs` (II-5, spared or burned), `meridian` (protected or sold), `okoye` (stayed or left), `lind` (gone). Sparing the labs brings Verdant in as allies at Zero Day; protecting the Meridian brings the Hollow as allies and unlocks the third ending.
+- The human factions now look different from each other: Kessler (riveted armour, rust stripes, war banners), Verdant (moss, vines, patched panels) and Ashen (soot, scorch, embers, scrap spikes). Helion stays clean.
 
 ## 7. Decisions
 - **Names:** locked. Cinder, Lantern, the Vey, the Hollow, Meridian.

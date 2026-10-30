@@ -261,7 +261,7 @@ function renderMissions() {
   const done = campaign.progress().done;
   const firstOpen = campaign.MISSIONS.find(m => campaign.unlocked(m.id) && !done.includes(m.id)) ?? campaign.MISSIONS[0];
   if (!selectedMission || !campaign.unlocked(selectedMission)) selectedMission = firstOpen.id;
-  const ACTS: Record<number, string> = { 1: 'Act I — Landfall', 2: 'Act II — The Corridor' };
+  const ACTS: Record<number, string> = { 1: 'Act I — Landfall', 2: 'Act II — The Corridor', 3: 'Act III — Last Light' };
   const button = (m: typeof campaign.MISSIONS[number]) => {
     const open = campaign.unlocked(m.id), fin = done.includes(m.id);
     return `<button class="opt mission${m.id === selectedMission ? ' sel' : ''}" type="button" data-id="${m.id}"${open ? '' : ' disabled'}>`
@@ -380,6 +380,7 @@ import * as configMod from './config';
 (window as any).novaMap = mapMod;
 (window as any).novaCfg = configMod;
 (window as any).novaAudio = audioStats;
+(window as any).novaCampaign = campaign;
 
 // Fast-forward the simulation by N seconds (e.g. novaStep(30) in the console)
 (window as any).novaStep = (seconds: number) => {

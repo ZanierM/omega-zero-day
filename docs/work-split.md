@@ -22,6 +22,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `polish-round`):** the classic art style is gone (the user's call): no `?style=classic`, no V key, no Graphics button in the pause menu, and `render.ts` no longer exports `refinedStyle`, `setRefinedStyle` or `onStyleChange`. The duplicate DOM order ring (`#ordermarker` and `markOrder` in `input.ts`) is removed; orders are marked by the canvas marker in `render.ts`.
 
+**Small cross-file change (Claude, `act3-and-looks`):** `src/ui.ts` takes its campaign end-screen text from `campaign.endingFor(win, eliminated)` (Zero Day has three endings), and clears `iconCache` when the played faction changes, because build icons are now painted with the faction's look (`src/faction-skin.ts`). Keep both when reworking the end screen or the build bar.
+
 **Campaign Act II (Claude, `campaign-act2`):** the comms box can carry a choice (`.commschoice` buttons, built in `ui.ts`, styled in `index.html`); the briefing's mission list is grouped by act; `defsFor` in `ui.ts` skips `nonBuildable` units (the Hollow). New portraits in `public/portraits` (Reyes, Vessa Kol, Seren).
 
 **The Vey brood (Claude, `vey-brood`):** new `src/brood.ts` (its AI) and `src/brood-art.ts`. Cross-file: `index.html` has a "The Vey brood: Dormant / Awake" skirmish option (`#broodopts`); `src/main.ts` seeds the brood at the map's centre in `startGame`; `src/ui.ts` keeps `nonBuildable` structures off the build bar.
