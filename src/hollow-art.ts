@@ -88,78 +88,35 @@ function hullPlate(g: Ctx, pts: Pt[], stencil?: string) {
 
 // ---------------- units ----------------
 
-function drawDelver(g: Ctx, a: number, team: string, phase = 0) {
-  // a long, low tunnel-runner on four legs: quartz hide in plates, a ridge of crystal down its spine
-  const t = phase * Math.PI * 2, z = 5.5 + Math.abs(Math.sin(t)) * 0.9;
-  shadow(g, 1, 2, 12, 5.5);
-  const limb = (x: number, side: number, ph: number) => {
-    const sw = Math.sin(t + ph) * 2.6, lift = Math.max(0, Math.cos(t + ph)) * 1.4;
-    const [hx, hy] = rotP(x, side * 2.6, a), [kx, ky] = rotP(x + sw * 0.5 + 1, side * 4.4, a), [fx, fy] = rotP(x + sw, side * 5, a);
-    g.lineCap = 'round'; g.lineJoin = 'round';
-    g.strokeStyle = QUARTZ.dk; g.lineWidth = 2.6;
-    g.beginPath(); g.moveTo(hx, hy - z); g.lineTo(kx, ky - z * 0.55 - lift); g.lineTo(fx, fy - lift); g.stroke();
-    g.strokeStyle = QUARTZ.lt; g.lineWidth = 0.9;
-    g.beginPath(); g.moveTo(hx, hy - z - 0.6); g.lineTo(kx, ky - z * 0.55 - lift - 0.6); g.stroke();
-    g.fillStyle = CRY.mid; g.beginPath(); g.arc(fx, fy - lift, 1, 0, Math.PI * 2); g.fill();   // crystal claws
-  };
-  const legs: [number, number, number][] = [[5, -1, 0], [5, 1, Math.PI], [-5, -1, Math.PI], [-5, 1, 0]];
-  const near = (side: number) => rotP(0, side, a)[1] > 0;
-  for (const [x, sd, ph] of legs) if (!near(sd)) limb(x, sd, ph);
-  // the body: belly, then overlapping hide plates front to back
-  const body: Pt[] = [[-10, 0], [-7, -3.4], [3, -3.8], [8, -2.6], [10, 0], [8, 2.6], [3, 3.8], [-7, 3.4]].map(([x, y]) => { const p = rotP(x, y, a); return [p[0], p[1] - z]; });
-  const bg = g.createLinearGradient(0, -z - 4, 0, -z + 4);
-  bg.addColorStop(0, QUARTZ.lt); bg.addColorStop(0.55, QUARTZ.mid); bg.addColorStop(1, QUARTZ.dk);
-  poly(g, body, bg);
-  for (const x of [-6, -2.5, 1, 4.5]) {
-    const p1 = rotP(x + 1.5, -3.3, a), p2 = rotP(x + 1.5, 3.3, a);   // the edge of each hide plate
-    g.strokeStyle = 'rgba(40,60,66,0.45)'; g.lineWidth = 0.6;
-    g.beginPath(); g.moveTo(p1[0], p1[1] - z - 0.4); g.quadraticCurveTo((p1[0] + p2[0]) / 2 + 1, (p1[1] + p2[1]) / 2 - z - 1.6, p2[0], p2[1] - z - 0.4); g.stroke();
-  }
-  // a strip of colony cloth across the back, in clan colours
-  const [s0x, s0y] = rotP(-3.5, -3.6, a), [s1x, s1y] = rotP(-3.5, 3.6, a), [s2x, s2y] = rotP(-1.8, 3.6, a), [s3x, s3y] = rotP(-1.8, -3.6, a);
-  poly(g, [[s0x, s0y - z - 0.6], [s1x, s1y - z - 0.6], [s2x, s2y - z - 0.6], [s3x, s3y - z - 0.6]], team, 'rgba(0,0,0,0.4)', 0.5);
-  // the spine ridge, tallest over the shoulders
-  for (const [x, h] of [[-7, 3], [-4.5, 4.5], [-2, 5.6], [0.5, 6.4], [3, 5.2], [5.5, 3.6]] as Pt[]) { const [sx, sy] = rotP(x, 0, a); shard(g, sx, sy - z - 2.6, h, 1.15, -0.25 * Math.cos(a)); }
-  // the head: a wedge of quartz, glowing eyes, a jaw of crystal teeth
-  const head: Pt[] = [[8, -2.4], [13, -1.2], [14, 0], [13, 1.2], [8, 2.4]].map(([x, y]) => { const p = rotP(x, y, a); return [p[0], p[1] - z - 0.5]; });
-  poly(g, head, QUARTZ.lt);
-  for (const sd of [-1, 1]) { const [ex, ey] = rotP(11.5, sd * 1.1, a); glowAt(g, ex, ey - z - 1.2, 2.4, 'rgba(160,255,245,0.9)'); g.fillStyle = CRY.hi; g.fillRect(ex - 0.4, ey - z - 1.6, 0.8, 0.8); }
-  for (const sd of [-0.6, 0, 0.6]) { const [tx, ty] = rotP(13.6, sd, a); g.fillStyle = CRY.lt; g.beginPath(); g.moveTo(tx - 0.4, ty - z); g.lineTo(tx + Math.cos(a), ty - z + 1.4); g.lineTo(tx + 0.4, ty - z); g.fill(); }
-  for (const [x, sd, ph] of legs) if (near(sd)) limb(x, sd, ph);
-}
-
 function drawCairn(g: Ctx, a: number, team: string, phase = 0) {
-  // stones the Hollow sang into walking: faceted rock bound by veins of light, a hull plate for a shield
-  const t = phase * Math.PI * 2, bob = Math.abs(Math.sin(t)) * 1.2;
-  shadow(g, 1, 2, 17, 8);
-  // legs: two stacked stones each, stepping
+  // stones the Hollow sang into walking: stacked faceted rock with light in the seams, a slab of the Meridian's hull for a shield
+  rigShadow(g, 15, 7);
+  const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * 1, P: Part[] = [];
   for (const sd of [-1, 1]) {
-    const sw = Math.sin(t + (sd > 0 ? 0 : Math.PI)) * 3.2, lift = Math.max(0, Math.cos(t + (sd > 0 ? 0 : Math.PI))) * 2;
-    const [fx, fy] = rotP(sw, sd * 7.5, a);
-    if (rotP(0, sd, a)[1] > 0) continue;
-    stone(g, fx, fy - lift, 4.6, 3, 5, 11 + sd);
+    const [sw, lift] = stride(phase, sd, 2.6, 1.6);
+    P.push({ k: 'rock', c: [-0.6 + sw, sd * 4.6, lift], rx: 3.4, ry: 2.4, h: 3.6, seed: 11 + sd });          // feet
+    P.push({ k: 'rock', c: [-0.4 + sw * 0.5, sd * 4.4, 4.4 + lift * 0.5], rx: 3, ry: 2.2, h: 3.4, seed: 13 + sd });   // shins
+    P.push({ k: 'glow', c: [-0.4 + sw * 0.5, sd * 4.4, 4.2 + lift * 0.5], r: 1.6, col: 'rgba(120,250,240,0.5)' });   // the knee's seam of light
   }
-  const [bx, by] = rotP(-1, 0, a), z = 9 + bob;
-  stone(g, bx, by - z + 4, 12, 7.5, 13, 3);                                    // the trunk
-  stone(g, bx + 1, by - z - 10, 8.5, 5.5, 9, 7, { ...STONE, lt: '#6e6876' });    // the shoulders
-  stone(g, bx - 0.5, by - z - 20, 5, 3.5, 6, 9);                                // the head-stone
-  // veins of light in the seams, and the singing crystal set in its chest
-  g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(120,250,240,0.75)'; g.lineWidth = 0.9; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(bx - 7, by - z - 4); g.quadraticCurveTo(bx - 2, by - z - 9, bx + 6, by - z - 6);
-  g.moveTo(bx - 3, by - z - 14); g.lineTo(bx + 2, by - z - 19); g.stroke(); g.restore();
-  for (const [x, y, h, w, lean] of [[-6, -15, 12, 2.2, -0.35], [4, -17, 15, 2.6, 0.12], [0, -27, 9, 1.8, 0], [7, -11, 8, 1.8, 0.45]] as number[][]) shard(g, bx + x, by - z + y, h, w, lean);
-  glowAt(g, bx, by - z - 8, 13, 'rgba(120,250,240,0.4)');
-  const [ex, ey] = rotP(3, 0, a); glowAt(g, bx + ex * 0.4, by - z - 21 + ey * 0.4, 3, 'rgba(200,255,250,0.95)');   // its one eye
-  // the shield: a slab of the Meridian's hull, held out front, banded in clan colour
-  const [px, py] = rotP(8, -3, a);
-  hullPlate(g, [[px - 5, py - z - 15], [px + 4, py - z - 17], [px + 5, py - z - 3], [px - 4, py - z - 1]], 'MER');
-  g.fillStyle = team; g.fillRect(px - 4.4, py - z - 9.5, 9, 1.6);
+  P.push({ k: 'rock', c: [-0.6, 0, 8 + bob], rx: 6.4, ry: 4.2, h: 5, seed: 3 });           // hips
+  P.push({ k: 'rock', c: [-0.2, 0, 13 + bob], rx: 7.6, ry: 4.8, h: 6, seed: 5 });          // the great chest
+  P.push({ k: 'glow', c: [1.4, 0, 16 + bob], r: 5, col: 'rgba(120,250,240,0.5)' });         // the light in its heart
+  P.push({ k: 'rock', c: [0.6, 0, 19.6 + bob], rx: 3.4, ry: 2.6, h: 3.4, seed: 9 });       // the head-stone
+  P.push({ k: 'glow', c: [2.6, 0, 21.4 + bob], r: 1.8, col: 'rgba(200,255,250,0.95)' });   // its one eye
   for (const sd of [-1, 1]) {
-    const sw = Math.sin(t + (sd > 0 ? 0 : Math.PI)) * 3.2, lift = Math.max(0, Math.cos(t + (sd > 0 ? 0 : Math.PI))) * 2;
-    const [fx, fy] = rotP(sw, sd * 7.5, a);
-    if (rotP(0, sd, a)[1] <= 0) continue;
-    stone(g, fx, fy - lift, 4.6, 3, 5, 11 + sd);
+    const [sw] = stride(phase, -sd, 1.6, 0);
+    P.push({ k: 'rock', c: [0.6, sd * 7.4, 15 + bob], rx: 3.2, ry: 2.4, h: 3.6, seed: 17 + sd });           // shoulders
+    P.push({ k: 'rock', c: [1.6 + sw * 0.3, sd * 8.4, 9.4 + bob], rx: 2.6, ry: 2, h: 3.6, seed: 19 + sd });  // fists
   }
+  for (const [x, y, z, h, w, lean] of [[-2.6, -3, 18, 8, 1.8, -0.35], [-1.6, 2.8, 18.6, 10, 2.1, -0.15], [-3.4, 0, 16, 6, 1.5, -0.5], [1.6, 0, 22.6, 5, 1.2, 0]] as number[][])
+    P.push({ k: 'shard', c: [x, y, z + bob], h, w, lean });
+  // the shield: held out in front, a slab of hull plate banded in clan colour; behind the body when it faces away
+  const sp: V3 = [6.6, -3.6, 14 + bob], [px, py] = proj(sp, a);
+  const shield = () => { hullPlate(g, [[px - 5, py - 7], [px + 4, py - 9], [px + 5, py + 6], [px - 4, py + 8]], 'MER'); g.fillStyle = team; g.fillRect(px - 4.4, py - 1.2, 9, 1.8); };
+  const behind = depthOf(sp, a) < depthOf([-0.2, 0, 13 + bob], a);
+  if (behind) shield();
+  drawRig(g, a, P);
+  if (!behind) shield();
 }
 
 // ---------------- structures ----------------
@@ -268,9 +225,193 @@ function drawEchoHead(g: Ctx, a: number, _team: string) {
   g.fillStyle = CRY.hi; g.beginPath(); g.arc(0, -z - 2, 1.4, 0, Math.PI * 2); g.fill();
 }
 
+// ---------------- the creature rig ----------------
+// A Hollow body is a handful of parts placed in 3D (x forward, y to the side, z up),
+// projected for the unit's heading and drawn back to front, so limbs pass in
+// front of and behind the body the right way as it turns and walks.
+
+type V3 = [number, number, number];
+type Part =
+  | { k: 'limb'; a: V3; b: V3; w: number; w2?: number; t: Tone }    // a tapered capsule: thigh, forearm, neck
+  | { k: 'blob'; c: V3; rx: number; ry: number; t: Tone; rot?: number; veins?: number }   // a rounded mass: torso, head, shoulder
+  | { k: 'cloth'; c: V3; r0: number; z1: number; r1: number; t: Tone; trim: string }   // a draped skirt or robe, from a waist ring down to a ragged hem
+  | { k: 'shard'; c: V3; h: number; w: number; lean: number }       // a crystal growing out of the body
+  | { k: 'glow'; c: V3; r: number; col: string }
+  | { k: 'rock'; c: V3; rx: number; ry: number; h: number; seed: number }   // a faceted stone: the Cairn is made of these
+  | { k: 'band'; a: V3; b: V3; w: number; col: string };            // cloth, a strap, a sash
+
+function proj(p: V3, a: number): Pt { const [x, y] = rotP(p[0], p[1], a); return [x, y - p[2]]; }
+const depthOf = (p: V3, a: number) => rotP(p[0], p[1], a)[1] + p[2] * 0.002;
+// glowing crystal veins under the skin of a rounded part
+function skinVeins(g: Ctx, rx: number, ry: number, n: number) {
+  g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(120,250,240,0.55)'; g.lineWidth = 0.45; g.lineCap = 'round';
+  for (let k = 0; k < n; k++) {
+    const t0 = k * 2.39, x0 = Math.cos(t0) * rx * 0.2, y0 = Math.sin(t0) * ry * 0.2;
+    g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(Math.cos(t0 + 0.6) * rx * 0.6, Math.sin(t0 + 0.6) * ry * 0.5, Math.cos(t0 + 1) * rx * 0.85, Math.sin(t0 + 1) * ry * 0.85); g.stroke();
+  }
+  g.restore();
+}
+
+function drawRig(g: Ctx, a: number, parts: Part[]) {
+  const key = (q: Part) => q.k === 'limb' || q.k === 'band' ? (depthOf(q.a, a) + depthOf(q.b, a)) / 2 : depthOf(q.c, a);   // cloth sorts by its waist
+  for (const q of [...parts].sort((p1, p2) => key(p1) - key(p2) || (p1.k === 'glow' ? 1 : 0) - (p2.k === 'glow' ? 1 : 0))) {
+    if (q.k === 'limb') {
+      // a tapered limb: a quad between two widths, round at both ends, shaded across its width
+      const [x0, y0] = proj(q.a, a), [x1, y1] = proj(q.b, a), w0 = q.w / 2, w1 = (q.w2 ?? q.w * 0.7) / 2;
+      const len = Math.hypot(x1 - x0, y1 - y0) || 1, nx = -(y1 - y0) / len, ny = (x1 - x0) / len;
+      // solid pieces (no self-crossing outline): a dark underlay a little wider, then the shaded body
+      const body = (grow: number, fill: string | CanvasGradient) => {
+        g.fillStyle = fill;
+        g.beginPath(); g.moveTo(x0 + nx * (w0 + grow), y0 + ny * (w0 + grow)); g.lineTo(x1 + nx * (w1 + grow), y1 + ny * (w1 + grow));
+        g.lineTo(x1 - nx * (w1 + grow), y1 - ny * (w1 + grow)); g.lineTo(x0 - nx * (w0 + grow), y0 - ny * (w0 + grow)); g.closePath(); g.fill();
+        g.beginPath(); g.arc(x0, y0, w0 + grow, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(x1, y1, w1 + grow, 0, Math.PI * 2); g.fill();
+      };
+      const litSide = nx < 0 || ny < 0;   // the side facing up-left catches the light
+      const lg = g.createLinearGradient(x0 + nx * w0, y0 + ny * w0, x0 - nx * w0, y0 - ny * w0);
+      lg.addColorStop(0, litSide ? q.t.lt : q.t.dk); lg.addColorStop(0.5, q.t.mid); lg.addColorStop(1, litSide ? q.t.dk : q.t.lt);
+      body(0.7, 'rgba(8,14,18,0.7)');
+      body(0, lg);
+    } else if (q.k === 'blob') {
+      const [x, y] = proj(q.c, a);
+      g.save(); g.translate(x, y); g.rotate(q.rot ?? 0);
+      const gr = g.createRadialGradient(-q.rx * 0.35, -q.ry * 0.45, Math.min(q.rx, q.ry) * 0.15, 0, 0, Math.max(q.rx, q.ry) * 1.05);
+      gr.addColorStop(0, q.t.hi); gr.addColorStop(0.3, q.t.lt); gr.addColorStop(0.7, q.t.mid); gr.addColorStop(1, q.t.dk);
+      g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, q.rx, q.ry, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(8,14,18,0.65)'; g.lineWidth = 0.7; g.stroke();
+      if (q.veins) skinVeins(g, q.rx, q.ry, q.veins);
+      g.restore();
+    } else if (q.k === 'cloth') {
+      // horizontal rings project to circles here, so a drape is the hull of its waist and hem circles
+      const [cx, cy0] = proj(q.c, a), cy1 = cy0 + (q.c[2] - q.z1);
+      const cg = g.createLinearGradient(cx - q.r1, 0, cx + q.r1, 0);
+      cg.addColorStop(0, q.t.lt); cg.addColorStop(0.45, q.t.mid); cg.addColorStop(1, q.t.dk);
+      g.fillStyle = cg; g.beginPath();
+      g.moveTo(cx - q.r0, cy0); g.lineTo(cx + q.r0, cy0); g.lineTo(cx + q.r1, cy1);
+      for (let k = 0; k <= 8; k++) { const t = k / 8, x = cx + q.r1 - t * q.r1 * 2; g.lineTo(x, cy1 + (k % 2 ? 1.6 : -0.2) + Math.sin(k * 1.7) * 0.5); }   // a ragged hem
+      g.closePath(); g.fill(); g.strokeStyle = 'rgba(8,14,18,0.6)'; g.lineWidth = 0.7; g.stroke();
+      g.strokeStyle = 'rgba(30,24,16,0.35)'; g.lineWidth = 0.5;
+      for (const f of [-0.5, 0, 0.5]) { g.beginPath(); g.moveTo(cx + q.r0 * f, cy0 + 1); g.lineTo(cx + q.r1 * f * 1.1, cy1 - 1); g.stroke(); }   // fold lines
+      g.fillStyle = q.trim; g.fillRect(cx - q.r1 * 0.95, cy1 - 2.4, q.r1 * 1.9, 1.2);   // a band of team colour near the hem
+    } else if (q.k === 'shard') {
+      const [x, y] = proj(q.c, a); shard(g, x, y, q.h, q.w, q.lean);
+    } else if (q.k === 'rock') {
+      const [x, y] = proj(q.c, a); stone(g, x, y, q.rx, q.ry, q.h, q.seed);
+    } else if (q.k === 'glow') {
+      const [x, y] = proj(q.c, a); glowAt(g, x, y, q.r, q.col);
+      g.fillStyle = 'rgba(240,255,255,0.95)'; g.beginPath(); g.arc(x, y, Math.max(0.4, q.r * 0.18), 0, Math.PI * 2); g.fill();
+    } else {
+      const [x0, y0] = proj(q.a, a), [x1, y1] = proj(q.b, a);
+      g.lineCap = 'butt'; g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = q.w + 0.8; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      g.strokeStyle = q.col; g.lineWidth = q.w; g.stroke();
+    }
+  }
+}
+// a walk cycle: the swing and lift of one foot for a gait phase (side flips the half-cycle)
+function stride(phase: number, side: number, len: number, lift: number): [number, number] {
+  const t = phase * Math.PI * 2 + (side > 0 ? 0 : Math.PI);
+  return [Math.sin(t) * len, Math.max(0, Math.cos(t)) * lift];
+}
+const SKIN: Tone = { dk: '#3a525a', mid: '#7a969c', lt: '#b6cfcf', hi: '#ecffff' };     // the Hollow's pale, quartz-veined skin
+const RAG: Tone = { dk: '#4a4238', mid: '#7a6e5c', lt: '#a89a80', hi: '#d0c4aa' };      // colony cloth, two hundred years mended
+
+function rigShadow(g: Ctx, rx: number, ry: number) { shadow(g, 1, 1.5, rx, ry); }
+
+function drawShardkin(g: Ctx, a: number, team: string, phase = 0) {
+  // lean and hunched on bent-back legs; its forearms end in crystal blades; shards run down its spine
+  rigShadow(g, 8, 3.8);
+  const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * 0.6, P: Part[] = [];
+  for (const sd of [-1, 1]) {
+    const [sw, lift] = stride(phase, sd, 2.2, 1.1);
+    const hip: V3 = [-0.6, sd * 1.5, 7 + bob], knee: V3 = [1.6 + sw * 0.4, sd * 1.8, 4.4 + lift], ankle: V3 = [-0.6 + sw, sd * 1.7, 1.6 + lift], toe: V3 = [0.8 + sw, sd * 1.7, lift];
+    P.push({ k: 'limb', a: hip, b: knee, w: 2.4, w2: 1.6, t: SKIN }, { k: 'limb', a: knee, b: ankle, w: 1.6, w2: 1.1, t: SKIN }, { k: 'limb', a: ankle, b: toe, w: 1.1, w2: 0.9, t: SKIN });
+    // arms swing against the legs; the forearm is a blade of crystal
+    const arm = -sw * 0.6;
+    const sh: V3 = [1.2, sd * 2.5, 11.4 + bob], el: V3 = [2.4 + arm, sd * 3, 8.4 + bob];
+    P.push({ k: 'limb', a: sh, b: el, w: 1.8, w2: 1.3, t: SKIN });
+    P.push({ k: 'shard', c: el, h: 5.4, w: 1.9, lean: 0.95 + arm * 0.1 });
+    P.push({ k: 'glow', c: [el[0] + 1.6, el[1], el[2] + 1.2], r: 1.8, col: 'rgba(140,255,245,0.55)' });
+  }
+  P.push({ k: 'blob', c: [-0.4, 0, 8 + bob], rx: 2.6, ry: 2.4, t: SKIN });               // hips
+  P.push({ k: 'blob', c: [0.8, 0, 11 + bob], rx: 3.2, ry: 3, t: SKIN, veins: 4 });      // chest, hunched forward
+  P.push({ k: 'cloth', c: [-0.4, 0, 8.6 + bob], r0: 2.4, z1: 5 + bob, r1: 3.2, t: RAG, trim: team });   // a kilt of colony cloth
+  P.push({ k: 'blob', c: [2.6, 0, 13.4 + bob], rx: 1.8, ry: 1.9, t: SKIN });            // head, thrust forward
+  for (const [y, h, lean] of [[-0.8, 2.2, -0.4], [0, 2.8, -0.2], [0.8, 2.2, -0.4]] as number[][]) P.push({ k: 'shard', c: [2.2, y, 14.8 + bob], h, w: 0.55, lean });   // crystal grown out of the skull
+  for (const sd of [-0.6, 0.6]) P.push({ k: 'glow', c: [4, sd, 13.6 + bob], r: 1.6, col: 'rgba(160,255,245,0.9)' });
+  for (const [x, z, h] of [[-0.8, 12.6, 5.5], [-1.4, 10.6, 4.5], [-1.6, 8.8, 3.2]] as number[][]) P.push({ k: 'shard', c: [x, 0, z + bob], h, w: 1.1, lean: -0.35 });
+  drawRig(g, a, P);
+}
+
+function drawBurrower(g: Ctx, a: number, team: string, phase = 0) {
+  // a knuckle-walking brute: short hind legs, huge forelimbs with digging claws, great crystal plates over the shoulders
+  rigShadow(g, 12, 5.5);
+  const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * 0.8, P: Part[] = [];
+  for (const sd of [-1, 1]) {
+    const [sw, lift] = stride(phase, sd, 1.8, 0.9), [fsw, flift] = stride(phase, -sd, 2.4, 1.2);
+    P.push({ k: 'limb', a: [-3.6, sd * 2.4, 7 + bob], b: [-2.4 + sw, sd * 2.6, 3.6 + lift], w: 3, t: SKIN }, { k: 'limb', a: [-2.4 + sw, sd * 2.6, 3.6 + lift], b: [-3.4 + sw, sd * 2.6, lift], w: 2.2, t: SKIN });
+    const sh: V3 = [2, sd * 4.2, 11 + bob], el: V3 = [4 + fsw * 0.5, sd * 5, 6.4 + flift], fist: V3 = [4.6 + fsw, sd * 4.6, 1 + flift];
+    P.push({ k: 'limb', a: sh, b: el, w: 4, w2: 3, t: SKIN }, { k: 'limb', a: el, b: fist, w: 3.2, w2: 2.6, t: SKIN });
+    P.push({ k: 'blob', c: fist, rx: 2.2, ry: 1.6, t: SKIN });
+    for (const k of [-1, 0, 1]) P.push({ k: 'shard', c: [fist[0] + 1.6, fist[1] + k * 0.9, fist[2] + 0.6], h: 2.4, w: 0.5, lean: 1.1 });   // digging claws
+  }
+  P.push({ k: 'blob', c: [-2.6, 0, 7.6 + bob], rx: 3.6, ry: 3, t: SKIN });               // haunches
+  P.push({ k: 'blob', c: [1.2, 0, 10.6 + bob], rx: 5.4, ry: 4.4, t: SKIN, veins: 6 });    // the great hunched back
+  P.push({ k: 'cloth', c: [-2.6, 0, 8.6 + bob], r0: 3, z1: 5.4 + bob, r1: 3.6, t: RAG, trim: team });   // a ragged loincloth
+  P.push({ k: 'blob', c: [4.6, 0, 9.4 + bob], rx: 2.2, ry: 2, t: SKIN });                // a small low head
+  for (const sd of [-0.7, 0.7]) P.push({ k: 'glow', c: [6.4, sd, 9.8 + bob], r: 1.5, col: 'rgba(160,255,245,0.85)' });
+  P.push({ k: 'band', a: [-1, -4.4, 12.6 + bob], b: [2.6, 4.4, 12 + bob], w: 1.4, col: team });   // a harness strap
+  for (const [x, y, h, lean] of [[1.4, -2.6, 7, -0.35], [1.8, 2.6, 7.5, -0.25], [-0.6, -1.2, 6, -0.45], [-0.4, 1.4, 6.5, -0.4], [2.8, 0, 5, -0.1], [-2.4, 0, 4.5, -0.55]] as number[][])
+    P.push({ k: 'shard', c: [x, y, 14 + bob], h, w: 1.8, lean });
+  drawRig(g, a, P);
+}
+
+function drawChoir(g: Ctx, a: number, team: string, phase = 0) {
+  // tall and gliding: a body that tapers into a skirt of crystal, a long neck, a crown of singing crystals, a glowing throat
+  rigShadow(g, 6.5, 3.2);
+  const sway = Math.sin(phase * Math.PI * 2) * 0.5, P: Part[] = [];
+  for (const [x, y, h, lean] of [[-2.4, -1.2, 3.6, -0.35], [2, -1.6, 3, 0.3], [-1.8, 2, 3.4, -0.3], [2.2, 1.4, 3, 0.35]] as number[][])
+    P.push({ k: 'shard', c: [x, y, 0.6], h, w: 1, lean });                                // crystal grown up round its hem
+  P.push({ k: 'cloth', c: [0, 0, 12.6 + sway * 0.3], r0: 2.4, z1: 1.2, r1: 4.2, t: RAG, trim: team });   // a long mended robe, to the ground
+  P.push({ k: 'blob', c: [0.2, 0, 12.4 + sway * 0.3], rx: 2.8, ry: 2.2, t: SKIN, veins: 3 });   // shoulders
+  P.push({ k: 'limb', a: [0.4, 0, 13.2], b: [1.4 + sway, 0, 17.6], w: 1.5, t: SKIN });   // the long neck
+  P.push({ k: 'glow', c: [1, 0, 15.2], r: 3.2, col: 'rgba(150,255,245,0.85)' });         // the singing throat
+  P.push({ k: 'blob', c: [1.8 + sway, 0, 18.8], rx: 1.6, ry: 1.9, t: SKIN });
+  for (const [y, h, lean] of [[-1.1, 3.6, -0.3], [0, 4.6, 0], [1.1, 3.6, 0.3]] as number[][]) P.push({ k: 'shard', c: [1.6 + sway, y, 20], h, w: 0.7, lean });
+  for (const sd of [-1, 1]) {                                                             // arms raised, hands open to the song
+    const sh: V3 = [0.4, sd * 2.4, 12.2], hand: V3 = [1.6, sd * 4.2, 15.8 + sway * sd];
+    P.push({ k: 'limb', a: sh, b: hand, w: 1.2, t: SKIN });
+    P.push({ k: 'glow', c: hand, r: 1.4, col: 'rgba(170,255,250,0.8)' });
+  }
+  drawRig(g, a, P);
+}
+
+function drawDelverRig(g: Ctx, a: number, team: string, phase = 0) {
+  // a long, low tunnel-runner on four bent legs: a quartz-plated back, a ridge of crystal, a wedge head with crystal teeth
+  rigShadow(g, 12, 5);
+  const bob = Math.abs(Math.sin(phase * Math.PI * 2)) * 0.7, P: Part[] = [];
+  for (const [x, sd, ph] of [[4.5, -1, 0], [4.5, 1, 0.5], [-4.5, -1, 0.5], [-4.5, 1, 0]] as number[][]) {
+    const [sw, lift] = stride((phase + ph) % 1, 1, 2.4, 1.2);
+    const hip: V3 = [x, sd * 2.4, 6.4 + bob], knee: V3 = [x + (x > 0 ? 1.6 : -1.4) + sw * 0.4, sd * 3.4, 3.6 + lift], foot: V3 = [x + sw, sd * 3.2, lift];
+    P.push({ k: 'limb', a: hip, b: knee, w: 2.4, w2: 1.6, t: SKIN }, { k: 'limb', a: knee, b: foot, w: 1.5, w2: 1, t: SKIN });
+    P.push({ k: 'shard', c: foot, h: 1.6, w: 0.6, lean: 0.9 });                         // crystal claws
+  }
+  P.push({ k: 'blob', c: [-4.4, 0, 7 + bob], rx: 4, ry: 3, t: SKIN, veins: 3 });       // haunches
+  P.push({ k: 'blob', c: [1, 0, 7.6 + bob], rx: 5.4, ry: 3.4, t: QUARTZ, veins: 4 });  // the plated back
+  P.push({ k: 'blob', c: [6.4, 0, 7.4 + bob], rx: 2.6, ry: 2.2, t: SKIN });            // shoulders
+  P.push({ k: 'limb', a: [7.6, 0, 7.8 + bob], b: [11.6, 0, 7 + bob], w: 3, w2: 1.6, t: QUARTZ });   // the wedge of its head
+  for (const sd of [-0.8, 0.8]) P.push({ k: 'glow', c: [10.4, sd, 8.2 + bob], r: 1.6, col: 'rgba(160,255,245,0.9)' });
+  for (const k of [-0.6, 0, 0.6]) P.push({ k: 'shard', c: [12, k, 6.6 + bob], h: 1.4, w: 0.4, lean: 1.2 });
+  P.push({ k: 'band', a: [-1.8, -3.4, 9.4 + bob], b: [-1.8, 3.4, 9.4 + bob], w: 1.8, col: team });   // a strip of colony cloth across its back
+  for (const [x, h] of [[-6, 2.6], [-3.6, 3.8], [-1.2, 5], [1.2, 5.6], [3.6, 4.4], [5.8, 3]] as Pt[]) P.push({ k: 'shard', c: [x, 0, 10 + bob], h, w: 1.1, lean: -0.3 });
+  drawRig(g, a, P);
+}
+
 Object.assign(VEHICLE_ART, {
-  delver: { hull: drawDelver, reach: 15, height: 16, frames: 4, turn: 8 },
-  cairn:  { hull: drawCairn,  reach: 18, height: 46, frames: 4, turn: 2.5 },
+  shardkin: { hull: drawShardkin, reach: 11, height: 26, frames: 4, turn: 10 },
+  burrower: { hull: drawBurrower, reach: 14, height: 30, frames: 4, turn: 8 },
+  choir:    { hull: drawChoir,    reach: 10, height: 34, frames: 4, turn: 9 },
+  delver: { hull: drawDelverRig, reach: 15, height: 18, frames: 4, turn: 8 },
+  cairn:  { hull: drawCairn,  reach: 18, height: 34, frames: 4, turn: 2.5 },
 });
 Object.assign(BUILDING_ART, {
   hearthstone: drawHearthstone, tunnelmouth: drawTunnelMouth, geode: drawGeode, grotto: drawGrotto, echo: drawEcho,

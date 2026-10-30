@@ -151,6 +151,7 @@ function makeCtx(): Ctx {
       const spot = nearestTile(tx, ty, 8, (x, y) => tileClear(1, 1, x, y)) ?? { x: tx, y: ty };
       game.openTunnel(spot.x, spot.y);
       const us = this.spawn(defIds, 4, spot.x, spot.y, group);
+      for (const u of us) game.surface(u);   // they come up out of the crust
       for (const u of us) {
         if (targetId !== undefined && game.byId.has(targetId)) issueOrder(u, { type: 'attack', targetId });
         else { const p = buildings.find(b => b.owner === PLAYER); if (p) { const c = buildingCenter(p); issueOrder(u, { type: 'attackMove', x: c.x, y: c.y }); } }
