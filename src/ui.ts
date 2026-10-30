@@ -586,7 +586,7 @@ export function updateUI() {
       : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.';
     const m = campaign.activeMission();
     if (m) {
-      const end = gameOver === 'win' ? m.endWin : (endReason === 'eliminated' && m.endEliminated) || m.endLose;
+      const end = campaign.endingFor(gameOver === 'win', endReason === 'eliminated')!;
       overlayTitle.textContent = end.title;
       overlaySub.textContent = end.text;
       const last = gameOver === 'win' && campaign.isLastMission();
@@ -627,7 +627,7 @@ function refreshTabs() {
 function updateCampaignUI() {
   const m = campaign.activeMission();
   const tech = (m?.id ?? '') + SLOTS[PLAYER];
-  if (tech !== shownTech) { shownTech = tech; refreshTabs(); rebuildGrid(); }   // the build bar follows the mission's and faction's tech
+  if (tech !== shownTech) { shownTech = tech; iconCache.clear(); refreshTabs(); rebuildGrid(); }   // a new faction means new icons too   // the build bar follows the mission's and faction's tech
   const line = campaign.currentComm();
   if (line !== shownComm) {   // only touch the DOM when the line changes
     shownComm = line;

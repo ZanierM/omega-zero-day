@@ -3,7 +3,7 @@
 // the objective list and comms queue, and tracks campaign progress.
 // Everything it remembers lives in `run`, which is plain data so it saves.
 
-import { PLAYER, TILE, FACTION_NAMES, BUILDINGS, resetSlots } from '../config';
+import { PLAYER, TILE, FACTION_NAMES, BUILDINGS, resetSlots, clearAllies } from '../config';
 import * as game from '../game';
 import {
   units, buildings, players, spawnUnit, placeBuilding, issueOrder, centerOfTile, buildingCenter,
@@ -32,7 +32,7 @@ let def: MissionDef | null = null;
 
 // ---------- comms ----------
 export interface CommLine { who: Speaker; text: string }
-export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'reyes' | 'vessa' | 'keeper';
+export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'elder' | 'reyes' | 'vessa' | 'keeper';
 // portrait: file in public/portraits (speakers without one get a lettered badge)
 export const SPEAKERS: Record<Speaker, { name: string; role: string; color: string; portrait?: string }> = {
   varga:   { name: 'Adm. Ines Varga',   role: 'Ark-fleet command',    color: '#e8c66a', portrait: 'varga.webp' },
@@ -43,6 +43,7 @@ export const SPEAKERS: Record<Speaker, { name: string; role: string; color: stri
   vessa:   { name: 'Vessa Kol',         role: 'Ashen Syndicate',      color: '#c2683e', portrait: 'vessa.webp' },
   keeper:  { name: 'The Keeper',        role: 'the makers of the Vey', color: '#ffd27a', portrait: 'keeper.webp' },
   seren:   { name: 'Unknown signal',    role: 'source: under the crust', color: '#bfeef2', portrait: 'seren.webp' },
+  elder:   { name: 'Seren',             role: 'elder of the Hollow',  color: '#bfeef2', portrait: 'seren.webp' },   // once she has told you her name
 };
 // a line can carry a choice: buttons in the comms box, the default taken if it times out
 export interface CommChoice { key: string; options: { id: string; label: string }[]; fallback: string }
@@ -91,6 +92,9 @@ export interface Ctx {
   show(id: string): void;                  // reveal a hidden objective
   /** Open a tunnel near a tile and bring Hollow up through it, attacking a target. */
   ambush(tx: number, ty: number, defIds: string[], group: string, targetId?: number): Unit[];
+  /** Campaign flags carry choices from one mission to the next. */
+  flag(key: string): string | undefined;
+  setFlag(key: string, value: string): void;
 }
 
 function tileClear(defW: number, defH: number, tx: number, ty: number) {
@@ -136,6 +140,11 @@ function makeCtx(): Ctx {
     ping(tx, ty, color = '#ffb02e') { pings.push({ x: centerOfTile(tx), y: centerOfTile(ty), t: 0, color }); },
     ask,
     show(id) { if (!r.shown.includes(id)) r.shown.push(id); },
+    flag: key => progress().flags?.[key],
+    setFlag(key, value) {
+      const p = progress(); p.flags = { ...(p.flags ?? {}), [key]: value };
+      try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage may be unavailable */ }
+    },
     ambush(tx, ty, defIds, group, targetId) {
       const spot = nearestTile(tx, ty, 8, (x, y) => tileClear(1, 1, x, y)) ?? { x: tx, y: ty };
       game.openTunnel(spot.x, spot.y);
@@ -208,6 +217,15 @@ function install(d: MissionDef, r: RunState) {
   mission.checkEnd = checkEnd;
   gameEvents.length = 0;
   gameEvents.push(onEvent);
+  clearAllies();
+  d.onInstall?.(makeCtx());   // per-mission state that isn't in the save (alliances from flags)
+}
+
+/** The end screen's title and text, which can depend on the player's choices. */
+export function endingFor(win: boolean, eliminated: boolean): { title: string; text: string } | null {
+  if (!def || !run) return null;
+  if (win) return typeof def.endWin === 'function' ? def.endWin(makeCtx()) : def.endWin;
+  return (eliminated && def.endEliminated) || def.endLose;
 }
 
 /** Build the mission's world. The caller loads sprites, paints the ground and starts the loop. */
@@ -236,6 +254,8 @@ export function setupMission(id: string) {
 export function bootComms() { if (def && run) def.intro(makeCtx()); }
 
 // ---------- save / resume ----------
+/** Dev: the live run state (for testing mission flows from the console). */
+export const debugRun = () => run;
 export function snapshotRun(): RunState | null { return run && JSON.parse(JSON.stringify(run)); }
 export function resumeRun(r: RunState) {
   const d = MISSIONS.find(m => m.id === r.id);
@@ -247,7 +267,7 @@ export function endRun() { def = null; run = null; queue.length = 0; current = n
 
 // ---------- progress ----------
 const KEY = 'ozd-campaign';
-export function progress(): { done: string[] } {
+export function progress(): { done: string[]; flags?: Record<string, string> } {
   try { return JSON.parse(localStorage.getItem(KEY) ?? '') ?? { done: [] }; } catch { return { done: [] }; }
 }
 function markComplete(id: string) {

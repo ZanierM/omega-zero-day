@@ -1,6 +1,7 @@
-import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, kindOf } from './config';
+import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, kindOf, SLOTS } from './config';
 import * as telemetry from './telemetry';
 import { setListener, sfxAt } from './audio';
+import { skinOf, skinBuilding, skinUnit } from './faction-skin';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
@@ -658,7 +659,7 @@ const VEH_ANGLES = 48;
 type VehPart = Scaled & { ox: number; oy: number; ww: number; wh: number };
 // walkers bake fewer headings (each has several gait frames)
 const vehAngles = (defId: string) => VEHICLE_ART[defId]!.frames ? 24 : VEH_ANGLES;
-function rotatedPart(key: string, reach: number, height: number, paint: (g: CanvasRenderingContext2D) => void): VehPart {
+function rotatedPart(key: string, reach: number, height: number, paint: (g: CanvasRenderingContext2D) => void, skinOwner = -1): VehPart {
   let s = sprites.get(key) as VehPart | undefined;
   if (!s) {
     const k = 3, ww = reach * 2 + 4, wh = ww + height;
@@ -668,6 +669,8 @@ function rotatedPart(key: string, reach: number, height: number, paint: (g: Canv
     paint(g);
     setFineArt(false);
     g.setTransform(1, 0, 0, 1, 0, 0);
+    const skin = skinOwner >= 0 ? skinOf(skinOwner) : null;
+    if (skin) skinUnit(c, skin);
     gradeWarmCool(c, 0.7);
     outline(c, 'rgba(16,10,8,0.6)', 2);
     s = c as VehPart; s.k = k; s.ox = ww / 2; s.oy = ww / 2 + height; s.ww = ww; s.wh = wh;
@@ -681,7 +684,7 @@ function vehiclePart(defId: string, owner: number, part: 'hull' | 'turret', i: n
   return rotatedPart(`v:${defId}:${owner}:${part}:${i}:${frame}`, va.reach, va.height, g => {
     if (part === 'hull') va.hull(g, ang, TEAM_COLORS[owner], frame / (va.frames ?? 1));
     else va.turret?.(g, ang, TEAM_COLORS[owner]);
-  });
+  }, owner);
 }
 // a defence's aiming head, eased toward its target and drawn at its pivot
 function drawDefenceHead(b: Building, px: number, py: number) {
@@ -861,6 +864,8 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   art(sg, w, h, level, TEAM_COLORS[owner]);
   setFineArt(false);
   sg.setTransform(1, 0, 0, 1, 0, 0);
+  const skin = skinOf(owner);
+  if (skin && !def.isWall) skinBuilding(st, skin, defId, k);   // the faction's look over the shared shape
   gradeWarmCool(st, 0.7);
   outline(st, 'rgba(20,12,8,0.55)', 1);                 // one device pixel, not two world pixels
 
@@ -1162,7 +1167,7 @@ setTimeout(warmIcons, 300);
 // defences show their turret head, aimed toward the viewer
 const ICON_AIM = 0.6;
 export function artIconUrl(defId: string, owner = PLAYER, level = 1): string | null {
-  return memoIcon(`a:${defId}:${owner}:${level}`, () => bakeArtIcon(defId, owner, level));
+  return memoIcon(`a:${SLOTS[owner]}:${defId}:${owner}:${level}`, () => bakeArtIcon(defId, owner, level));
 }
 function bakeArtIcon(defId: string, owner: number, level: number): string | null {
   const art = BUILDING_ART[defId];
@@ -1178,6 +1183,8 @@ function bakeArtIcon(defId: string, owner: number, level: number): string | null
   if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[owner]); g.restore(); }
   setFineArt(false);
   g.setTransform(1, 0, 0, 1, 0, 0);
+  const skin = skinOf(owner);
+  if (skin && !def.isWall) skinBuilding(c, skin, defId, k);
   gradeWarmCool(c, 0.7);
   outline(c, 'rgba(20,12,8,0.55)', 1);
   return iconUrl(c);
@@ -1186,7 +1193,7 @@ function bakeArtIcon(defId: string, owner: number, level: number): string | null
 // build-bar icon for a unit drawn in code (infantry, vehicles, aircraft),
 // three-quarter view facing the viewer; null if it has no code-drawn art
 export function unitIconUrl(defId: string, owner = PLAYER): string | null {
-  return memoIcon(`u:${defId}:${owner}`, () => bakeUnitIcon(defId, owner));
+  return memoIcon(`u:${SLOTS[owner]}:${defId}:${owner}`, () => bakeUnitIcon(defId, owner));
 }
 function bakeUnitIcon(defId: string, owner: number): string | null {
   const va = VEHICLE_ART[defId];
@@ -1199,6 +1206,8 @@ function bakeUnitIcon(defId: string, owner: number): string | null {
   va.turret?.(g, ICON_AIM, TEAM_COLORS[owner]);
   setFineArt(false);
   g.setTransform(1, 0, 0, 1, 0, 0);
+  const skin = skinOf(owner);
+  if (skin) skinUnit(c, skin);
   gradeWarmCool(c, 0.7);
   outline(c, 'rgba(16,10,8,0.6)', 2);
   return iconUrl(c);

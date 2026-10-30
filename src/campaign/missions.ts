@@ -5,7 +5,9 @@ import type { Ctx } from './runner';
 import type { GameEvent } from '../game';
 import { PLAYER, KEEPERS } from '../config';
 import { seedKeepers, initKeepers, clearSpot } from '../keepers';
-import { ventsHeld, neutrals, buildingCenter, issueOrder, units, burrowUnit, players, resCell, RES_TREMOR, RES_STORM, addResonance, byId, resonance, ensureFaction } from '../game';
+import { seedBrood, initBrood } from '../brood';
+import { setAllied } from '../config';
+import { ventsHeld, neutrals, buildingCenter, issueOrder, units, burrowUnit, players, resCell, RES_TREMOR, RES_STORM, addResonance, byId, resonance, ensureFaction, setSupernova, novaLeft } from '../game';
 
 export interface Objective {
   id: string;
@@ -16,7 +18,7 @@ export interface Objective {
 }
 export interface Trigger { id: string; when: (c: Ctx) => boolean; run: (c: Ctx) => void }
 export interface MissionDef {
-  id: string; act: 1 | 2; code: string; title: string; tagline: string;
+  id: string; act: 1 | 2 | 3; code: string; title: string; tagline: string;
   briefing: string[]; goals: string[];
   seed: number; enemies: number; crystalMul?: number; credits: number;
   size?: number;                           // map size override (tiles)
@@ -33,8 +35,9 @@ export interface MissionDef {
   triggers: Trigger[];
   win(c: Ctx): boolean;
   lose?(c: Ctx): boolean;
-  endWin: { title: string; text: string };
+  endWin: { title: string; text: string } | ((c: Ctx) => { title: string; text: string });
   endLose: { title: string; text: string };
+  onInstall?(c: Ctx): void;               // runs at start and on resume (alliances from flags)
   endEliminated?: { title: string; text: string };   // base wiped out, if different from endLose
 }
 
@@ -489,6 +492,8 @@ const greenTide: MissionDef = {
       c.say('lind', 'It\'s not geology. It\'s... thinking.');
     } },
     { id: 'showhold', when: c => c.done('vents'), run: c => { c.show('hold'); c.say('okoye', 'Three vents. Hold them ninety seconds and Lind gets his survey.'); } },
+    // Act III remembers whether the labs were left standing
+    { id: 'labsFlag', when: c => c.done('hold'), run: c => c.setFlag('labs', c.buildingsOf(VERDANT, 'lab').length > 0 ? 'spared' : 'burned') },
   ],
   onEvent(c, ev) {
     harvesterWarning(c, ev);
@@ -634,4 +639,277 @@ const resonanceM: MissionDef = {
   endLose: { title: 'The uplink fires', text: 'Kessler\'s uplink locks onto the ark-fleet. On every channel his terms begin, and the first of them is the Resonance Report, read aloud.' },
 };
 
-export const MISSIONS: MissionDef[] = [coldDrop, fluxLines, ironWeather, sparks, greenTide, resonanceM];
+// ===========================================================================
+// Act III — Last Light
+
+const ACT3_TECH = [...ACT2_TECH, 'spire', 'artillery', 'railgun', 'arctower', 'dominator', 'skyport', 'gunship', 'bomber', 'fusion',
+  'arm2', 'arm3', 'wpn2', 'wpn3', 'def2', 'bastion', 'juggernaut', 'sniper', 'colossus'];
+const BROOD_SLOT = 5;
+const hollowAllied = (c: Ctx) => c.flag('meridian') === 'protected';
+
+// ---------------------------------------------------------------------------
+// III-7 · Meridian
+const meridian: MissionDef = {
+  id: 'act3-7', act: 3, code: 'III-7', title: 'Meridian', tagline: 'The Hollow\'s ship, and a choice',
+  briefing: [
+    'Lantern, Varga. Survey drones found the wreck the Hollow live in: the Meridian. Colony ship, two hundred years down, listed as lost with all hands.',
+    'The Ashen Syndicate found her too. Vessa Kol has sent you a message. So has something under the crust. You will have to decide which of them you answer.',
+  ],
+  goals: ['Decide the Meridian\'s fate', 'Then live with it'],
+  seed: 77117, enemies: 3, size: 72, credits: 7000,
+  allowed: ACT3_TECH,
+  setup(c) {
+    ensureFaction(HOLLOW);
+    act2Base(c, ['fab', 'lab']);
+    const b = c.base(PLAYER);
+    c.spawn(['hovertank', 'hovertank', 'rocketeer', 'rocketeer', 'rocketeer', 'trooper', 'trooper', 'trooper', 'trooper', 'warden'], PLAYER, b.tx + 1, b.ty + 5);
+    // the wreck near the middle, the Hollow round her
+    const ship = c.place('meridian', HOLLOW, Math.floor(36) - 2, Math.floor(36) - 1);
+    if (ship) c.run.vars.ship = ship.id;
+    const sx = ship ? ship.tx : 34, sy = ship ? ship.ty : 35;
+    c.spawn(['shardkin', 'shardkin', 'shardkin', 'shardkin', 'burrower', 'choir', 'choir'], HOLLOW, sx + 2, sy + 4, 'hollowHome');
+    const a = c.base(ASHEN);
+    c.place('outpost', ASHEN, a.tx, a.ty); c.place('skyport', ASHEN, a.tx + 3, a.ty);
+    for (const [dx, dy] of [[-2, 3], [4, 3], [1, -3], [6, 0]]) c.place('turret', ASHEN, a.tx + dx, a.ty + dy);
+  },
+  onInstall(c) { if (c.run.vars.choice === 1) setAllied(PLAYER, HOLLOW, true); },
+  intro(c) {
+    c.say('vessa', 'Commander. That wreck is mine: two hundred years of flux grown into her walls. Look the other way and there\'s four thousand in it for you.');
+    c.say('seren', 'Root-taker. I am Seren. My mother was born in that ship, and hers. They will cut my children out of her walls. Will you watch?');
+    c.ask('okoye', 'Your call, Lantern.', { key: 'meridian', fallback: 'defend', options: [{ id: 'defend', label: 'Stand with the Hollow' }, { id: 'sell', label: 'Take the money' }] });
+  },
+  onChoice(c, key, opt) {
+    if (key !== 'meridian') return;
+    if (opt === 'defend') {
+      c.run.vars.choice = 1; c.setFlag('meridian', 'protected');
+      setAllied(PLAYER, HOLLOW, true);
+      c.show('protect');
+      c.say('elder', 'Then stand at her side. We will stand at yours.');
+      c.say('vessa', 'Pity. I liked you. Crews, take the ship. And whoever is standing in front of it.');
+    } else {
+      c.run.vars.choice = 2; c.setFlag('meridian', 'sold');
+      players[PLAYER].credits += 4000;
+      c.show('survive');
+      c.say('vessa', 'Sensible. Stay out of my way for ten minutes and we\'re friends.');
+      c.say('elder', 'Then you are what they are. We will remember you, root-taker. All of us.');
+      c.say('okoye', '...Four thousand flux. I hope it was worth it, Lantern. I really do.');
+    }
+  },
+  update(c, dt) {
+    const v = c.run.vars;
+    if (!v.choice) return;
+    v.t0 ??= c.t;
+    const into = c.t - v.t0;
+    v.wave = (v.wave ?? 30) - dt;
+    if (v.wave > 0) return;
+    v.wave = v.choice === 1 ? 42 : 38;
+    const ship = byId.get(v.ship);
+    if (v.choice === 1) {
+      // the Ashen come for the ship, more of them every time
+      const a = c.base(ASHEN), n = 5 + Math.floor(into / 60);
+      const comp = Array.from({ length: n }, (_, i) => ['raider', 'ranger', 'rocketeer', 'pyro', 'trooper', 'artillery', 'gunship'][(i + Math.floor(into / 40)) % 7]);
+      const tgt = ship ? buildingCenter(ship as any) : hqPos(c);
+      c.attackMove(c.spawn(comp, ASHEN, a.tx + 1, a.ty + 5), tgt.x, tgt.y);
+    } else {
+      // the Ashen strip the ship; the Hollow come up out of the ground for you
+      if (ship && !v.cutting) { v.cutting = 1; const a = c.base(ASHEN); c.attackMove(c.spawn(['raider', 'raider', 'rocketeer', 'rocketeer', 'artillery', 'artillery'], ASHEN, a.tx + 1, a.ty + 5), buildingCenter(ship as any).x, buildingCenter(ship as any).y); }
+      const hs = units.filter(u => u.owner === PLAYER && (u.def.harvester || u.def.id === 'trooper'));
+      const tgt = hs[Math.floor(Math.random() * hs.length)];
+      const at = tgt ? { x: Math.floor(tgt.x / 32), y: Math.floor(tgt.y / 32) } : { x: c.base(PLAYER).tx + 4, y: c.base(PLAYER).ty + 6 };
+      const n = 4 + Math.floor(into / 70);
+      c.ambush(at.x + 5, at.y + 4, Array.from({ length: n }, (_, i) => (i % 4 === 3 ? 'burrower' : i % 5 === 4 ? 'choir' : 'shardkin')), `fury${Math.floor(c.t)}`, tgt?.id);
+    }
+  },
+  objectives: [
+    { id: 'protect', text: c => `Protect the Meridian: ${fmt(Math.max(0, 480 - (c.t - (c.run.vars.t0 ?? c.t))))}`, hidden: true, check: c => c.run.vars.choice === 1 && c.t - (c.run.vars.t0 ?? c.t) >= 480 },
+    { id: 'survive', text: c => `Survive the Hollow's fury: ${fmt(Math.max(0, 360 - (c.t - (c.run.vars.t0 ?? c.t))))}`, hidden: true, check: c => c.run.vars.choice === 2 && c.t - (c.run.vars.t0 ?? c.t) >= 360 },
+  ],
+  triggers: [
+    { id: 'half', when: c => !!c.run.vars.choice && c.t - (c.run.vars.t0 ?? c.t) >= 200, run: c => {
+      if (c.run.vars.choice === 1) c.say('elder', 'Her walls remember the sky. Two hundred years. A little longer, root-taker. A little longer.');
+      else c.say('okoye', 'The Ashen are cutting into her now. Listen to that. It sounds like screaming.');
+    } },
+  ],
+  onEvent: harvesterWarning,
+  win: c => (c.run.vars.choice === 1 && c.done('protect')) || (c.run.vars.choice === 2 && c.done('survive')),
+  lose: c => c.run.vars.choice === 1 && !byId.has(c.run.vars.ship),
+  endWin: c => c.run.vars.choice === 1
+    ? { title: 'The Meridian stands', text: 'Seren: "You stood with us. When the light comes, root-taker, we will stand with you." For the first time in two hundred years, someone on the surface knows their name.' }
+    : { title: 'Four thousand flux', text: 'The Ashen haul the last of the Meridian\'s crystal away. Okoye says nothing on the drive back. She doesn\'t have to.' },
+  endLose: { title: 'The Meridian falls', text: 'The Ashen cutters reach her heart. Under the crust, something that sounded like a choir goes silent.' },
+};
+
+// ---------------------------------------------------------------------------
+// III-8 · Kessler's Wall
+const kesslersWall: MissionDef = {
+  id: 'act3-8', act: 3, code: 'III-8', title: 'Kessler\'s Wall', tagline: 'Break the Collective; hold the Lantern shaft',
+  briefing: [
+    'Lantern, Varga. Kessler has walled himself in around the last launch-capable vents in the north. His fleet bid goes out the moment the corridor opens. It cannot.',
+    'Lind says Project Lantern is still drawing from the Vey\'s heart. He wants to go down the shaft and shut it off himself. I can\'t order you to let him. I can\'t order you to stop him either.',
+  ],
+  goals: ['Hold the head of the Lantern shaft while Lind goes down', 'Destroy Kessler\'s Nexus'],
+  seed: 88231, enemies: 1, size: 72, credits: 9000,
+  allowed: ACT3_TECH,
+  aiOwners: [KESSLER],
+  setup(c) {
+    ensureFaction(HOLLOW); ensureFaction(BROOD_SLOT);
+    act2Base(c, ['fab', 'lab']);
+    const b = c.base(PLAYER);
+    c.place('spire', PLAYER, b.tx - 4, b.ty + 6);
+    c.spawn(['dominator', 'hovertank', 'hovertank', 'hovertank', 'artillery', 'rocketeer', 'rocketeer', 'rocketeer', 'rocketeer', 'vanguard', 'vanguard'], PLAYER, b.tx + 1, b.ty + 5);
+    const k = c.base(KESSLER);
+    const hq = c.place('nexus', KESSLER, k.tx, k.ty);
+    if (hq) c.run.vars.kessler = hq.id;
+    for (const [id, dx, dy] of [['solar', -4, 0], ['solar', -4, 3], ['barracks', 4, 0], ['fab', 4, 4], ['extractor', 0, 5], ['repairyard', -4, 6]] as [string, number, number][]) c.place(id, KESSLER, k.tx + dx, k.ty + dy);
+    for (const [id, dx, dy] of [['bastion', -3, -4], ['bastion', 5, -3], ['railgun', 8, 2], ['railgun', -7, 4], ['arctower', 2, -5], ['turret', 9, 6], ['turret', -7, -2], ['turret', 1, 9], ['skyguard', 6, 8]] as [string, number, number][]) c.place(id, KESSLER, k.tx + dx, k.ty + dy);
+    for (let i = -8; i <= 10; i++) { c.place('heavywall', KESSLER, k.tx + i, k.ty - 8); c.place('heavywall', KESSLER, k.tx - 9, k.ty + i); }
+    c.spawn(['dominator', 'dominator', 'hovertank', 'hovertank', 'hovertank', 'vanguard', 'vanguard', 'vanguard', 'rocketeer', 'rocketeer', 'artillery'], KESSLER, k.tx + 2, k.ty + 10, 'guard');
+    players[KESSLER].credits = 6000;
+    // the Lantern shaft, out between the two of you
+    const shaft = c.place('lanternshaft', PLAYER, Math.round((b.tx + k.tx) / 2), Math.round((b.ty + k.ty) / 2));
+    if (shaft) c.run.vars.shaft = shaft.id;
+  },
+  intro(c) {
+    c.say('varga', 'Lantern. Kessler\'s wall, and the shaft. Your call how you take them.');
+    c.say('okoye', 'Bastions on the north face, railguns either side. Thumpers first, then the heavy armour.');
+  },
+  update(c, dt) {
+    const v = c.run.vars;
+    if (c.run.shown.includes('shaft') && !c.done('shaft')) v.held = (v.held ?? 0) + dt;
+  },
+  objectives: [
+    { id: 'shaft', text: c => `Hold the Lantern shaft while Lind goes down: ${Math.floor(c.run.vars.held ?? 0)} / 90 s`, hidden: true, check: c => (c.run.vars.held ?? 0) >= 90 },
+    { id: 'kessler', text: 'Destroy Kessler\'s Nexus', check: c => !byId.has(c.run.vars.kessler) },
+  ],
+  triggers: [
+    { id: 'terms', when: c => c.t >= 50, run: c => {
+      c.say('kessler', 'Lantern. Stand down. Hand me Helion\'s board and every sleeper on that fleet comes with me, yours included. You have my word.');
+      if (c.flag('meridian') === 'sold') {
+        c.say('okoye', '...He\'s right, Lantern. About them. About you. I\'m sorry.');
+        c.say('okoye', 'Okoye to Kessler. I\'m coming over.');
+        c.run.vars.okoyeLeft = 1; c.setFlag('okoye', 'left');
+      } else {
+        c.say('okoye', 'He\'s not wrong about the board. But he\'s wrong about us. I\'m with you, Lantern. Let\'s finish this.');
+        c.setFlag('okoye', 'stayed');
+      }
+    } },
+    { id: 'lind', when: c => c.t >= 110, run: c => {
+      c.show('shaft');
+      const sh = byId.get(c.run.vars.shaft);
+      if (sh) { const p = buildingCenter(sh as any); c.ping(Math.floor(p.x / 32), Math.floor(p.y / 32), '#43f3ec'); }
+      c.say('lind', 'Lantern. I\'m at the shaft. If I shut Project Lantern off from the bottom, the Vey might hold long enough for the corridor. Keep them off the head of the shaft for ninety seconds.');
+      c.say('lind', 'Don\'t argue. I built it. I\'m the only one who knows where the off switch is.');
+    } },
+    // the moment he starts shutting it down, the Vey wakes, and comes up the shaft
+    { id: 'wakes', when: c => c.run.shown.includes('shaft') && (c.run.vars.held ?? 0) >= 25, run: c => {
+      const sh = byId.get(c.run.vars.shaft);
+      const at = sh ? clearSpot('heart', { x: (sh as any).tx + 6, y: (sh as any).ty + 4 }, 10) : null;
+      if (at) { seedBrood(at); initBrood(true, 0.75); }
+      c.say('lind', 'Lantern... something\'s coming up the shaft past me. It\'s... it\'s beautiful. It\'s not stopping.');
+      c.say(hollowAllied(c) ? 'elder' : c.run.vars.okoyeLeft ? 'varga' : 'okoye', hollowAllied(c) ? 'The Vey is waking. It does not know friend from root-taker any more. Forgive it.' : 'Contacts out of the shaft! The ground itself is coming up at us!');
+    } },
+    { id: 'lindGone', when: c => c.done('shaft'), run: c => {
+      c.say('lind', 'It\'s done. Lantern\'s off. It\'s... quiet down here now. Tell Mara I—');
+      c.say(c.run.vars.okoyeLeft ? 'varga' : 'okoye', c.run.vars.okoyeLeft ? 'Signal lost. Lind\'s gone, Lantern.' : 'Teo? Teo. ...Signal lost. He\'s gone, Lantern.');
+      c.setFlag('lind', 'gone');
+    } },
+  ],
+  onEvent: harvesterWarning,
+  win: c => c.done('shaft') && !byId.has(c.run.vars.kessler),
+  lose: c => !c.done('shaft') && !byId.has(c.run.vars.shaft),
+  endWin: c => ({ title: 'The wall comes down', text: `Kessler, on a dying channel: "You'll see what they are soon enough, Lantern. Remember I told you." ${c.run.vars.okoyeLeft ? "Somewhere in the rubble, Okoye's beacon stops moving." : 'Okoye stands at the shaft head for a long time.'}` }),
+  endLose: { title: 'The shaft is lost', text: 'Something comes up the Lantern shaft and doesn\'t stop. Lind\'s channel goes to static and stays there.' },
+};
+
+// ---------------------------------------------------------------------------
+// III-9 · Zero Day
+const NOVA = 900, HOLD = 300;
+const zeroDay: MissionDef = {
+  id: 'act3-9', act: 3, code: 'III-9', title: 'Zero Day', tagline: 'Hold the corridor while the sun dies',
+  briefing: [
+    'Lantern. This is Varga, on every channel I have. Helios is coming apart. The corridor opens in minutes and closes for good fifteen after that.',
+    'Hold the vents long enough to light the beacon. After that, I\'m told, there will be a choice. I am sorry it falls to you.',
+  ],
+  goals: ['Hold three of the five vents for 5:00 before the sun goes', 'Then choose'],
+  seed: 99991, enemies: 3, size: 80, credits: 9000, resonance: true,
+  allowed: ACT3_TECH,
+  aiOwners: [ASHEN],
+  setup(c) {
+    ensureFaction(HOLLOW); ensureFaction(BROOD_SLOT); ensureFaction(KEEPERS);
+    act2Base(c, ['fab', 'lab']);
+    const b = c.base(PLAYER);
+    c.place('spire', PLAYER, b.tx - 4, b.ty + 6); c.place('skyport', PLAYER, b.tx + 7, b.ty + 4);
+    c.spawn(['dominator', 'dominator', 'hovertank', 'hovertank', 'hovertank', 'artillery', 'artillery', 'rocketeer', 'rocketeer', 'rocketeer', 'vanguard', 'vanguard', 'sniper', 'gunship'], PLAYER, b.tx + 1, b.ty + 5);
+    // the Ashen at their base; the Verdant at theirs (friends if you spared their labs)
+    const a = c.base(ASHEN); c.place('nexus', ASHEN, a.tx, a.ty); players[ASHEN].credits = 7000;
+    const v = c.base(VERDANT);
+    c.place('barracks', VERDANT, v.tx, v.ty); c.place('solar', VERDANT, v.tx + 3, v.ty); c.place('turret', VERDANT, v.tx + 1, v.ty + 3);
+    setSupernova(NOVA);
+  },
+  onInstall(c) {
+    if (c.flag('labs') === 'spared') setAllied(PLAYER, VERDANT, true);
+    if (hollowAllied(c)) setAllied(PLAYER, HOLLOW, true);
+  },
+  intro(c) {
+    c.say('varga', 'Lantern. Whatever happens in the next fifteen minutes: thank you.');
+    if (c.flag('labs') === 'spared') c.say('reyes', 'Commander. You left our labs standing. The Pact will hold the vents beside you, whatever you decide at the end.');
+    else c.say('reyes', 'You burned our proof. We will not help you, Commander. Do what you came to do.');
+    c.say(c.flag('okoye') === 'left' ? 'varga' : 'okoye', c.flag('okoye') === 'left' ? 'Okoye isn\'t with you. I know. Hold anyway.' : 'Last one, Lantern. Three vents. Five minutes. Let\'s go.');
+  },
+  update(c, dt) {
+    const v = c.run.vars;
+    if (!c.done('hold')) v.hold = ventsHeld(PLAYER) + (c.flag('labs') === 'spared' ? ventsHeld(VERDANT) : 0) >= 3 ? (v.hold ?? 0) + dt : Math.max(0, (v.hold ?? 0) - dt * 2);
+    if (v.seedAt !== undefined && !c.done('seed')) v.seed = (v.seed ?? 0) + (ventsHeld(PLAYER) >= 2 ? dt : 0);
+    // allies on the vents: the Hollow (if you stood with them) and the Pact (if you spared them)
+    v.allyWave = (v.allyWave ?? 20) - dt;
+    if (v.allyWave <= 0) {
+      v.allyWave = 75;
+      const held = neutrals.filter(n => n.kind === 'vent' && n.owner === PLAYER);
+      const n = held[Math.floor(Math.random() * held.length)] ?? neutrals.find(x => x.kind === 'vent');
+      if (n && hollowAllied(c)) { const us = c.spawn(['shardkin', 'shardkin', 'shardkin', 'choir'], HOLLOW, n.tx + 3, n.ty + 3); for (const u of us) issueOrder(u, { type: 'move', x: (n.tx + 0.5) * 32, y: (n.ty + 0.5) * 32 }); }
+      if (n && c.flag('labs') === 'spared') { const vb = c.base(VERDANT); c.attackMove(c.spawn(['pyro', 'pyro', 'trooper', 'trooper', 'vanguard'], VERDANT, vb.tx + 1, vb.ty + 5), (n.tx + 0.5) * 32, (n.ty + 0.5) * 32); }
+    }
+  },
+  objectives: [
+    { id: 'hold', text: c => `Hold three vents to light the beacon: ${fmt(Math.max(0, HOLD - (c.run.vars.hold ?? 0)))}`, check: c => (c.run.vars.hold ?? 0) >= HOLD },
+    { id: 'seed', text: c => `Hold two vents while the Hollow carry the heart-crystal to the beacon: ${Math.floor(c.run.vars.seed ?? 0)} / 60 s`, hidden: true, check: c => (c.run.vars.seed ?? 0) >= 60 },
+  ],
+  triggers: [
+    { id: 'brood', when: c => c.t >= 40, run: c => {
+      const at = clearSpot('heart', { x: 38, y: 38 }, 14);
+      if (at) { seedBrood(at); initBrood(true, 0.8); }
+      c.say(hollowAllied(c) ? 'elder' : 'lind', hollowAllied(c) ? 'The Vey is dying, and it is afraid. It will fight everything. Even us.' : 'Static on Lind\'s old channel. Just the sound of the ground breathing.');
+    } },
+    { id: 'keepers', when: c => c.t >= 120, run: c => {
+      const at = clearSpot('beacon', { x: 70, y: 8 }, 10);
+      if (at) { seedKeepers(at, 3000); initKeepers(true, 0.75); }
+      c.say('keeper', 'We have come to watch the end of what we made. Choose well, small one. It is the last thing you will choose here.');
+    } },
+    { id: 'final', when: c => c.done('hold'), run: c => {
+      const options = [{ id: 'fire', label: 'Fire the beacon' }, { id: 'give', label: 'Give the vents to Reyes' }];
+      if (hollowAllied(c)) options.push({ id: 'seed', label: 'Carry the seed' });
+      c.say('varga', 'The beacon is lit. Lantern, the corridor is open. I have to tell you something before you choose. I signed Project Lantern\'s fleet contract. I knew.');
+      if (hollowAllied(c)) c.say('elder', 'There is a third way. The Vey can live in one crystal, its heart. Carry it with you, and it will not die with this sun. But Helios will not wait for it.');
+      c.ask(c.flag('okoye') === 'left' ? 'varga' : 'okoye', 'It\'s yours, Lantern. All of it.', { key: 'end', fallback: 'fire', options });
+    } },
+  ],
+  onChoice(c, key, opt) {
+    if (key !== 'end') return;
+    c.run.vars.ending = opt === 'fire' ? 1 : opt === 'give' ? 2 : 3;
+    if (opt === 'seed') {
+      c.run.vars.seedAt = c.t; c.show('seed');
+      c.say('elder', 'Hold the vents. We are bringing it up now. All of us.');
+    }
+  },
+  onEvent: harvesterWarning,
+  win: c => (c.run.vars.ending === 1 || c.run.vars.ending === 2) || (c.run.vars.ending === 3 && c.done('seed')),
+  lose: () => novaLeft <= 0,
+  endWin: c => c.run.vars.ending === 1
+    ? { title: 'Last Light', text: 'The beacon burns the vents dry, and the Vey with them. The ark-fleet rides the corridor out as Helios goes. On an open channel, Admiral Varga reads the Resonance Report aloud to forty thousand waking sleepers. Behind them, Cinder is a cinder.' }
+    : c.run.vars.ending === 2
+    ? { title: 'The Long Dusk', text: 'You give the vents to Ama Reyes. The beacon gutters out; the Vey, unbled, takes hold of its star again. The fleet comes down to stay. Helion\'s board stands trial in the open, under a sun that is dying more slowly. Nobody knows how long that is. Everyone is here to find out.' }
+    : { title: 'The Seed', text: 'The Hollow carry the Vey\'s heart aboard in their arms. The ark-fleet leaves with a living world in its hold and Seren\'s people beside it. Helios goes a moment later. Cinder, the Pact, everyone who could not reach the corridor: gone. It is the best ending there was. It still cost a world.' },
+  endLose: { title: 'Zero Day', text: 'Helios goes before the beacon is lit. There is no corridor, no fleet, no dawn. Only light.' },
+};
+
+export const MISSIONS: MissionDef[] = [coldDrop, fluxLines, ironWeather, sparks, greenTide, resonanceM, meridian, kesslersWall, zeroDay];
