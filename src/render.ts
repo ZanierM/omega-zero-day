@@ -748,10 +748,15 @@ function drawVehicle(u: Unit, moving: boolean, lift = 0) {
   // walkers stride instead of hovering; the gait speeds up with the unit
   const frame = va.frames && moving ? Math.floor(T * u.def.speed * 2.2 + u.id * 0.37) % va.frames : 0;
   const bob = va.frames ? 0 : Math.sin(T * 2.4 + u.id) * 0.8;
+  // the Hollow rising out of the ground: sunk and faint at first, the ground line cutting off what's still under it
+  const rise = u.emergeT ? Math.min(1, u.emergeT / game.EMERGE_TIME) : 0;
+  if (rise) { ctx.save(); ctx.beginPath(); ctx.rect(u.x - 60, u.y - 120, 120, 120 + 4); ctx.clip(); ctx.globalAlpha = 1 - rise * 0.5; }
+  const sink = rise * (va.height + 6);
   for (const part of va.turret ? ['hull', 'turret'] as const : ['hull'] as const) {
     const s = vehiclePart(u.def.id, u.owner, part, headingIndex(part === 'hull' ? v.hull : v.tur, n), part === 'hull' ? frame : 0);
-    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob - lift, s.ww, s.wh);
+    ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob - lift + sink, s.ww, s.wh);
   }
+  if (rise) ctx.restore();
 }
 
 // warm key light from the dying sun in the north-west and a cool sky fill in

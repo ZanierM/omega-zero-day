@@ -51,6 +51,7 @@ export interface Unit {
   ignoreTimer: number;           // ...and for how long it won't re-acquire it
   slowT?: number; slowMul?: number;   // harpooned or snared: speed × slowMul for slowT more seconds
   packed?: string; packedLevel?: number;   // a Clan Caravan carrying a packed-up building
+  emergeT?: number;              // the Hollow: seconds left of climbing up out of the ground
 }
 
 export interface Building {
@@ -748,6 +749,7 @@ function finishUnit(owner: number, defId: string) {
     (x, y) => inBounds(x, y) && terrain[idx(x, y)] === 0 && occupied[idx(x, y)] === -1);
   if (!spot) return;
   const u = spawnUnit(defId, owner, centerOfTile(spot.x), centerOfTile(spot.y));
+  if (kindOf(owner) === 'hollow' && !def.air) surface(u);   // up out of the tunnel
   issueOrder(u, { type: 'move', x: src.rallyX, y: src.rallyY }, true);
 }
 
@@ -898,6 +900,13 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
   damage(target, damageAmt * damageMult(dmgType, target), u.kind === 'unit' ? u : undefined);
 }
 
+// a Hollow unit breaking up through the crust: it climbs out over a moment, in a ring of thrown dirt
+export const EMERGE_TIME = 0.9;
+export function surface(u: Unit) {
+  u.emergeT = EMERGE_TIME;
+  booms.push({ x: u.x, y: u.y + 2, r: 3, ttl: 0.5, max: u.def.radius * 2.2 });
+}
+
 // the Hollow live off crystal: a little always, more for each Geode, most for one sat by a crystal field
 export function hollowIncome(owner: number): number {
   let inc = 10;
@@ -930,6 +939,7 @@ export function translocate(us: Unit[], x: number, y: number): boolean {
     else lightColumns.push({ x: u.x, y: u.y, born: stats.time });
     u.x = centerOfTile(spot.x); u.y = centerOfTile(spot.y); u.path = null;
     if (!burrow) lightColumns.push({ x: u.x, y: u.y, born: stats.time });
+    else surface(u);
     u.abilityCd = u.def.ability!.cooldown;
     issueOrder(u, { type: 'idle' }, true);
     u.guardX = u.x; u.guardY = u.y;
@@ -1364,6 +1374,7 @@ function step(dt: number) {
   for (const u of units) {
     if (u.rank > 0 && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + VET_HEAL[u.rank] * dt);
     if (u.slowT) u.slowT = Math.max(0, u.slowT - dt);
+    if (u.emergeT) u.emergeT = Math.max(0, u.emergeT - dt);
     // a crowd can shove a unit inside a building's footprint, where it can never find a path out: step it clear
     if (!u.def.air) {
       const tx = tileOf(u.x), ty = tileOf(u.y);
