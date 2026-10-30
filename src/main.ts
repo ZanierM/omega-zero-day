@@ -195,6 +195,26 @@ for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts',
     syncMoreSummary();
   });
 }
+// the last skirmish setup comes back next visit: every option row's pick, by its data attribute
+const SETUP_KEY = 'ozd-setup', AUTOSTART = 'ozd-autostart';
+const SETUP_ROWS = ['factionopts', 'aiopts', 'diffopts', 'creditopts', 'crystalopts', 'landopts', 'broodopts', 'keeperopts', 'hollowopts', 'novaopts'];
+const pickOf = (b: HTMLElement) => b.dataset.f ?? b.dataset.n ?? b.dataset.d ?? b.dataset.l ?? b.dataset.v ?? '';
+function saveSetup() {
+  const out: Record<string, string> = {};
+  for (const row of SETUP_ROWS) { const b = document.querySelector<HTMLElement>(`#${row} .opt.sel`); if (b) out[row] = pickOf(b); }
+  try { localStorage.setItem(SETUP_KEY, JSON.stringify(out)); } catch { /* storage may be unavailable */ }
+}
+function restoreSetup() {
+  let saved: Record<string, string> = {};
+  try { saved = JSON.parse(localStorage.getItem(SETUP_KEY) ?? '{}'); } catch { /* storage may be unavailable */ }
+  for (const row of SETUP_ROWS) {
+    const btns = [...document.querySelectorAll<HTMLElement>(`#${row} .opt`)], want = btns.find(b => pickOf(b) === saved[row]);
+    if (!want) continue;
+    btns.forEach(b => { b.classList.toggle('sel', b === want); if (b.getAttribute('role') === 'radio') b.setAttribute('aria-checked', String(b === want)); });
+  }
+}
+
+restoreSetup();
 syncAlienOptions();
 
 // the campaign difficulty is kept with the campaign's progress
@@ -231,7 +251,14 @@ menuBtn.addEventListener('click', () => {
   pauseMenu.style.display === 'flex' ? closePause() : openPause();
 });
 document.getElementById('resumebtn')!.addEventListener('click', closePause);
-document.getElementById('restartbtn')!.addEventListener('click', () => { clearSave(); location.reload(); });
+// restart replays the same mission or skirmish setup; quitting goes back to the briefing
+document.getElementById('restartbtn')!.addEventListener('click', () => {
+  clearSave();
+  if (campaign.activeMission()) campaign.queueMission(false);
+  else try { sessionStorage.setItem(AUTOSTART, '1'); } catch { /* storage may be unavailable */ }
+  location.reload();
+});
+document.getElementById('menubtn')!.addEventListener('click', () => { clearSave(); location.reload(); });
 pauseMenu.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closePause(); } });
 function trapDialogTabs(dialog: HTMLElement, heading?: HTMLElement) {
   dialog.addEventListener('keydown', e => {
@@ -252,6 +279,7 @@ const deployBtn = document.getElementById('deploy') as HTMLButtonElement;
 deployBtn.addEventListener('click', async () => {
   if (deploying || started) return;
   deploying = true;
+  if (mode === 'skirmish') saveSetup();
   deployBtn.disabled = true;
   deployBtn.textContent = 'Deploying…';
   deployBtn.setAttribute('aria-busy', 'true');
@@ -337,6 +365,15 @@ missionList.addEventListener('click', e => {
 try { if (localStorage.getItem(modeKey) === 'campaign') setMode('campaign'); } catch { /* storage may be unavailable */ }
 // arriving from "Next mission" / "Retry mission": go straight in
 const queuedMission = campaign.takeQueuedMission();
+// "Restart" in a skirmish: the same setup, straight back in
+let restartSkirmish = false;
+try { restartSkirmish = sessionStorage.getItem(AUTOSTART) === '1'; sessionStorage.removeItem(AUTOSTART); } catch { /* storage may be unavailable */ }
+if (restartSkirmish && !queuedMission) {
+  setMode('skirmish');
+  const wake = () => { initAudio(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
+  addEventListener('pointerdown', wake); addEventListener('keydown', wake);
+  queueMicrotask(() => deployBtn.click());
+}
 if (queuedMission) {
   setMode('campaign');
   selectedMission = queuedMission;
