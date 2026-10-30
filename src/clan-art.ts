@@ -81,40 +81,56 @@ function sandbags(g: Ctx, x0: number, y: number, n: number, rows: number) {
 
 // ---------------- infantry ----------------
 
-const CLAN_LEGS: [string, string, string, string] = ['#5a4c3c', '#46392c', '#3a2e22', '#2a2018'];
+const CLAN_LEGS: [string, string, string, string] = ['#7a6a52', '#5e503e', '#4a3a2a', '#33281c'];   // patched canvas trousers, scuffed boots
 const longRifle = (len: number, bob: number, y = 2.4): Limb[] => [
-  { x0: 0.5, y0: y - 0.7, x1: 3.2, y1: y + 0.7, z0: 6.8 + bob + 3.4, z1: 6.8 + bob + 5, top: '#8a7458', side: '#6e5a44' },      // wrapped forearm
-  { x0: -1.5, y0: y - 0.6, x1: 2, y1: y + 0.6, z0: 6.8 + bob + 3.6, z1: 6.8 + bob + 5.2, top: '#8a6038', side: '#5e3e22' },    // wooden stock
-  { x0: 2, y0: y - 0.45, x1: len, y1: y + 0.45, z0: 6.8 + bob + 4.2, z1: 6.8 + bob + 5.2, top: '#5a5650', side: '#3a3632' },
+  { x0: 0.5, y0: y - 0.7, x1: 3.2, y1: y + 0.7, z0: 6.8 + bob + 3.4, z1: 6.8 + bob + 5, top: '#a8906c', side: '#8a7454' },      // wrapped forearm
+  { x0: -1.5, y0: y - 0.6, x1: 2, y1: y + 0.6, z0: 6.8 + bob + 3.6, z1: 6.8 + bob + 5.2, top: '#a8743e', side: '#7a5028' },    // wooden stock
+  { x0: 2, y0: y - 0.45, x1: len, y1: y + 0.45, z0: 6.8 + bob + 4.2, z1: 6.8 + bob + 5.2, top: '#6e6a62', side: '#46423c' },
 ];
-const bedroll = (bob: number): Limb => ({ x0: -4.2, y0: -2.6, x1: -2.2, y1: 2.6, z0: 6.8 + bob + 4, z1: 6.8 + bob + 6.6, top: '#8a7a5a', side: '#6a5a40' });
+const bedroll = (bob: number): Limb => ({ x0: -4.2, y0: -2.6, x1: -2.2, y1: 2.6, z0: 6.8 + bob + 4, z1: 6.8 + bob + 6.6, top: '#a89870', side: '#7a6a4a' });
+// a wide-brimmed hat, drawn flat over the head wrap: the brim, then a low crown
+function hat(g: Ctx, a: number, bob: number) {
+  const [x, y] = at(0.2, 0, a), z = 6.8 + bob + 11;
+  g.fillStyle = '#5e462c'; g.beginPath(); g.ellipse(x, y - z + 0.6, 4.6, 2.1, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#8a6a44'; g.beginPath(); g.ellipse(x, y - z, 4.4, 1.9, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#7a5c3a'; g.beginPath(); g.ellipse(x, y - z - 1.2, 2.4, 1.6, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,230,190,0.25)'; g.beginPath(); g.ellipse(x - 1.2, y - z - 0.4, 2, 0.7, -0.2, 0, Math.PI * 2); g.fill();
+}
+// salvaged welding goggles, two amber lenses facing forward
+function goggles(g: Ctx, a: number, bob: number, col = 'rgba(255,190,90,0.95)') {
+  for (const sd of [-0.9, 0.9]) { const [x, y] = at(2.6, sd, a); g.fillStyle = '#2a241c'; g.fillRect(x - 0.9, y - 6.8 - bob - 10.9, 1.8, 1.4); g.fillStyle = col; g.fillRect(x - 0.6, y - 6.8 - bob - 10.7, 1.2, 1); }
+}
 
 const SCAV: SoldierSpec = {
-  armour: '#6e5a44', armourTop: '#9a8060', build: 0.95, helmet: '#8a7458', visor: null, legs: CLAN_LEGS,
+  armour: '#8a7254', armourTop: '#b89c74', build: 0.95, helmet: '#b8a480', visor: null, legs: CLAN_LEGS,
   extra: bob => [bedroll(bob), ...longRifle(9.5, bob)],
+  glow: (g, a, bob) => { goggles(g, a, bob); hat(g, a, bob); },
 };
 const HARPOONER: SoldierSpec = {
-  armour: '#6a5848', armourTop: '#94806a', build: 1.05, helmet: '#7a6650', visor: null, legs: CLAN_LEGS,
+  armour: '#7e6a54', armourTop: '#ac9478', build: 1.08, helmet: '#9a8466', visor: null, legs: CLAN_LEGS,
   extra: bob => [
-    { x0: -4.4, y0: -2.4, x1: -2.2, y1: 2.4, z0: 6.8 + bob + 1, z1: 6.8 + bob + 5.5, top: '#b09868', side: '#7a6646' },          // coiled line
-    { x0: -3, y0: 1.9, x1: 8, y1: 3.7, z0: 6.8 + bob + 5.5, z1: 6.8 + bob + 7.6, top: IRON_TOP, side: IRON },                     // the gun
-    { x0: 8, y0: 2.3, x1: 10.5, y1: 3.3, z0: 6.8 + bob + 6, z1: 6.8 + bob + 7.1, top: '#c8c0b0', side: '#8a8478' },               // the barb
+    { x0: -4.6, y0: -2.6, x1: -2.2, y1: 2.6, z0: 6.8 + bob + 1, z1: 6.8 + bob + 5.8, top: '#d0b884', side: '#9a8458' },          // a coil of line on the back
+    { x0: -3, y0: 1.9, x1: 8.5, y1: 3.8, z0: 6.8 + bob + 5.5, z1: 6.8 + bob + 7.8, top: IRON_TOP, side: IRON },                   // the gun, over the shoulder
+    { x0: -1, y0: 1.7, x1: 1.5, y1: 4, z0: 6.8 + bob + 5.2, z1: 6.8 + bob + 8.2, top: '#a8743e', side: '#7a5028' },               // its wooden grip
+    { x0: 8.5, y0: 2.2, x1: 11.5, y1: 3.4, z0: 6.8 + bob + 6, z1: 6.8 + bob + 7.3, top: '#e0d8c8', side: '#9a9488' },             // the barb
+    { x0: 10.2, y0: 1.6, x1: 10.9, y1: 4, z0: 6.8 + bob + 6.1, z1: 6.8 + bob + 7.2, top: '#e0d8c8', side: '#9a9488' },            // its flukes
   ],
 };
 const FIREBRAND: SoldierSpec = {
-  armour: '#7a5a40', armourTop: '#a07a58', build: 1, helmet: '#6a5040', visor: null, legs: CLAN_LEGS,
+  armour: '#946c48', armourTop: '#c0946a', build: 1, helmet: '#7a5e44', visor: null, legs: CLAN_LEGS,
   extra: bob => [
-    { x0: -2.6, y0: -3.6, x1: 2.4, y1: -2.6, z0: 6.8 + bob + 2, z1: 6.8 + bob + 5.2, top: '#4a7a5a', side: '#2e5a40' },            // a bandolier of bottles
-    { x0: 2, y0: 2.6, x1: 3.4, y1: 4, z0: 6.8 + bob + 6, z1: 6.8 + bob + 9.5, top: '#5a8a6a', side: '#3a6a4a' },                   // one in hand
+    { x0: -2.6, y0: -3.6, x1: 2.4, y1: -2.6, z0: 6.8 + bob + 2, z1: 6.8 + bob + 5.2, top: '#5a9a6a', side: '#3a7a4a' },            // a bandolier of bottles
+    { x0: -2.6, y0: 2.6, x1: 2.4, y1: 3.6, z0: 6.8 + bob + 2, z1: 6.8 + bob + 5.2, top: '#9a7a3a', side: '#6a5222' },              // and of rags
+    { x0: 2, y0: 2.6, x1: 3.4, y1: 4, z0: 6.8 + bob + 6, z1: 6.8 + bob + 9.5, top: '#6aa87a', side: '#4a7a5a' },                   // one in hand
   ],
-  glow: (g, a, bob) => { const [x, y] = at(2.7, 3.3, a); fireGlow(g, x, y - 6.8 - bob - 10.5, 4); },
+  glow: (g, a, bob) => { goggles(g, a, bob, 'rgba(255,140,60,0.95)'); const [x, y] = at(2.7, 3.3, a); fireGlow(g, x, y - 6.8 - bob - 10.5, 4); },
 };
 const LONGSHOT: SoldierSpec = {
-  armour: '#5e5440', armourTop: '#80745a', build: 0.92, helmet: '#5a4e3a', visor: null, legs: CLAN_LEGS,
+  armour: '#76684e', armourTop: '#a08e6c', build: 0.92, helmet: '#4e4434', visor: null, legs: CLAN_LEGS,   // a dark head wrap
   extra: bob => [
-    { x0: -3.8, y0: -3.8, x1: 1, y1: 3.8, z0: 6.8 + bob + 0.3, z1: 6.8 + bob + 6.8, top: '#6a5e46', side: '#4a4030' },             // ragged cloak
+    { x0: -3.8, y0: -3.8, x1: 1, y1: 3.8, z0: 6.8 + bob + 0.3, z1: 6.8 + bob + 6.8, top: '#8a7a5a', side: '#62563e' },             // ragged cloak
     ...longRifle(14, bob),
-    { x0: 3.5, y0: 1.9, x1: 6.5, y1: 2.9, z0: 6.8 + bob + 5.2, z1: 6.8 + bob + 6.3, top: '#3a3632', side: '#24201c' },               // brass scope
+    { x0: 3.5, y0: 1.9, x1: 6.5, y1: 2.9, z0: 6.8 + bob + 5.2, z1: 6.8 + bob + 6.3, top: '#c8a050', side: '#8a6a2a' },               // brass scope
   ],
   glow: (g, a, bob) => { const [x, y] = at(6.6, 2.4, a); g.fillStyle = 'rgba(255,220,140,0.9)'; g.fillRect(x - 0.4, y - 6.8 - bob - 5.8, 0.8, 0.8); },
 };
@@ -239,6 +255,18 @@ function drawCaravanHull(g: Ctx, a: number, team: string, phase = 0) {
   beast(g, a, 9.5, 2.2, (phase + 0.5) % 1, team);
 }
 
+// lived-in clutter round a clan building: crates, barrels, a woodpile, a hanging lantern, hides on a rack
+function crate(g: Ctx, x: number, y: number, s = 1) { box(g, 0, x - 2.5 * s, y - 2 * s, x + 2.5 * s, y + 2 * s, 0, 3.6 * s, '#a8824e', '#7a5a34'); g.strokeStyle = 'rgba(40,24,10,0.6)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(x - 2.5 * s, y + 2 * s - 3.6 * s); g.lineTo(x + 2.5 * s, y + 2 * s); g.stroke(); }
+function barrel(g: Ctx, x: number, y: number, col = RUST) { cylinder(g, x, y, 2, 0, 5, shade(col, 1.25), col); g.strokeStyle = 'rgba(30,20,12,0.6)'; g.lineWidth = 0.5; g.beginPath(); g.ellipse(x, y - 2.5, 2, 0.8, 0, 0, Math.PI); g.stroke(); }
+function woodpile(g: Ctx, x: number, y: number) { for (let r = 0; r < 3; r++) for (let k = 0; k < 4 - r; k++) { const cx = x + k * 2.6 + r * 1.3, cy = y - r * 2; g.fillStyle = '#6a4a2c'; g.beginPath(); g.ellipse(cx, cy, 1.4, 1.2, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#c09a6a'; g.beginPath(); g.ellipse(cx, cy, 0.8, 0.7, 0, 0, Math.PI * 2); g.fill(); } }
+function lantern(g: Ctx, x: number, y: number) { g.strokeStyle = '#2a241c'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(x, y - 4); g.lineTo(x, y - 1.6); g.stroke(); g.fillStyle = '#3a3228'; g.fillRect(x - 1, y - 1.6, 2, 2.6); fireGlow(g, x, y - 0.3, 4); }
+function hideRack(g: Ctx, x: number, y: number, team: string) {
+  g.strokeStyle = WOOD_DK; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - 10); g.moveTo(x + 10, y); g.lineTo(x + 10, y - 10); g.moveTo(x - 0.5, y - 9.5); g.lineTo(x + 10.5, y - 9.5); g.stroke();
+  poly(g, [[x + 1, y - 9], [x + 4.5, y - 9], [x + 5, y - 3], [x + 3, y - 1.5], [x + 1.5, y - 3]], HIDE);
+  poly(g, [[x + 5.5, y - 9], [x + 9, y - 9], [x + 8.5, y - 4], [x + 6, y - 2.5]], team);
+}
+function smoke(g: Ctx, x: number, y: number, n = 3) { for (let k = 0; k < n; k++) { g.fillStyle = `rgba(90,84,80,${0.28 - k * 0.07})`; g.beginPath(); g.ellipse(x + k * 2.2, y - k * 5, 2.6 + k * 1.4, 2 + k, 0, 0, Math.PI * 2); g.fill(); } }
+
 // ---------------- structures ----------------
 
 function drawHall(g: Ctx, w: number, _h: number, level: number, team: string) {
@@ -265,6 +293,14 @@ function drawHall(g: Ctx, w: number, _h: number, level: number, team: string) {
   sandbags(g, 18, 84, 4, 2);
   if (level >= 2) banner(g, 76, 30, 34, team);
   if (level >= 3) { banner(g, 20, 30, 34, team); scrapPile(g, 86, 60, 1.1, 3); }
+  // the yard: firewood, crates, barrels, hides drying, lanterns either side of the door, smoke from the roof
+  woodpile(g, 62, 86); crate(g, 22, 88); crate(g, 27, 90, 0.8); barrel(g, 72, 84); barrel(g, 76, 87, IRON);
+  hideRack(g, 82, 80, team);
+  lantern(g, 36, 50); lantern(g, 60, 50);
+  smoke(g, 34, 40); smoke(g, 62, 40);
+  // patched hide and plank seams across the front wall
+  poly(g, [[18, 48], [28, 47], [29, 58], [18, 59]], HIDE_DK); poly(g, [[68, 50], [78, 50], [78, 60], [68, 61]], HIDE);
+  g.fillStyle = 'rgba(30,18,10,0.6)'; for (const x of [19, 27, 69, 77]) for (const y of [49, 57]) g.fillRect(x, y, 0.8, 0.8);
   g.restore();
 }
 
@@ -298,6 +334,13 @@ function drawSmelter(g: Ctx, w: number, _h: number, _level: number, team: string
   spill(g, 76, 44, 12, 'rgba(67,243,236,0.25)');
   quad(g, [12, 52 - 26], [50, 52 - 26], [50, 52 - 24], [12, 52 - 24], team, false);
   banner(g, 88, 22, 26, team);
+  // slag cooling in a heap, a bucket of ore, sparks from the mouth, smoke from the stack, blocks marked in the stone
+  for (const [x, y, r] of [[56, 54, 4], [61, 56, 3], [52, 57, 2.5]] as number[][]) { g.fillStyle = '#2a2420'; g.beginPath(); g.ellipse(x, y, r, r * 0.6, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = 'rgba(255,120,40,0.6)'; g.fillRect(x - 0.6, y - 0.6, 1.2, 0.8); }
+  barrel(g, 8, 56, IRON); crate(g, 6, 48, 0.8);
+  for (const [x, y] of [[29, 36], [33, 33], [36, 37], [27, 32]] as Pt[]) { g.fillStyle = '#ffd080'; g.fillRect(x, y, 1, 1); }
+  smoke(g, 18, -28, 4);
+  g.strokeStyle = 'rgba(30,26,22,0.4)'; g.lineWidth = 0.5;
+  for (let y = 30; y < 52; y += 6) { g.beginPath(); g.moveTo(12, y); g.lineTo(24, y); g.moveTo(38, y); g.lineTo(50, y); g.stroke(); }
   g.restore();
 }
 
@@ -315,6 +358,9 @@ function drawLonghouse(g: Ctx, w: number, _h: number, level: number, team: strin
   box(g, 0, 41, 54, 52, 56, 0, 3, WOOD_TOP, WOOD);
   if (level >= 2) sandbags(g, 10, 58, 3, 2);
   if (level >= 3) banner(g, 14, 26, 30, team);
+  // firewood stacked by the wall, a hide drying, a lantern, smoke from the roof
+  woodpile(g, 12, 58); hideRack(g, 48, 46, team); lantern(g, 24, 34); smoke(g, 30, 4);
+  crate(g, 56, 56, 0.8);
   g.restore();
 }
 
@@ -354,6 +400,11 @@ function drawForge(g: Ctx, w: number, _h: number, _level: number, team: string) 
   cylinder(g, 50, 32, 4, 1.5, 9, '#3a5a6a', WOOD);
   poly(g, [[6, 46], [14, 44], [14, 52], [6, 52]], HIDE);
   quad(g, [10, 44 - 20], [40, 44 - 20], [40, 44 - 18], [10, 44 - 18], team, false);
+  // hammers and tongs on the wall, a bucket of quench water, sparks off the anvil, smoke from the chimney
+  g.strokeStyle = '#3a3632'; g.lineWidth = 0.9;
+  for (const x of [14, 18, 22]) { g.beginPath(); g.moveTo(x, 44 - 16); g.lineTo(x, 44 - 9); g.stroke(); g.fillStyle = '#5a5650'; g.fillRect(x - 1.5, 44 - 17, 3, 1.6); }
+  for (const [x, y] of [[48, 40], [51, 37], [46, 36], [53, 41], [49, 34]] as Pt[]) { g.fillStyle = '#ffd890'; g.fillRect(x, y, 0.9, 0.9); }
+  smoke(g, 32, -22, 3); crate(g, 56, 52, 0.7);
   g.restore();
 }
 
@@ -379,6 +430,12 @@ function drawMender(g: Ctx, w: number, _h: number, _level: number, team: string)
   quad(g, [27, 48 - 9], [37, 48 - 9], [37, 48 - 1.5], [27, 48 - 1.5], '#3a2e22');
   fireGlow(g, 40, 48 - 10, 5);
   box(g, 0, 14, 52, 26, 57, 1.5, 4, '#9a8e78', '#6e6452');                                      // a cot outside
+  // a painted stripe and a hand-stitched mark on the canvas, a crate of supplies, a water barrel, a lantern by the flap
+  quad(g, [20, 48 - 16], [26, 48 - 16], [26, 48 - 10], [20, 48 - 10], '#eee2c8', false);
+  g.fillStyle = team; g.fillRect(22, 48 - 15, 2, 4); g.fillRect(21, 48 - 14, 4, 2);
+  crate(g, 50, 56, 0.9); barrel(g, 56, 50, '#5a6a72'); lantern(g, 26, 36);
+  g.strokeStyle = 'rgba(90,80,60,0.5)'; g.lineWidth = 0.5;
+  for (const x of [16, 30, 44]) { g.beginPath(); g.moveTo(x, 48 - 10); g.lineTo(x + 1, 48 - 24); g.stroke(); }   // canvas seams
   g.restore();
 }
 

@@ -49,27 +49,17 @@ function hoverPool(g: Ctx, rx: number, ry: number, team: string) {
 // units
 
 function drawAcolyte(g: Ctx, a: number, team: string, phase = 0) {
-  const bob = Math.sin(phase * Math.PI * 2) * 0.8, z = 5 + bob;
+  const z = 5 + Math.sin(phase * Math.PI * 2) * 0.8;
   hoverPool(g, 6, 3.5, team);
-  // a tall tapering robe-body of ivory, gold mantle across the shoulders
-  const [cx, cy] = rotP(0, 0, a);
-  poly(g, [[cx - 3.6, cy - z], [cx + 3.6, cy - z], [cx + 2.2, cy - z - 13], [cx - 2.2, cy - z - 13]], sheen(g, cx, cy - z, cx, cy - z - 13, IVORY));
-  poly(g, [[cx - 4.6, cy - z - 11], [cx + 4.6, cy - z - 11], [cx + 3, cy - z - 15], [cx - 3, cy - z - 15]], sheen(g, cx, cy - z - 11, cx, cy - z - 15, GOLD));
-  // an elongated head with a crystal crest
-  g.fillStyle = sheen(g, cx, cy - z - 15, cx, cy - z - 21, IVORY);
-  g.beginPath(); g.ellipse(cx, cy - z - 18, 2.2, 3.3, 0, 0, Math.PI * 2); g.fill();
-  jewel(g, cx - 0.6, cy - z - 21.5, 1.3);
-  const [ex, ey] = rotP(1.6, 0, a);
-  g.fillStyle = '#9ffcf6'; g.fillRect(ex - 0.5, ey - z - 18.5, 1.6, 0.9);    // eyes, on the way it faces
-  // the rifle: a thin gold rod with a sun-bright tip
-  const [r0x, r0y] = rotP(1, 2.6, a), [r1x, r1y] = rotP(10, 2.6, a);
-  g.strokeStyle = GOLD.dk; g.lineWidth = 1.8; g.lineCap = 'round';
+  robed(g, a, z, 3.6, 13, team);
+  // the rifle: a long gold rod, a ring of light at the muzzle
+  const [r0x, r0y] = rotP(1, 3, a), [r1x, r1y] = rotP(11, 3, a);
+  g.strokeStyle = GOLD.dk; g.lineWidth = 1.9; g.lineCap = 'round';
   g.beginPath(); g.moveTo(r0x, r0y - z - 9); g.lineTo(r1x, r1y - z - 9); g.stroke();
   g.strokeStyle = GOLD.lt; g.lineWidth = 0.7; g.stroke();
+  const [mx, my] = rotP(8, 3, a); jewel(g, mx, my - z - 9.4, 0.8);
+  g.strokeStyle = 'rgba(255,240,190,0.8)'; g.lineWidth = 0.6; g.beginPath(); g.ellipse(r1x, r1y - z - 9, 1.4, 2, a, 0, Math.PI * 2); g.stroke();
   glowAt(g, r1x, r1y - z - 9, 3.5, 'rgba(255,240,190,0.8)');
-  // team colour as a sash of light
-  g.strokeStyle = team; g.lineWidth = 1.2;
-  g.beginPath(); g.moveTo(cx - 3, cy - z - 4); g.lineTo(cx + 3, cy - z - 9); g.stroke();
 }
 
 function drawLancer(g: Ctx, a: number, team: string) {
@@ -133,75 +123,143 @@ function drawMonolith(g: Ctx, a: number, team: string, phase = 0) {
 }
 
 
-// a robed Keeper figure (shared by Seraph and Oracle): ivory body, gold mantle, crested head
-function robed(g: Ctx, a: number, z: number, wide: number, tall: number) {
+// a robed Keeper figure (shared by Seraph and Oracle): an ivory under-robe, a gold mantle with pauldrons,
+// a tabard trimmed in team light, filigree down the front, and an elongated crested head
+function robed(g: Ctx, a: number, z: number, wide: number, tall: number, team: string, hood = false) {
   const [cx, cy] = rotP(0, 0, a);
-  poly(g, [[cx - wide, cy - z], [cx + wide, cy - z], [cx + wide * 0.6, cy - z - tall], [cx - wide * 0.6, cy - z - tall]], sheen(g, cx, cy - z, cx, cy - z - tall, IVORY));
-  poly(g, [[cx - wide - 1, cy - z - tall + 2], [cx + wide + 1, cy - z - tall + 2], [cx + wide * 0.8, cy - z - tall - 2], [cx - wide * 0.8, cy - z - tall - 2]], sheen(g, cx, cy - z - tall + 2, cx, cy - z - tall - 2, GOLD));
-  g.fillStyle = sheen(g, cx, cy - z - tall - 2, cx, cy - z - tall - 8, IVORY);
-  g.beginPath(); g.ellipse(cx, cy - z - tall - 5, 2.2, 3.3, 0, 0, Math.PI * 2); g.fill();
-  jewel(g, cx - 0.6, cy - z - tall - 8.5, 1.3);
-  const [ex, ey] = rotP(1.6, 0, a);
-  g.fillStyle = '#9ffcf6'; g.fillRect(ex - 0.5, ey - z - tall - 5.5, 1.6, 0.9);
-  return { cx, cy };
+  // the under-robe, flaring at the hem, with two fold shadows
+  poly(g, [[cx - wide - 1, cy - z + 1], [cx + wide + 1, cy - z + 1], [cx + wide * 0.62, cy - z - tall], [cx - wide * 0.62, cy - z - tall]], sheen(g, cx, cy - z, cx, cy - z - tall, IVORY));
+  g.strokeStyle = 'rgba(90,80,60,0.35)'; g.lineWidth = 0.6;
+  for (const f of [-0.45, 0.4]) { g.beginPath(); g.moveTo(cx + wide * f * 1.4, cy - z + 1); g.lineTo(cx + wide * f * 0.8, cy - z - tall * 0.7); g.stroke(); }
+  // the tabard down the front, edged in team light, a gold filigree seam
+  poly(g, [[cx - wide * 0.38, cy - z + 0.5], [cx + wide * 0.38, cy - z + 0.5], [cx + wide * 0.3, cy - z - tall + 2], [cx - wide * 0.3, cy - z - tall + 2]], sheen(g, cx, cy - z, cx, cy - z - tall, GOLD), 'rgba(60,40,10,0.5)');
+  g.strokeStyle = team; g.lineWidth = 0.7;
+  g.beginPath(); g.moveTo(cx - wide * 0.38, cy - z + 0.5); g.lineTo(cx - wide * 0.3, cy - z - tall + 2); g.moveTo(cx + wide * 0.38, cy - z + 0.5); g.lineTo(cx + wide * 0.3, cy - z - tall + 2); g.stroke();
+  g.strokeStyle = GOLD.hi; g.lineWidth = 0.4;
+  for (let k = 1; k < 4; k++) { const y = cy - z - tall * k / 4; g.beginPath(); g.arc(cx, y, 0.9, 0, Math.PI); g.stroke(); }
+  // the mantle and two curved pauldrons
+  poly(g, [[cx - wide - 1.4, cy - z - tall + 2], [cx + wide + 1.4, cy - z - tall + 2], [cx + wide * 0.75, cy - z - tall - 2.2], [cx - wide * 0.75, cy - z - tall - 2.2]], sheen(g, cx, cy - z - tall + 2, cx, cy - z - tall - 2, GOLD));
+  for (const sd of [-1, 1]) {
+    const px = cx + sd * (wide + 0.6), py = cy - z - tall + 0.5;
+    g.fillStyle = sheen(g, px, py + 2, px, py - 3, GOLD); g.beginPath(); g.ellipse(px, py - 0.6, 2.2, 1.7, sd * 0.4, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(60,40,10,0.5)'; g.lineWidth = 0.5; g.stroke();
+    jewel(g, px, py - 0.8, 0.6);
+  }
+  // the head: a hood with a lit face beneath, or a bare crested head
+  const hy = cy - z - tall - 5;
+  if (hood) {
+    poly(g, [[cx - 3.2, hy + 3.4], [cx - 2.4, hy - 2.6], [cx, hy - 4.6], [cx + 2.4, hy - 2.6], [cx + 3.2, hy + 3.4]], sheen(g, cx, hy + 3, cx, hy - 4, IVORY));
+    g.fillStyle = '#1a1408'; g.beginPath(); g.ellipse(cx + Math.cos(a) * 0.5, hy + 0.6, 1.7, 2.2, 0, 0, Math.PI * 2); g.fill();
+    glowAt(g, cx + Math.cos(a) * 0.8, hy, 2.2, 'rgba(160,255,250,0.9)');
+  } else {
+    g.fillStyle = sheen(g, cx, hy + 3, cx, hy - 3.5, IVORY);
+    g.beginPath(); g.ellipse(cx, hy, 2.2, 3.4, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(90,80,60,0.45)'; g.lineWidth = 0.5; g.stroke();
+    jewel(g, cx - 0.6, hy - 3.6, 1.3);
+    const [ex, ey] = rotP(1.6, 0, a);
+    g.fillStyle = '#9ffcf6'; g.fillRect(cx + ex - 0.5, hy + ey * 0.3 - 0.5, 1.6, 0.9);
+  }
+  return { cx, cy, hy };
 }
 
 function drawSeraph(g: Ctx, a: number, team: string, phase = 0) {
-  const z = 5 + Math.sin(phase * Math.PI * 2) * 0.8;
-  hoverPool(g, 7, 4, team);
-  // a shield of light around it, then the figure, a blade of light in each hand
-  g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(255,230,160,0.35)'; g.lineWidth = 1.2;
-  g.beginPath(); g.ellipse(0, -z - 9, 8, 12, 0, 0, Math.PI * 2); g.stroke(); g.restore();
-  const { cx, cy } = robed(g, a, z, 4, 13);
+  const t = phase * Math.PI * 2, z = 5 + Math.sin(t) * 0.8;
+  hoverPool(g, 8, 4.5, team);
+  // its shield: a shell of hexagonal light around the whole figure
+  g.save(); g.globalCompositeOperation = 'lighter';
+  const sg = g.createRadialGradient(0, -z - 10, 4, 0, -z - 10, 13);
+  sg.addColorStop(0, 'rgba(255,230,160,0)'); sg.addColorStop(0.85, 'rgba(255,230,160,0.12)'); sg.addColorStop(1, 'rgba(255,240,190,0.35)');
+  g.fillStyle = sg; g.beginPath(); g.ellipse(0, -z - 10, 9.5, 13, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,235,180,0.22)'; g.lineWidth = 0.5;
+  for (let k = 0; k < 6; k++) { const ang = k / 6 * Math.PI * 2 + t * 0.2; g.beginPath(); g.moveTo(Math.cos(ang) * 4, -z - 10 + Math.sin(ang) * 6); g.lineTo(Math.cos(ang) * 9, -z - 10 + Math.sin(ang) * 12.5); g.stroke(); }
+  g.restore();
+  // a halo behind the head
+  g.strokeStyle = 'rgba(255,225,150,0.75)'; g.lineWidth = 1; g.beginPath(); g.ellipse(0, -z - 19.5, 4.2, 1.6, 0, 0, Math.PI * 2); g.stroke();
+  robed(g, a, z, 4.2, 13, team);
+  // two long blades of light, held low and outward
   for (const sd of [-1, 1]) {
-    const [h0x, h0y] = rotP(2, sd * 4, a), [h1x, h1y] = rotP(8, sd * 6, a);
-    g.strokeStyle = 'rgba(255,245,210,0.95)'; g.lineWidth = 1.4; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(h0x, h0y - z - 8); g.lineTo(h1x, h1y - z - 12); g.stroke();
-    glowAt(g, h1x, h1y - z - 12, 3.5, 'rgba(255,230,160,0.8)');
+    const [h0x, h0y] = rotP(2, sd * 4.6, a), [h1x, h1y] = rotP(8.5, sd * 6.2, a);
+    const bg = g.createLinearGradient(h0x, h0y - z - 8, h1x, h1y - z - 3);
+    bg.addColorStop(0, 'rgba(255,240,200,1)'); bg.addColorStop(1, 'rgba(255,220,140,0.2)');
+    g.strokeStyle = bg; g.lineWidth = 1.1; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(h0x, h0y - z - 8); g.lineTo(h1x, h1y - z - 4); g.stroke();
+    g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(255,220,140,0.22)'; g.lineWidth = 2.4; g.stroke(); g.restore();
+    g.fillStyle = GOLD.mid; g.beginPath(); g.arc(h0x, h0y - z - 8, 1, 0, Math.PI * 2); g.fill();   // the hilt
   }
-  g.strokeStyle = team; g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx - 3, cy - z - 4); g.lineTo(cx + 3, cy - z - 9); g.stroke();
+  for (let k = 0; k < 3; k++) { const ang = t + k * 2.1; glowAt(g, Math.cos(ang) * 8, -z - 6 + Math.sin(ang) * 3, 1.6, 'rgba(255,240,190,0.8)'); }   // motes
 }
 
 function drawOracle(g: Ctx, a: number, team: string, phase = 0) {
-  const z = 6 + Math.sin(phase * Math.PI * 2) * 0.6;
-  hoverPool(g, 6, 3.5, team);
-  const { cx, cy } = robed(g, a, z, 3.2, 15);
-  // a tall staff topped with a seeing-eye crystal, held out in front
-  const [s0x, s0y] = rotP(3, 2.4, a);
-  g.strokeStyle = GOLD.dk; g.lineWidth = 1.6; g.beginPath(); g.moveTo(s0x, s0y - z); g.lineTo(s0x, s0y - z - 27); g.stroke();
+  const t = phase * Math.PI * 2, z = 6 + Math.sin(t) * 0.6;
+  hoverPool(g, 6.5, 3.8, team);
+  const { hy } = robed(g, a, z, 3.4, 15, team, true);
+  // a tall staff ending in a crescent that cradles the seeing-crystal
+  const [s0x, s0y] = rotP(3.2, 2.8, a), top = s0y - z - 29;
+  g.strokeStyle = GOLD.dk; g.lineWidth = 1.7; g.lineCap = 'round'; g.beginPath(); g.moveTo(s0x, s0y - z + 1); g.lineTo(s0x, top + 3); g.stroke();
   g.strokeStyle = GOLD.lt; g.lineWidth = 0.6; g.stroke();
-  jewel(g, s0x, s0y - z - 28, 2.2);
-  glowAt(g, s0x, s0y - z - 28, 7, 'rgba(160,255,250,0.6)');
-  g.strokeStyle = team; g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx - 3, cy - z - 4); g.lineTo(cx + 3, cy - z - 10); g.stroke();
+  g.strokeStyle = sheen(g, s0x, top + 4, s0x, top - 4, GOLD); g.lineWidth = 1.4;
+  g.beginPath(); g.arc(s0x, top, 3.6, 0.2, Math.PI - 0.2, true); g.stroke();
+  jewel(g, s0x, top - 0.5, 2.4);
+  // rings orbiting the crystal, and three glyph-shards turning about the figure
+  g.strokeStyle = 'rgba(160,255,250,0.55)'; g.lineWidth = 0.6;
+  g.beginPath(); g.ellipse(s0x, top - 0.6, 5.5, 1.8, t * 0.5, 0, Math.PI * 2); g.stroke();
+  glowAt(g, s0x, top - 0.6, 9, 'rgba(160,255,250,0.55)');
+  for (let k = 0; k < 3; k++) {
+    const ang = t * 0.7 + k * 2.09, gx = Math.cos(ang) * 7, gy = hy - 2 + Math.sin(ang) * 2.4;
+    poly(g, [[gx, gy - 2], [gx + 1.1, gy], [gx, gy + 1.4], [gx - 1.1, gy]], sheen(g, gx, gy + 1.4, gx, gy - 2, GOLD), 'rgba(60,40,10,0.5)');
+  }
 }
 
 function drawHerald(g: Ctx, a: number, team: string) {
-  // a slim gold dart with swept wings and a cyan engine trail
-  const hull: Pt[] = [[13, 0], [3, -2.5], [-4, -9], [-7, -8.5], [-4, -2], [-9, 0], [-4, 2], [-7, 8.5], [-4, 9], [3, 2.5]];
-  const pts = hull.map(([x, y]) => rotP(x, y, a));
-  poly(g, pts, sheen(g, pts[5][0], pts[5][1], pts[0][0], pts[0][1], GOLD));
-  const [r0x, r0y] = rotP(11, 0, a), [r1x, r1y] = rotP(-6, 0, a);
-  g.strokeStyle = IVORY.lt; g.lineWidth = 1.2; g.beginPath(); g.moveTo(r0x, r0y); g.lineTo(r1x, r1y); g.stroke();
-  const [jx, jy] = rotP(3, 0, a); jewel(g, jx, jy, 1.3);
-  for (const sd of [-1, 1]) { const [wx, wy] = rotP(-4, sd * 6, a); g.fillStyle = team; g.beginPath(); g.arc(wx, wy, 1.1, 0, Math.PI * 2); g.fill(); }
-  const [ex, ey] = rotP(-10, 0, a); glowAt(g, ex, ey, 7, 'rgba(120,240,255,0.8)');
+  // a slim gold dart: layered swept wings with ivory leading edges, panel lines, a lit canopy, twin engines
+  const P = (pts: Pt[]) => pts.map(([x, y]) => rotP(x, y, a));
+  for (const sd of [-1, 1]) {
+    const wing = P([[3, sd * 2], [-3, sd * 10.5], [-7, sd * 10], [-5, sd * 2.5]]);
+    poly(g, wing, sheen(g, wing[0][0], wing[0][1], wing[2][0], wing[2][1], GOLD));
+    const edge = P([[3, sd * 2], [-3, sd * 10.5]]);
+    g.strokeStyle = IVORY.lt; g.lineWidth = 1.1; g.beginPath(); g.moveTo(edge[0][0], edge[0][1]); g.lineTo(edge[1][0], edge[1][1]); g.stroke();
+    const panel = P([[-1, sd * 4], [-4.5, sd * 8]]);
+    g.strokeStyle = 'rgba(70,46,10,0.55)'; g.lineWidth = 0.5; g.beginPath(); g.moveTo(panel[0][0], panel[0][1]); g.lineTo(panel[1][0], panel[1][1]); g.stroke();
+    const [tx, ty] = rotP(-4, sd * 10.4, a); g.fillStyle = team; g.beginPath(); g.arc(tx, ty, 1.1, 0, Math.PI * 2); g.fill(); glowAt(g, tx, ty, 3, team + 'a0');
+  }
+  const hull = P([[14, 0], [6, -2.4], [-6, -2.6], [-9, -1.4], [-9, 1.4], [-6, 2.6], [6, 2.4]]);
+  poly(g, hull, sheen(g, hull[3][0], hull[3][1], hull[0][0], hull[0][1], IVORY));
+  const spine = P([[12, 0], [-8, 0]]);
+  g.strokeStyle = GOLD.mid; g.lineWidth = 0.9; g.beginPath(); g.moveTo(spine[0][0], spine[0][1]); g.lineTo(spine[1][0], spine[1][1]); g.stroke();
+  const canopy = P([[8, 0], [4.5, -1.3], [2, 0], [4.5, 1.3]]);
+  poly(g, canopy, 'rgba(120,240,245,0.9)', 'rgba(10,40,44,0.6)');
+  glowAt(g, (canopy[0][0] + canopy[2][0]) / 2, (canopy[0][1] + canopy[2][1]) / 2, 3.5, 'rgba(160,255,250,0.6)');
+  for (const sd of [-1, 1]) { const [ex, ey] = rotP(-9.5, sd * 1.4, a); glowAt(g, ex, ey, 4.5, 'rgba(120,240,255,0.85)'); const [rx, ry] = rotP(-15, sd * 1.4, a); g.strokeStyle = 'rgba(120,240,255,0.25)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(ex, ey); g.lineTo(rx, ry); g.stroke(); }
 }
 
 function drawArbiter(g: Ctx, a: number, team: string, phase = 0) {
-  // a great floating lens in a gold ring, three ivory vanes under it
-  const bob = Math.sin(phase * Math.PI * 2) * 1.4, z = 12 + bob;
-  hoverPool(g, 13, 7, team);
+  // a floating lens array: four gold ring segments around a lens of gathered sunlight, three ivory vanes threaded to it
+  const t = phase * Math.PI * 2, bob = Math.sin(t) * 1.4, z = 13 + bob, cy = -z - 12;
+  hoverPool(g, 14, 7.5, team);
   for (let k = 0; k < 3; k++) {
-    const ang = a + k * 2.094, [vx, vy] = rotP(9, 0, ang);
-    poly(g, [[vx * 0.3, vy * 0.3 - z + 2], [vx, vy - z + 6], [vx * 0.8, vy * 0.8 - z - 1]], sheen(g, vx, vy - z + 6, vx, vy - z - 1, IVORY));
+    const ang = a + k * 2.094, [vx, vy] = rotP(10, 0, ang), [ix, iy] = rotP(3, 0, ang);
+    poly(g, [[ix, iy - z + 3], [vx, vy - z + 7], [vx * 0.85, vy * 0.85 - z - 2], [ix * 1.2, iy * 1.2 - z - 1]], sheen(g, vx, vy - z + 7, vx, vy - z - 2, IVORY), 'rgba(80,70,50,0.5)');
+    g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(255,235,170,0.45)'; g.lineWidth = 0.6;
+    g.beginPath(); g.moveTo(vx * 0.9, vy * 0.9 - z); g.lineTo(0, cy); g.stroke(); g.restore();
   }
-  g.strokeStyle = sheen(g, 0, -z - 22, 0, -z, GOLD); g.lineWidth = 3.4;
-  g.beginPath(); g.ellipse(0, -z - 12, 10, 11, 0, 0, Math.PI * 2); g.stroke();
-  const lg = g.createRadialGradient(-2, -z - 14, 1, 0, -z - 12, 9);
-  lg.addColorStop(0, '#ffffff'); lg.addColorStop(0.5, 'rgba(255,240,190,0.85)'); lg.addColorStop(1, 'rgba(255,200,110,0.35)');
-  g.fillStyle = lg; g.beginPath(); g.ellipse(0, -z - 12, 8.5, 9.5, 0, 0, Math.PI * 2); g.fill();
-  glowAt(g, 0, -z - 12, 18, team + '60');
-  jewel(g, 0, -z - 25, 1.8);
+  // the emitter beneath the lens, where the judgment comes out
+  poly(g, [[-2.6, -z - 1], [2.6, -z - 1], [0, -z + 4]], sheen(g, 0, -z + 4, 0, -z - 1, GOLD));
+  glowAt(g, 0, -z + 3.5, 4, 'rgba(255,220,140,0.75)');
+  // the lens: concentric light
+  const lg = g.createRadialGradient(-2, cy - 2, 0.5, 0, cy, 9);
+  lg.addColorStop(0, '#ffffff'); lg.addColorStop(0.35, 'rgba(255,244,205,0.95)'); lg.addColorStop(0.75, 'rgba(255,212,130,0.6)'); lg.addColorStop(1, 'rgba(255,190,90,0.2)');
+  g.fillStyle = lg; g.beginPath(); g.ellipse(0, cy, 8.5, 9.5, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 0.5;
+  for (const r of [3, 5.8]) { g.beginPath(); g.ellipse(0, cy, r, r * 1.1, 0, 0, Math.PI * 2); g.stroke(); }
+  // four floating ring segments, slowly turning
+  for (let k = 0; k < 4; k++) {
+    const a0 = t * 0.3 + k * Math.PI / 2 + 0.18, a1 = a0 + Math.PI / 2 - 0.36;
+    g.strokeStyle = sheen(g, 0, cy + 11, 0, cy - 11, GOLD); g.lineWidth = 3;
+    g.beginPath(); g.ellipse(0, cy, 11, 12, 0, a0, a1); g.stroke();
+    g.strokeStyle = GOLD.hi; g.lineWidth = 0.6; g.beginPath(); g.ellipse(0, cy, 11, 12, 0, a0 + 0.1, a1 - 0.1); g.stroke();
+    jewel(g, Math.cos((a0 + a1) / 2) * 11, cy + Math.sin((a0 + a1) / 2) * 12, 0.9);
+  }
+  glowAt(g, 0, cy, 20, team + '50');
 }
 
 export interface KeeperUnitArt { hull: (g: Ctx, a: number, team: string, phase?: number) => void; reach: number; height: number; frames?: number; turn?: number }
@@ -299,18 +357,33 @@ function drawObelisk(g: Ctx, w: number, _h: number, _level: number, team: string
 
 function drawArchive(g: Ctx, w: number, _h: number, _level: number, team: string) {
   g.save(); const s = w / 64; g.scale(s, s);
-  petals(g, 32, 50, 20, 6);
-  // a cube of light turned on its point, ringed by floating gold tablets
-  const cx = 32, cy = 26;
-  poly(g, [[cx, cy - 18], [cx + 14, cy - 4], [cx, cy + 10], [cx - 14, cy - 4]], 'rgba(255,248,225,0.55)', 'rgba(200,160,80,0.7)');
-  poly(g, [[cx, cy - 18], [cx + 14, cy - 4], [cx, cy + 2], [cx - 14, cy - 4]], 'rgba(255,255,255,0.35)', 'rgba(0,0,0,0)');
-  glowAt(g, cx, cy - 4, 22, 'rgba(255,240,200,0.6)');
-  for (let k = 0; k < 5; k++) {
-    const ang = k / 5 * Math.PI * 2, x = cx + Math.cos(ang) * 22, y = cy + 10 + Math.sin(ang) * 7;
-    poly(g, [[x - 3, y - 7], [x + 3, y - 7], [x + 3, y], [x - 3, y]], sheen(g, x, y, x, y - 7, GOLD));
+  // three stepped ivory tiers, each ringed in gold
+  for (const [ry, rx, z, t] of [[13, 27, 0, IVORY], [10, 21, 4, IVORY], [7, 15, 8, GOLD]] as [number, number, number, Tone][]) {
+    g.fillStyle = sheen(g, 32, 50 - z + ry, 32, 50 - z - ry, t); g.beginPath(); g.ellipse(32, 50 - z, rx, ry, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = GOLD.mid; g.lineWidth = 1; g.stroke();
   }
-  jewel(g, cx, cy - 4, 3);
-  glowAt(g, cx, cy - 4, 30, team + '40');
+  // a pillar of light from the top tier up into the cube
+  g.save(); g.globalCompositeOperation = 'lighter';
+  const pg = g.createLinearGradient(32, 42, 32, 4); pg.addColorStop(0, 'rgba(255,240,200,0.55)'); pg.addColorStop(1, 'rgba(255,240,200,0)');
+  g.fillStyle = pg; g.fillRect(28, 4, 8, 38); g.restore();
+  // the cube of memory, turned on its point: three lit faces and a jewel at its heart
+  const cx = 32, cy = 22;
+  poly(g, [[cx, cy - 15], [cx + 12, cy - 7], [cx, cy + 1], [cx - 12, cy - 7]], 'rgba(255,250,232,0.85)', 'rgba(200,160,80,0.8)');
+  poly(g, [[cx - 12, cy - 7], [cx, cy + 1], [cx, cy + 15], [cx - 12, cy + 7]], 'rgba(236,222,190,0.75)', 'rgba(200,160,80,0.8)');
+  poly(g, [[cx + 12, cy - 7], [cx, cy + 1], [cx, cy + 15], [cx + 12, cy + 7]], 'rgba(205,186,150,0.75)', 'rgba(200,160,80,0.8)');
+  g.strokeStyle = 'rgba(160,120,50,0.5)'; g.lineWidth = 0.5;
+  for (const k of [-1, 1]) { g.beginPath(); g.moveTo(cx + k * 6, cy - 11); g.lineTo(cx + k * 6, cy + 3); g.stroke(); }
+  jewel(g, cx, cy - 2, 3);
+  glowAt(g, cx, cy, 24, 'rgba(255,240,200,0.45)');
+  // tablets of gold orbiting the cube, each carved with a line of glyphs
+  for (let k = 0; k < 5; k++) {
+    const ang = k / 5 * Math.PI * 2 + 0.3, x = cx + Math.cos(ang) * 23, y = cy + 14 + Math.sin(ang) * 7;
+    if (Math.sin(ang) < 0) { poly(g, [[x - 3, y - 8], [x + 3, y - 8], [x + 3, y], [x - 3, y]], sheen(g, x, y, x, y - 8, GOLD)); }
+    else { poly(g, [[x - 3, y - 8], [x + 3, y - 8], [x + 3, y], [x - 3, y]], sheen(g, x, y, x, y - 8, GOLD)); }
+    g.strokeStyle = 'rgba(80,50,10,0.6)'; g.lineWidth = 0.5;
+    for (const yy of [y - 6, y - 4, y - 2]) { g.beginPath(); g.moveTo(x - 2, yy); g.lineTo(x + 2, yy); g.stroke(); }
+  }
+  glowAt(g, 32, 50, 30, team + '30');
   g.restore();
 }
 

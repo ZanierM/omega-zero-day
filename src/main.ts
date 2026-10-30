@@ -416,6 +416,8 @@ setInterval(() => {
 // Dev helpers, handy in the browser console while balancing
 import * as inputMod from './input';
 import * as mapMod from './map';
+import { VEHICLE_ART, BUILDING_ART, TURRET_ART, setFineArt } from './art';
+const artTables = { VEHICLE_ART, BUILDING_ART, TURRET_ART, setFineArt };
 import * as configMod from './config';
 (window as any).novaDebug = game;
 (window as any).novaInput = inputMod;
@@ -423,6 +425,7 @@ import * as configMod from './config';
 (window as any).novaCfg = configMod;
 (window as any).novaAudio = audioStats;
 (window as any).novaCampaign = campaign;
+(window as any).novaArt = artTables;   // dev: draw any unit or building straight onto a canvas
 
 // Fast-forward the simulation by N seconds (e.g. novaStep(30) in the console)
 (window as any).novaStep = (seconds: number) => {

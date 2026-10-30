@@ -212,54 +212,106 @@ function drawBehemoth(g: Ctx, a: number, team: string, phase = 0) {
 
 
 function drawLurker(g: Ctx, a: number, team: string, phase = 0) {
-  // squat and low, a fan of crystal spines on its back cocked to throw
-  const z = 3.5 + Math.abs(Math.sin(phase * Math.PI * 2)) * 0.4;
-  const legs: LegSpec[] = [{ x: 2, side: -1, reach: 6 }, { x: 2, side: 1, reach: 6 }, { x: -3, side: -1, reach: 6.5 }, { x: -3, side: 1, reach: 6.5 }];
-  shadow(g, 9, 5);
-  walkLegs(g, a, phase, z, legs, 1.3, 1.2, false);
-  const [bx, by] = rotP(-1, 0, a);
-  lobe(g, bx, by - z, 8, 5, a, CHITIN);
-  veins(g, bx, by - z, 8, 5, 3, 21, team + '80');
-  for (const [x, s2, h] of [[-5, -1, 9], [-3, 1, 10], [-1, -1, 11], [-3, 0, 12], [-6, 1, 8]] as number[][]) {
-    const [sx, sy] = rotP(x, s2 * 2, a); spike(g, sx, sy - z - 1, h, 1.4, -0.35 * Math.cos(a));
+  // squat and armoured, its back a quiver of crystal spines cocked to throw; three plated segments, a fanged head
+  const z = 3.6 + Math.abs(Math.sin(phase * Math.PI * 2)) * 0.4;
+  const legs: LegSpec[] = [{ x: 3, side: -1, reach: 6.5 }, { x: 3, side: 1, reach: 6.5 }, { x: -1, side: -1, reach: 7 }, { x: -1, side: 1, reach: 7 }, { x: -5, side: -1, reach: 6.5 }, { x: -5, side: 1, reach: 6.5 }];
+  shadow(g, 10, 5.5);
+  walkLegs(g, a, phase, z, legs, 1.3, 1.1, false);
+  // segments back to front: abdomen, thorax, the armoured fore-plate
+  for (const [x, rx, ry, t] of [[-6, 4.4, 3.4, FLESH], [-2, 5, 3.8, CHITIN], [2.5, 4.2, 3.4, CHITIN]] as [number, number, number, Tone][]) {
+    const [bx, by] = rotP(x, 0, a); lobe(g, bx, by - z, rx, ry, a, t);
   }
-  const [hx, hy] = rotP(5, 0, a);
-  lobe(g, hx, hy - z, 3, 2.4, a, FLESH);
-  eyes(g, a, 6, z + 0.5, team, 1.1);
-  walkLegs(g, a, phase, z, legs, 1.3, 1.2, true);
+  const [vx, vy] = rotP(-6, 0, a); veins(g, vx, vy - z, 4.4, 3.4, 4, 41, team + '90');
+  // the quiver: spines fanned up and back, glowing at the tips where the acid sits
+  for (const [x, y, h, lean] of [[-4, -1.6, 9, -0.45], [-3, 1.6, 10, -0.4], [-1.5, -0.5, 12, -0.3], [-2, 0.8, 11, -0.35], [-5.5, 0, 7, -0.55], [0, -1.4, 8, -0.2]] as number[][]) {
+    const [sx, sy] = rotP(x, y, a), lx = lean * Math.cos(a);
+    spike(g, sx, sy - z - 1.5, h, 1.3, lx);
+    glowAt(g, sx + lx * h, sy - z - 1.5 - h, 2.2, 'rgba(150,255,245,0.7)');
+  }
+  // a fanged head with a glowing gullet
+  const [hx, hy] = rotP(6, 0, a);
+  lobe(g, hx, hy - z, 2.8, 2.3, a, FLESH);
+  for (const sd of [-1, 1]) {
+    const [m0x, m0y] = rotP(7, sd * 1.4, a), [m1x, m1y] = rotP(9.5, sd * 0.5, a);
+    g.strokeStyle = CHITIN.dk; g.lineWidth = 1.3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(m0x, m0y - z); g.quadraticCurveTo((m0x + m1x) / 2, (m0y + m1y) / 2 - z - 1.2, m1x, m1y - z + 0.4); g.stroke();
+  }
+  glowAt(g, hx + Math.cos(a) * 2.5, hy + Math.sin(a) * 2.5 - z, 3, 'rgba(140,255,240,0.6)');
+  eyes(g, a, 6.5, z + 0.8, team, 1.2);
+  walkLegs(g, a, phase, z, legs, 1.3, 1.1, true);
 }
 
 function drawNurse(g: Ctx, a: number, team: string, phase = 0) {
-  // a swollen sac on short legs, dripping glowing sap
-  const z = 4 + Math.abs(Math.sin(phase * Math.PI * 2)) * 0.8;
-  const legs: LegSpec[] = [{ x: 3, side: -1, reach: 6 }, { x: 3, side: 1, reach: 6 }, { x: -3, side: -1, reach: 6 }, { x: -3, side: 1, reach: 6 }];
-  shadow(g, 9, 5.5);
-  walkLegs(g, a, phase, z, legs, 1.2, 1.1, false);
-  const [bx, by] = rotP(-1, 0, a);
-  g.save(); g.globalAlpha = 0.93;
-  lobe(g, bx, by - z - 2, 8, 7, a, { dk: '#3a1430', mid: '#9a4a78', lt: '#f0b0d8', hi: '#fff' });
+  // a bloated translucent sac on short legs; shapes curl inside it, veins of light pulse, sap drips from it
+  const pulse = Math.sin(phase * Math.PI * 2), z = 4.5 + Math.abs(pulse) * 0.6;
+  const legs: LegSpec[] = [{ x: 3.5, side: -1, reach: 6.5 }, { x: 3.5, side: 1, reach: 6.5 }, { x: 0, side: -1, reach: 7 }, { x: 0, side: 1, reach: 7 }, { x: -3.5, side: -1, reach: 6.5 }, { x: -3.5, side: 1, reach: 6.5 }];
+  shadow(g, 10, 6);
+  walkLegs(g, a, phase, z, legs, 1.1, 0.9, false);
+  const [bx, by] = rotP(-1, 0, a), sy = by - z - 3, r = 8 + pulse * 0.35;
+  // the skin, thin enough to see through
+  g.save(); g.globalAlpha = 0.9;
+  lobe(g, bx, sy, r, r * 0.86, a, { dk: '#3a1430', mid: '#9a4a78', lt: '#f2b6dc', hi: '#ffffff' });
   g.restore();
-  glowAt(g, bx, by - z - 2, 10, 'rgba(140,255,240,0.5)');
-  for (const k of [-3, 0, 3]) { const [dx, dy] = rotP(k - 1, 4, a); g.fillStyle = '#8ef4f0'; g.beginPath(); g.ellipse(dx, dy - z + 2, 0.8, 1.4, 0, 0, Math.PI * 2); g.fill(); }   // drips
-  eyes(g, a, 6, z, team, 1);
-  walkLegs(g, a, phase, z, legs, 1.2, 1.1, true);
+  // what's inside: curled shapes, lit from behind
+  glowAt(g, bx, sy, r * 1.25, 'rgba(140,255,240,0.45)');
+  for (const [x, y, rr, rot] of [[-2.5, -1, 2.6, 0.6], [2, 1.2, 2.2, -0.8], [0.5, -2.6, 1.8, 1.4]] as number[][]) {
+    g.fillStyle = 'rgba(40,10,30,0.55)'; g.beginPath(); g.ellipse(bx + x, sy + y, rr, rr * 0.6, rot, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,190,230,0.4)'; g.lineWidth = 0.5; g.beginPath(); g.arc(bx + x, sy + y, rr * 0.5, rot, rot + 3.5); g.stroke();
+  }
+  veins(g, bx, sy, r, r * 0.86, 7, 23, team + 'a0');
+  // a crown of small spines, and feeding tendrils at the front
+  for (const k of [-2, -1, 0, 1, 2]) { const [cx, cy] = rotP(-1 + k * 0.4, k * 1.8, a); spike(g, cx, cy - z - 3 - r * 0.75, 3 + (2 - Math.abs(k)), 0.9, k * 0.15); }
+  for (const sd of [-1, 0, 1]) {
+    const [t0x, t0y] = rotP(6, sd * 1.5, a), [t1x, t1y] = rotP(9, sd * 2.6, a);
+    g.strokeStyle = FLESH.lt; g.lineWidth = 0.9; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(t0x, t0y - z - 1); g.quadraticCurveTo(t1x, t0y - z + 1, t1x, t1y - z + 2 + pulse); g.stroke();
+  }
+  // glowing sap dripping from its underside
+  for (const [x, y, len] of [[-4, 3, 2.5], [-1, 4, 3.5], [2.5, 3.2, 2.2]] as number[][]) {
+    const [dx, dy] = rotP(x, y, a);
+    g.strokeStyle = CRY.lt; g.lineWidth = 0.8; g.beginPath(); g.moveTo(dx, dy - z + 1); g.lineTo(dx, dy - z + 1 + len); g.stroke();
+    g.fillStyle = CRY.hi; g.beginPath(); g.arc(dx, dy - z + 1.4 + len, 0.8, 0, Math.PI * 2); g.fill();
+  }
+  eyes(g, a, 6, z + 0.4, team, 1);
+  walkLegs(g, a, phase, z, legs, 1.1, 0.9, true);
 }
 
 function drawStalker(g: Ctx, a: number, team: string, phase = 0) {
-  // long-legged and lean: a narrow body high off the ground, a crystal blade for a head
-  const z = 10 + Math.abs(Math.sin(phase * Math.PI * 2)) * 1.2;
-  const legs: LegSpec[] = [{ x: 5, side: -1, reach: 10 }, { x: 5, side: 1, reach: 10 }, { x: -5, side: -1, reach: 11 }, { x: -5, side: 1, reach: 11 }];
-  shadow(g, 12, 6);
-  walkLegs(g, a, phase, z, legs, 1.6, 3.2, false);
-  const [bx, by] = rotP(-1, 0, a);
-  lobe(g, bx, by - z, 11, 3.6, a, CHITIN);
-  veins(g, bx, by - z, 11, 3.6, 3, 31, team + '90');
-  const [tx, ty] = rotP(-12, 0, a); lobe(g, tx, ty - z + 1, 3.5, 2, a, FLESH);
-  const [hx, hy] = rotP(10, 0, a), [px, py] = rotP(17, 0, a);
-  g.fillStyle = CRY.mid; g.beginPath(); g.moveTo(hx, hy - z - 2); g.lineTo(px, py - z); g.lineTo(hx, hy - z + 2); g.closePath(); g.fill();
-  g.strokeStyle = CRY.hi; g.lineWidth = 0.6; g.beginPath(); g.moveTo(hx, hy - z - 1); g.lineTo(px, py - z); g.stroke();
-  eyes(g, a, 9, z + 1, team, 1.3);
-  walkLegs(g, a, phase, z, legs, 1.6, 3.2, true);
+  // long-legged and lean, high off the ground: jointed legs barbed at the knee, a ridge of spines, a crystal blade for a head
+  const z = 11 + Math.abs(Math.sin(phase * Math.PI * 2)) * 1.3;
+  const legs: LegSpec[] = [{ x: 5, side: -1, reach: 11 }, { x: 5, side: 1, reach: 11 }, { x: -5, side: -1, reach: 12 }, { x: -5, side: 1, reach: 12 }];
+  shadow(g, 13, 6.5);
+  walkLegs(g, a, phase, z, legs, 1.7, 3.4, false);
+  // barbs at each knee
+  const knee = (near: boolean) => {
+    for (const [i, l] of legs.entries()) {
+      const sw = Math.sin(phase * Math.PI * 2 + (i % 2 ? Math.PI : 0)) * 3.4;
+      const hip = rotP(l.x, l.side * 2.2, a), foot = rotP(l.x + sw, l.side * l.reach, a);
+      if ((hip[1] > 0) !== near) continue;
+      const kx = (hip[0] + foot[0]) / 2, ky = (hip[1] - z + foot[1]) / 2 - (z * 0.6 + 2);
+      spike(g, kx, ky, 3.5, 0.7, l.side * 0.3);
+    }
+  };
+  knee(false);
+  // abdomen, thorax and neck: three narrow segments
+  for (const [x, rx, ry, t] of [[-10, 4.2, 2.6, FLESH], [-3, 6.5, 3.4, CHITIN], [4, 4, 2.6, CHITIN]] as [number, number, number, Tone][]) {
+    const [bx, by] = rotP(x, 0, a); lobe(g, bx, by - z, rx, ry, a, t);
+  }
+  const [vx, vy] = rotP(-3, 0, a); veins(g, vx, vy - z, 6.5, 3.4, 4, 31, team + '90');
+  for (const x of [-7, -4.5, -2, 0.5]) { const [sx, sy] = rotP(x, 0, a); spike(g, sx, sy - z - 2.4, 3 + (x + 7) * 0.25, 0.9, -0.35 * Math.cos(a)); }
+  // the head: a crystal blade between two hooked mandibles
+  const [hx, hy] = rotP(8, 0, a), [px, py] = rotP(16, 0, a), [sx1, sy1] = rotP(9, -1.6, a), [sx2, sy2] = rotP(9, 1.6, a);
+  g.fillStyle = CRY.dk; g.beginPath(); g.moveTo(sx1, sy1 - z); g.lineTo(px, py - z - 0.5); g.lineTo(hx, hy - z + 0.4); g.closePath(); g.fill();
+  g.fillStyle = CRY.mid; g.beginPath(); g.moveTo(hx, hy - z + 0.4); g.lineTo(px, py - z - 0.5); g.lineTo(sx2, sy2 - z); g.closePath(); g.fill();
+  g.strokeStyle = CRY.hi; g.lineWidth = 0.6; g.beginPath(); g.moveTo(hx, hy - z); g.lineTo(px, py - z - 0.5); g.stroke();
+  for (const sd of [-1, 1]) {
+    const [m0x, m0y] = rotP(8, sd * 2, a), [m1x, m1y] = rotP(12.5, sd * 1, a);
+    g.strokeStyle = CHITIN.dk; g.lineWidth = 1.3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(m0x, m0y - z); g.quadraticCurveTo((m0x + m1x) / 2, (m0y + m1y) / 2 - z - 1.6, m1x, m1y - z + 0.6); g.stroke();
+  }
+  eyes(g, a, 8, z + 1, team, 1.3);
+  walkLegs(g, a, phase, z, legs, 1.7, 3.4, true);
+  knee(true);
 }
 
 export interface BroodUnitArt { hull: (g: Ctx, a: number, team: string, phase?: number) => void; reach: number; height: number; frames?: number; turn?: number }
@@ -367,13 +419,28 @@ function drawSpineSpire(g: Ctx, w: number, _h: number, _level: number, team: str
 
 function drawEvoPit(g: Ctx, w: number, _h: number, _level: number, team: string) {
   g.save(); const s = w / 64; g.scale(s, s);
-  roots(g, 32, 40, 9, 28, 17);
-  // a churning pit ringed with lips of flesh; shapes half-formed in the glow
-  g.fillStyle = '#1a0614'; g.beginPath(); g.ellipse(32, 40, 22, 11, 0, 0, Math.PI * 2); g.fill();
-  glowAt(g, 32, 40, 20, team + 'a0');
-  for (const [x, y, r] of [[24, 38, 4], [36, 42, 5], [30, 44, 3]] as number[][]) lobe(g, x, y, r, r * 0.7, 0.3, { dk: '#3a1430', mid: '#8a3a68', lt: '#e6a0c8', hi: '#fff' });
-  for (let k = 0; k < 10; k++) { const t = k / 10 * Math.PI * 2; lobe(g, 32 + Math.cos(t) * 22, 40 + Math.sin(t) * 11, 5, 3.4, t, k % 2 ? FLESH : CHITIN); }
-  for (const [x, y, hh, lean] of [[12, 36, 12, -0.2], [52, 34, 14, 0.2], [32, 24, 10, 0]] as number[][]) spike(g, x, y, hh, 2.6, lean);
+  roots(g, 32, 40, 10, 30, 17);
+  // a churning pit, ringed by lips of flesh and chitin, half-formed shapes rising in the glow
+  g.fillStyle = '#12030e'; g.beginPath(); g.ellipse(32, 40, 23, 12, 0, 0, Math.PI * 2); g.fill();
+  const pg = g.createRadialGradient(32, 42, 2, 32, 40, 22);
+  pg.addColorStop(0, 'rgba(255,170,230,0.75)'); pg.addColorStop(0.45, team + '90'); pg.addColorStop(1, 'rgba(20,0,16,0)');
+  g.fillStyle = pg; g.beginPath(); g.ellipse(32, 40, 22, 11, 0, 0, Math.PI * 2); g.fill();
+  // the shapes: a curled limb, a head, an egg, each only half made
+  lobe(g, 25, 39, 4.2, 2.8, 0.4, { dk: '#3a1430', mid: '#8a3a68', lt: '#e6a0c8', hi: '#fff' });
+  lobe(g, 37, 42, 5, 3.2, -0.3, CHITIN);
+  spike(g, 37, 41, 5, 1.2, 0.2);
+  lobe(g, 31, 45, 3, 2.2, 0, FLESH);
+  for (const sd of [-1, 1]) {
+    g.strokeStyle = FLESH.lt; g.lineWidth = 1.2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(32 + sd * 6, 41); g.quadraticCurveTo(32 + sd * 10, 30, 32 + sd * 7, 24); g.stroke();   // feelers reaching up
+    glowAt(g, 32 + sd * 7, 24, 2.4, team + 'c0');
+  }
+  // the rim: alternating lobes of flesh and chitin, veined
+  for (let k = 0; k < 12; k++) { const t = k / 12 * Math.PI * 2; if (Math.sin(t) < -0.1) lobe(g, 32 + Math.cos(t) * 23, 40 + Math.sin(t) * 12, 5, 3.4, t, k % 2 ? FLESH : CHITIN); }
+  for (let k = 0; k < 12; k++) { const t = k / 12 * Math.PI * 2; if (Math.sin(t) >= -0.1) lobe(g, 32 + Math.cos(t) * 23, 40 + Math.sin(t) * 12, 5, 3.4, t, k % 2 ? FLESH : CHITIN); }
+  veins(g, 32, 40, 23, 12, 6, 19, team + '80');
+  for (const [x, y, hh, lean] of [[11, 36, 13, -0.25], [53, 34, 15, 0.25], [32, 22, 11, 0], [20, 30, 8, -0.4], [44, 29, 9, 0.35]] as number[][]) spike(g, x, y, hh, 2.6, lean);
+  glowAt(g, 32, 38, 26, team + '40');
   g.restore();
 }
 
