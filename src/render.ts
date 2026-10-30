@@ -1696,7 +1696,13 @@ function buildingOverlay(b: Building) {
 
 interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; kind: 'spark' | 'smoke' | 'debris' | 'flash' | 'steam' | 'mote'; col?: string; ambient?: boolean }
 const particles: Particle[] = [];
-const scorches: { x: number; y: number; r: number; life: number; max: number }[] = [];
+const scorches: { x: number; y: number; r: number; life: number; max: number; col?: string }[] = [];   // col: a stain instead of soot ('r,g,b')
+// burning hulks where machines died: a charred shell with embers, smoking for a while
+const wrecks: { x: number; y: number; r: number; life: number; max: number; seed: number }[] = [];
+const MAX_WRECKS = 30;
+// per weapon style: muzzle-flash colour, impact spark colour (r,g,b)
+const FX_FLASH: Record<string, string> = { laser: '120,230,255', tracer: '255,210,120', powder: '255,220,150', acid: '160,255,140', light: '255,236,180', crystal: '150,255,245', flame: '255,170,80' };
+const FX_SPARK: Record<string, string> = { laser: '140,235,255', tracer: '255,200,110', powder: '255,190,110', acid: '150,240,90', light: '255,232,170', crystal: '140,250,245', flame: '255,160,70' };
 const seenFx = new WeakSet<object>();
 const trails = new WeakMap<object, [number, number][]>();
 const MAX_PARTICLES = 420, MAX_SCORCHES = 70;
@@ -1787,28 +1793,24 @@ function spawnEffects(dt: number) {
   for (const bm of beams) {
     if (seenFx.has(bm)) continue;
     seenFx.add(bm);
-    addParticle({ x: bm.x1, y: bm.y1, z: 6, vx: 0, vy: 0, vz: 0, life: 0.07, max: 0.07, size: 6, kind: 'flash' });
-    for (let k = 0; k < 4; k++) {
+    const fx = bm.fx ?? 'laser';
+    addParticle({ x: bm.x1, y: bm.y1, z: 6, vx: 0, vy: 0, vz: 0, life: 0.07, max: 0.07, size: fx === 'powder' ? 9 : fx === 'light' ? 8 : 6, kind: 'flash', col: FX_FLASH[fx] });
+    if (fx === 'powder') for (let k = 0; k < 3; k++)   // a cloud of black-powder smoke hangs at the muzzle
+      addParticle({ x: bm.x1 + rnd(-2, 2), y: bm.y1 + rnd(-1, 1), z: 6, vx: WIND.x * 2 + rnd(-6, 6), vy: rnd(-3, 3), vz: rnd(4, 10), life: rnd(1, 1.6), max: 1.6, size: rnd(4, 7), kind: 'steam', col: '214,206,192' });
+    if (fx === 'tracer') addParticle({ x: bm.x1, y: bm.y1, z: 6, vx: rnd(-4, 4), vy: rnd(-2, 2), vz: 8, life: 0.6, max: 0.6, size: 3.5, kind: 'steam', col: '150,145,140' });
+    const n = fx === 'light' ? 0 : 4;
+    for (let k = 0; k < n; k++) {
       const a = Math.random() * Math.PI * 2, sp = rnd(40, 95);
-      addParticle({ x: bm.x2, y: bm.y2, z: 4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(20, 60), life: rnd(0.2, 0.38), max: 0.38, size: 1, kind: 'spark' });
+      addParticle({ x: bm.x2, y: bm.y2, z: 4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(20, 60), life: rnd(0.2, 0.38), max: 0.38, size: 1, kind: fx === 'acid' ? 'debris' : 'spark', col: FX_SPARK[fx] });
     }
+    if (fx === 'light') for (let k = 0; k < 3; k++) addParticle({ x: bm.x2 + rnd(-3, 3), y: bm.y2 + rnd(-2, 2), z: 4, vx: rnd(-6, 6), vy: rnd(-3, 3), vz: rnd(14, 26), life: rnd(0.5, 0.9), max: 0.9, size: rnd(1.2, 1.8), kind: 'mote', col: '255,230,160' });
+    if (fx === 'powder' || fx === 'tracer') addParticle({ x: bm.x2, y: bm.y2, z: 2, vx: rnd(-4, 4), vy: rnd(-2, 2), vz: 6, life: 0.7, max: 0.7, size: 3, kind: 'steam', col: '150,128,104' });   // dirt kicked up
+    if (fx === 'acid') addParticle({ x: bm.x2, y: bm.y2, z: 2, vx: 0, vy: 0, vz: 5, life: 0.6, max: 0.6, size: 3.5, kind: 'steam', col: '120,200,90' });
   }
   for (const bo of booms) {
     if (seenFx.has(bo)) continue;
     seenFx.add(bo);
-    const big = bo.max;
-    for (let k = 0; k < Math.min(12, 4 + big / 4); k++) {
-      const a = Math.random() * Math.PI * 2, sp = rnd(30, 70) * (0.6 + big / 40);
-      addParticle({ x: bo.x, y: bo.y, z: 3, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(50, 110), life: rnd(0.6, 1.1), max: 1.1, size: rnd(1.8, 3.4), kind: 'debris' });
-    }
-    for (let k = 0; k < Math.min(6, 2 + big / 10); k++)
-      addParticle({ x: bo.x + rnd(-big, big) * 0.3, y: bo.y + rnd(-big, big) * 0.2, z: rnd(2, 8), vx: rnd(-6, 6) + 5, vy: rnd(-3, 3), vz: rnd(8, 18), life: rnd(1.2, 2.2), max: 2.2, size: big * rnd(0.25, 0.4), kind: 'smoke' });
-    for (let k = 0; k < 5; k++) {
-      const a = Math.random() * Math.PI * 2, sp = rnd(60, 130);
-      addParticle({ x: bo.x, y: bo.y, z: 5, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(40, 90), life: rnd(0.25, 0.45), max: 0.45, size: 1, kind: 'spark' });
-    }
-    if (scorches.length >= MAX_SCORCHES) scorches.shift();
-    scorches.push({ x: bo.x, y: bo.y + 2, r: big * 0.7, life: 25, max: 25 });
+    boomParticles(bo);
   }
   // shells: remember the recent flight path; rockets shed smoke as they go
   for (const sh of shells) {
@@ -1817,9 +1819,67 @@ function spawnEffects(dt: number) {
     const y = sh.y - shellLift(sh);
     tr.push([sh.x, y]);
     if (tr.length > 10) tr.shift();
-    if (sh.kind === 'rocket' && dt > 0)
-      addParticle({ x: sh.x, y, z: 0, vx: rnd(-4, 4), vy: rnd(-4, 4), vz: 6, life: 0.55, max: 0.55, size: 2.2, kind: 'smoke' });
+    if (dt <= 0) continue;
+    if (sh.fx === 'powder' || sh.fx === 'flame') addParticle({ x: sh.x, y, z: 0, vx: rnd(-3, 3), vy: rnd(-3, 3), vz: 4, life: 0.8, max: 0.8, size: 2.6, kind: 'steam', col: '190,182,170' });
+    else if (sh.fx === 'acid') { if (Math.random() < 0.4) addParticle({ x: sh.x, y: sh.y, z: shellLift(sh), vx: 0, vy: 0, vz: -10, life: 0.6, max: 0.6, size: 1.2, kind: 'debris', col: '150,240,90' }); }
+    else if (sh.kind === 'rocket') addParticle({ x: sh.x, y, z: 0, vx: rnd(-4, 4), vy: rnd(-4, 4), vz: 6, life: 0.55, max: 0.55, size: 2.2, kind: 'smoke' });
   }
+  for (const w of wrecks) if (dt > 0 && w.life > w.max * 0.25 && Math.random() < dt * (2 + w.r / 8)) {
+    addParticle({ x: w.x + rnd(-w.r, w.r) * 0.4, y: w.y + rnd(-1, 1), z: 3, vx: WIND.x * 3 + rnd(-3, 3), vy: rnd(-2, 2), vz: rnd(10, 18), life: rnd(1.6, 2.6), max: 2.6, size: w.r * rnd(0.35, 0.55), kind: 'smoke' });
+    if (Math.random() < 0.4) addParticle({ x: w.x + rnd(-w.r, w.r) * 0.3, y: w.y, z: 4, vx: rnd(-6, 6), vy: rnd(-3, 3), vz: rnd(20, 40), life: rnd(0.4, 0.8), max: 0.8, size: 1, kind: 'spark' });
+  }
+}
+
+// what an impact or a death throws up, by the style of whoever made it
+function boomParticles(bo: { x: number; y: number; max: number; fx?: string; death?: string }) {
+  const big = bo.max, fx = bo.fx ?? 'fire';
+  const burst = (n: number, kind: Particle['kind'], col: string | undefined, sp0: number, sp1: number, vz0: number, vz1: number, life: number, s0: number, s1: number) => {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, sp = rnd(sp0, sp1);
+      addParticle({ x: bo.x, y: bo.y, z: 3, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, vz: rnd(vz0, vz1), life: rnd(life * 0.6, life), max: life, size: rnd(s0, s1), kind, col });
+    }
+  };
+  const puffs = (n: number, col: string, size: number) => {
+    for (let k = 0; k < n; k++) addParticle({ x: bo.x + rnd(-big, big) * 0.3, y: bo.y + rnd(-big, big) * 0.2, z: rnd(1, 5), vx: WIND.x * 2 + rnd(-6, 6), vy: rnd(-3, 3), vz: rnd(6, 14), life: rnd(0.9, 1.6), max: 1.6, size: size * rnd(0.7, 1.2), kind: 'steam', col });
+  };
+  const stain = (col: string | undefined, r: number, life = 25) => { if (scorches.length >= MAX_SCORCHES) scorches.shift(); scorches.push({ x: bo.x, y: bo.y + 2, r, life, max: life, col }); };
+  if (fx === 'dust' || bo.death === 'infantry') {
+    // a soldier going down, or crust thrown up: dust, not fire
+    puffs(3, '150,128,104', big * 0.6);
+    burst(3, 'debris', '110,92,70', 20, 50, 30, 60, 0.8, 1.2, 2);
+    return;
+  }
+  if (fx === 'acid') {
+    // a splash of acid and ichor, crystal shards from a creature's back
+    burst(Math.min(14, 6 + big / 3), 'debris', '150,240,90', 30, 80, 40, 90, 0.9, 1, 2);
+    if (bo.death) { burst(Math.min(12, 5 + big / 3), 'debris', '130,40,110', 30, 70, 30, 80, 1, 1.4, 2.6); burst(6, 'spark', '140,250,245', 50, 110, 40, 90, 0.45, 1, 1); }
+    puffs(Math.min(5, 2 + big / 10), '120,200,90', big * 0.5);
+    stain(bo.death ? '70,20,60' : '50,80,20', big * (bo.death ? 0.9 : 0.6), bo.death ? 40 : 20);
+    return;
+  }
+  if (fx === 'light') {
+    // the Keepers come apart into light: no fire, no wreck, motes rising
+    for (let k = 0; k < Math.min(18, (bo.death ? 8 : 3) + big / 3); k++)
+      addParticle({ x: bo.x + rnd(-big, big) * 0.4, y: bo.y + rnd(-big, big) * 0.25, z: rnd(2, 10), vx: rnd(-8, 8), vy: rnd(-4, 4), vz: rnd(18, 40), life: rnd(0.8, 1.6), max: 1.6, size: rnd(1.2, 2.2), kind: 'mote', col: '255,230,160' });
+    burst(bo.death ? 8 : 4, 'spark', '255,240,200', 60, 140, 30, 70, 0.4, 1, 1);
+    if (bo.death) burst(6, 'debris', '232,206,140', 30, 70, 50, 100, 1, 1.2, 2);   // shards of gold
+    return;
+  }
+  if (fx === 'crystal') {
+    // stone and crystal: the Hollow crumble
+    burst(Math.min(14, 5 + big / 3), 'debris', '96,90,104', 25, 70, 40, 90, 1.1, 1.6, 3);
+    burst(Math.min(10, 4 + big / 4), 'spark', '140,250,245', 50, 120, 40, 90, 0.5, 1, 1);
+    puffs(Math.min(4, 2 + big / 12), '170,230,230', big * 0.45);
+    if (bo.death) stain('40,80,90', big * 0.6, 25);
+    return;
+  }
+  // fire: everything with fuel in it (Helion, Kessler, the Clans, flamers, the big guns)
+  burst(Math.min(12, 4 + big / 4), 'debris', undefined, 30 * (0.6 + big / 40), 70 * (0.6 + big / 40), 50, 110, 1.1, 1.8, 3.4);
+  for (let k = 0; k < Math.min(fx === 'powder' ? 9 : 6, (fx === 'powder' ? 4 : 2) + big / 10); k++)
+    addParticle({ x: bo.x + rnd(-big, big) * 0.3, y: bo.y + rnd(-big, big) * 0.2, z: rnd(2, 8), vx: rnd(-6, 6) + 5, vy: rnd(-3, 3), vz: rnd(8, 18), life: rnd(1.2, 2.2), max: 2.2, size: big * rnd(0.25, 0.4), kind: 'smoke' });
+  burst(5, 'spark', FX_SPARK[fx], 60, 130, 40, 90, 0.45, 1, 1);
+  stain(undefined, big * 0.7);
+  if (bo.death === 'machine') { if (wrecks.length >= MAX_WRECKS) wrecks.shift(); wrecks.push({ x: bo.x, y: bo.y, r: Math.max(6, big * 0.55), life: 14, max: 14, seed: Math.random() * 1000 }); }
 }
 
 function updateEffects(dt: number) {
@@ -1840,19 +1900,41 @@ function updateEffects(dt: number) {
     }
   }
   for (let i = scorches.length - 1; i >= 0; i--) if ((scorches[i].life -= dt) <= 0) scorches.splice(i, 1);
+  for (let i = wrecks.length - 1; i >= 0; i--) if ((wrecks[i].life -= dt) <= 0) wrecks.splice(i, 1);
 }
 
 function drawScorches() {
   for (const sc of scorches) {
     // a burn mark, not a hole: soft sooty centre, warm singed rim
-    const a = Math.min(1, sc.life / 6) * 0.3;
+    const a = Math.min(1, sc.life / 6) * (sc.col ? 0.45 : 0.3);
     const gr = ctx.createRadialGradient(sc.x, sc.y, 0, sc.x, sc.y, sc.r);
-    gr.addColorStop(0, `rgba(24,14,8,${a})`); gr.addColorStop(0.55, `rgba(46,24,12,${a * 0.55})`);
-    gr.addColorStop(0.85, `rgba(90,44,18,${a * 0.25})`); gr.addColorStop(1, 'rgba(90,44,18,0)');
+    if (sc.col) { gr.addColorStop(0, `rgba(${sc.col},${a})`); gr.addColorStop(0.7, `rgba(${sc.col},${a * 0.5})`); gr.addColorStop(1, `rgba(${sc.col},0)`); }   // ichor, crystal dust
+    else { gr.addColorStop(0, `rgba(24,14,8,${a})`); gr.addColorStop(0.55, `rgba(46,24,12,${a * 0.55})`); gr.addColorStop(0.85, `rgba(90,44,18,${a * 0.25})`); gr.addColorStop(1, 'rgba(90,44,18,0)'); }
     ctx.save(); ctx.translate(sc.x, sc.y); ctx.scale(1, 0.62); ctx.translate(-sc.x, -sc.y);
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(sc.x, sc.y, sc.r, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
+  for (const w of wrecks) drawWreck(w);
+}
+// a burnt-out hull: a charred, broken outline, embers glowing in it as it cools
+function drawWreck(w: { x: number; y: number; r: number; life: number; max: number; seed: number }) {
+  const fade = Math.min(1, w.life / 3), heat = Math.max(0, (w.life - w.max * 0.3) / (w.max * 0.7));
+  let sd = w.seed | 0; const rr2 = () => (sd = (sd * 16807 + 7) % 2147483647) / 2147483647;
+  const pts: [number, number][] = [];
+  for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2, r = w.r * (0.6 + rr2() * 0.45); pts.push([w.x + Math.cos(a) * r, w.y + Math.sin(a) * r * 0.55]); }
+  ctx.globalAlpha = fade;
+  ctx.fillStyle = 'rgba(14,10,8,0.85)'; ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y - 2) : ctx.moveTo(x, y - 2)); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#3a342e'; ctx.lineWidth = 1; ctx.stroke();
+  // a few twisted plates standing up out of it
+  for (let k = 0; k < 3; k++) {
+    const x = w.x + (rr2() - 0.5) * w.r, y = w.y + (rr2() - 0.5) * w.r * 0.4, h = w.r * (0.35 + rr2() * 0.4);
+    ctx.fillStyle = k % 2 ? '#2a2622' : '#3e3832'; ctx.beginPath(); ctx.moveTo(x - 2, y); ctx.lineTo(x + rr2() * 2, y - h); ctx.lineTo(x + 2.5, y); ctx.closePath(); ctx.fill();
+  }
+  if (heat > 0) for (let k = 0; k < 4; k++) {
+    const x = w.x + (rr2() - 0.5) * w.r * 0.9, y = w.y + (rr2() - 0.5) * w.r * 0.35 - 2;
+    g2Glow(x, y, 2.4 + Math.sin(T * 7 + k + w.seed) * 0.6, `rgba(255,${120 + k * 20},40,${0.7 * heat})`);
+  }
+  ctx.globalAlpha = 1;
 }
 
 
@@ -2124,17 +2206,46 @@ function drawParticles() {
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, sy, p.size, 0, Math.PI * 2); ctx.fill();
     } else if (p.kind === 'debris') {
       ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(p.x - p.size / 2 + 1, p.y - p.size / 4, p.size, p.size / 2);
-      ctx.fillStyle = '#3a302a'; ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, p.size);
-      ctx.fillStyle = 'rgba(255,190,120,0.5)'; ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, 0.6);
+      ctx.fillStyle = p.col ? `rgb(${p.col})` : '#3a302a'; ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, p.size);
+      ctx.fillStyle = p.col ? 'rgba(255,255,255,0.35)' : 'rgba(255,190,120,0.5)'; ctx.fillRect(p.x - p.size / 2, sy - p.size / 2, p.size, 0.6);
     } else if (p.kind === 'spark') {
-      ctx.strokeStyle = `rgba(255,${200 + 40 * f | 0},120,${f})`; ctx.lineWidth = 1.4;
+      ctx.strokeStyle = p.col ? `rgba(${p.col},${f})` : `rgba(255,${200 + 40 * f | 0},120,${f})`; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(p.x, sy); ctx.lineTo(p.x - p.vx * 0.025, sy - p.vy * 0.025 + p.vz * 0.025); ctx.stroke();
     } else {
-      g2Glow(p.x, sy, p.size * (0.6 + f), `rgba(255,236,190,${0.9 * f})`);
+      g2Glow(p.x, sy, p.size * (0.6 + f), `rgba(${p.col ?? '255,236,190'},${0.9 * f})`);
       ctx.strokeStyle = `rgba(255,255,240,${f})`; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(p.x - p.size, sy); ctx.lineTo(p.x + p.size, sy); ctx.moveTo(p.x, sy - p.size * 0.7); ctx.lineTo(p.x, sy + p.size * 0.7); ctx.stroke();
     }
   }
+}
+
+// a blast in the style of whoever made it: fire for fuel, a green splash for
+// acid, a flash and ring of light for the Keepers, a cyan crack for crystal,
+// nothing but dust for crust and fallen soldiers
+function drawStyledBoom(bo: { x: number; y: number; r: number; ttl: number; max: number; fx?: string; death?: string }) {
+  const life = Math.max(0, bo.ttl / 0.5), r = bo.r * 1.25, fx = bo.fx;
+  if (fx === 'dust' || bo.death === 'infantry') return;
+  const flash = (c0: string, c1: string, c2: string, ring: string, rk: number) => {
+    const fg = ctx.createRadialGradient(bo.x, bo.y - r * 0.15, 0, bo.x, bo.y, r);
+    fg.addColorStop(0, `rgba(${c0},${life})`); fg.addColorStop(0.35, `rgba(${c1},${life * 0.85})`); fg.addColorStop(1, `rgba(${c2},0)`);
+    ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(bo.x, bo.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(bo.x, bo.y); ctx.scale(1, 0.6);
+    ctx.strokeStyle = `rgba(${ring},${life * 0.6})`; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(0, 0, bo.r * rk, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  };
+  if (fx === 'acid') return flash('230,255,190', '140,230,80', '60,120,30', '170,255,120', 1.6);
+  if (fx === 'crystal') return flash('230,255,255', '120,240,240', '30,110,120', '160,255,250', 1.8);
+  if (fx === 'light') {
+    flash('255,255,245', '255,225,150', '200,150,60', '255,235,180', 2.6);
+    if (bo.death) {   // a pillar of light where a Keeper was
+      const pg = ctx.createLinearGradient(bo.x, bo.y, bo.x, bo.y - 60);
+      pg.addColorStop(0, `rgba(255,240,200,${life * 0.7})`); pg.addColorStop(1, 'rgba(255,240,200,0)');
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = pg; ctx.fillRect(bo.x - 4, bo.y - 60, 8, 60); ctx.restore();
+    }
+    return;
+  }
+  drawRefinedBoom(bo);
 }
 
 // refined explosion: white core, layered fireball and a thin shock ring
@@ -2534,9 +2645,9 @@ export function render() {
   // projectiles: shells arc high, rockets fly flat with a flame trail
   for (const s2 of shells) {
     const tr = trails.get(s2);
-    if (tr && tr.length > 1 && s2.kind === 'shell') {
+    if (tr && tr.length > 1 && (s2.kind === 'shell' || s2.fx === 'acid' || s2.fx === 'light')) {
       for (let k = 1; k < tr.length; k++) {
-        ctx.strokeStyle = `rgba(255,190,110,${(k / tr.length) * 0.5})`; ctx.lineWidth = 1.4;
+        ctx.strokeStyle = `rgba(${s2.fx === 'acid' ? '150,240,90' : s2.fx === 'light' ? '255,230,160' : '255,190,110'},${(k / tr.length) * 0.5})`; ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.moveTo(tr[k - 1][0], tr[k - 1][1]); ctx.lineTo(tr[k][0], tr[k][1]); ctx.stroke();
       }
     }
@@ -2546,7 +2657,22 @@ export function render() {
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath(); ctx.ellipse(s2.x, s2.y, 3, 1.6, 0, 0, Math.PI * 2); ctx.fill();
     const py2 = s2.y - arc;
-    if (s2.kind === 'rocket') {
+    if (s2.fx === 'acid') {
+      g2Glow(s2.x, py2, 3.4, 'rgba(150,250,100,0.85)');
+      ctx.fillStyle = '#3a7a20'; ctx.beginPath(); ctx.arc(s2.x, py2, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d8ff9a'; ctx.beginPath(); ctx.arc(s2.x - 0.8, py2 - 0.8, 1, 0, Math.PI * 2); ctx.fill();
+    } else if (s2.fx === 'light') {
+      g2Glow(s2.x, py2, 4.5, 'rgba(255,230,160,0.95)');
+      ctx.fillStyle = '#fffaf0'; ctx.beginPath(); ctx.arc(s2.x, py2, 2, 0, Math.PI * 2); ctx.fill();
+    } else if (s2.fx === 'flame') {
+      // a lit bottle tumbling end over end
+      ctx.save(); ctx.translate(s2.x, py2); ctx.rotate(s2.t * 14);
+      ctx.fillStyle = '#4a8a5a'; ctx.fillRect(-1.2, -2.4, 2.4, 4.4); ctx.fillStyle = '#c8a060'; ctx.fillRect(-0.6, -3.6, 1.2, 1.4);
+      ctx.restore(); g2Glow(s2.x, py2 - 2, 3, 'rgba(255,150,60,0.9)');
+    } else if (s2.fx === 'powder' && s2.kind === 'shell') {
+      ctx.fillStyle = '#1a1612'; ctx.beginPath(); ctx.arc(s2.x, py2, 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(s2.x - 0.9, py2 - 0.9, 0.9, 0, Math.PI * 2); ctx.fill();
+    } else if (s2.kind === 'rocket') {
       const ang = Math.atan2(s2.ty - s2.sy, s2.tx - s2.sx);
       g2Glow(s2.x - Math.cos(ang) * 6, py2 - Math.sin(ang) * 6, 3.5, 'rgba(255,170,80,0.8)');
       ctx.save(); ctx.translate(s2.x, py2); ctx.rotate(ang);
@@ -2580,23 +2706,57 @@ export function render() {
     }
   }
 
-  // weapon beams
+  // weapon beams, by the firer's style
   for (const bm of beams) {
-    const a = Math.min(1, bm.ttl / 0.12);
-    ctx.globalAlpha = a * 0.30;
-    ctx.strokeStyle = bm.color; ctx.lineWidth = 7; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
-    ctx.globalAlpha = a;
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
-    ctx.globalAlpha = 1;
-    g2Glow(bm.x1, bm.y1, 5 * a, bm.color);
-    g2Glow(bm.x2, bm.y2, 4 * a, 'rgba(255,220,160,0.9)');
+    const a = Math.min(1, bm.ttl / 0.12), t = 1 - a, fx = bm.fx ?? 'laser';
+    const at2 = (k: number): [number, number] => [bm.x1 + (bm.x2 - bm.x1) * k, bm.y1 + (bm.y2 - bm.y1) * k];
+    ctx.lineCap = 'round';
+    if (fx === 'tracer') {
+      // a bright tracer round streaking along the line
+      const [hx, hy] = at2(Math.min(1, t * 1.3 + 0.25)), [tx, ty] = at2(Math.max(0, t * 1.3 - 0.1));
+      ctx.strokeStyle = 'rgba(255,200,110,0.15)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,170,70,0.55)'; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.strokeStyle = '#fff2c8'; ctx.lineWidth = 1.4; ctx.stroke();
+      g2Glow(bm.x1, bm.y1, 4 * a, 'rgba(255,200,110,0.9)');
+    } else if (fx === 'powder') {
+      // a lead ball: barely a line, the muzzle smoke does the talking
+      ctx.strokeStyle = `rgba(235,225,205,${0.35 * a})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      g2Glow(bm.x1, bm.y1, 5 * a, 'rgba(255,210,140,0.9)');
+    } else if (fx === 'acid') {
+      // a glob of acid flying with a short wet trail
+      const [hx, hy] = at2(Math.min(1, t * 1.4)), [tx, ty] = at2(Math.max(0, t * 1.4 - 0.25));
+      ctx.strokeStyle = 'rgba(150,240,90,0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      g2Glow(hx, hy, 2.6, 'rgba(160,255,110,0.9)');
+      ctx.fillStyle = '#d8ff9a'; ctx.beginPath(); ctx.arc(hx, hy, 1.4, 0, Math.PI * 2); ctx.fill();
+    } else if (fx === 'light') {
+      // a lance of gold light, flared at both ends
+      ctx.globalAlpha = a * 0.45; ctx.strokeStyle = '#ffd27a'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.globalAlpha = a; ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke(); ctx.globalAlpha = 1;
+      g2Glow(bm.x1, bm.y1, 6 * a, 'rgba(255,230,160,0.9)'); g2Glow(bm.x2, bm.y2, 7 * a, 'rgba(255,240,200,0.95)');
+    } else if (fx === 'crystal') {
+      // a spray of crystal splinters
+      ctx.setLineDash([3, 2.5]); ctx.lineDashOffset = -t * 20;
+      ctx.strokeStyle = `rgba(154,246,241,${a})`; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.setLineDash([]);
+      g2Glow(bm.x2, bm.y2, 4 * a, 'rgba(150,255,245,0.85)');
+    } else {
+      // Helion's lasers and the flamers: a coloured bolt round a white core
+      ctx.globalAlpha = a * 0.30;
+      ctx.strokeStyle = bm.color; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.globalAlpha = 1;
+      g2Glow(bm.x1, bm.y1, 5 * a, bm.color);
+      g2Glow(bm.x2, bm.y2, 4 * a, fx === 'laser' ? 'rgba(160,235,255,0.9)' : 'rgba(255,220,160,0.9)');
+    }
     ctx.lineCap = 'butt';
   }
 
   // explosions
-  for (const bo of booms) drawRefinedBoom(bo);
+  for (const bo of booms) drawStyledBoom(bo);
 
   drawParticles();
   drawStorms();

@@ -261,13 +261,23 @@ export function initGame(numEnemies: number) {
   telemetry.startMatch(numPlayers);
 }
 
-export interface Beam { x1: number, y1: number, x2: number, y2: number, ttl: number, color: string }
-export interface Boom { x: number, y: number, r: number, ttl: number, max: number }
+// how a faction's weapons look and how its dead go: Helion lasers, Kessler
+// tracer rounds, Clan black powder, Brood acid, Keeper light, Hollow crystal;
+// 'flame' for the flamers, 'dust' for a puff of crust
+export type FxStyle = 'laser' | 'tracer' | 'powder' | 'acid' | 'light' | 'crystal' | 'flame' | 'dust';
+export const fxOf = (owner: number): FxStyle => {
+  const k = kindOf(owner);
+  return k === 'brood' ? 'acid' : k === 'keepers' ? 'light' : k === 'hollow' ? 'crystal' : isClan(owner) ? 'powder' : SLOTS[owner] === 'kessler' ? 'tracer' : 'laser';
+};
+export interface Beam { x1: number, y1: number, x2: number, y2: number, ttl: number, color: string, fx?: FxStyle }
+// death: what went down here (a burning machine, a soldier, a creature, a building)
+export interface Boom { x: number, y: number, r: number, ttl: number, max: number, fx?: FxStyle, death?: 'machine' | 'infantry' | 'creature' | 'building' }
 export interface Shell {
   x: number, y: number, sx: number, sy: number, tx: number, ty: number,
   t: number, dur: number, dmg: number, splash: number, owner: number, kind: 'shell' | 'rocket',
   dmgType?: DmgType, by?: number,   // by = firing unit id, for veterancy credit
   slow?: { mul: number; t: number },  // a harpoon's barb
+  fx?: FxStyle,
 }
 // an orbital strike telegraphs a reticle, then a beam slams down and detonates
 export interface Strike { x: number, y: number, t: number, delay: number, owner: number, damage: number, radius: number }
@@ -561,7 +571,9 @@ function destroy(e: Entity) {
   byId.delete(e.id);
   emit({ type: 'destroyed', e });
   const p = entityPos(e);
-  booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * 1.6 });
+  const alien = kindOf(e.owner) !== 'human';
+  const death = e.kind === 'building' ? 'building' : alien ? 'creature' : UNIT_ARMOR[e.def.id] === 'infantry' ? 'infantry' : 'machine';
+  booms.push({ x: p.x, y: p.y, r: 4, ttl: 0.5, max: entityRadius(e) * (death === 'infantry' ? 0.9 : 1.6), fx: fxOf(e.owner), death });
   if (e.owner === PLAYER || audible(p.x, p.y)) {
     if (kindOf(e.owner) === 'brood') sfxAt('squelch', p.x, p.y, e.kind === 'building' ? 1.6 : 1);   // flesh, not metal
     else if (e.kind === 'building') sfxAt('explodeBuilding', p.x, p.y, e.def.isWall ? 0.5 : 1.3);
@@ -607,7 +619,7 @@ export function burrowUnit(u: Unit) {
   if (!byId.has(u.id)) return;
   byId.delete(u.id);
   units.splice(units.indexOf(u), 1);
-  booms.push({ x: u.x, y: u.y, r: 2, ttl: 0.4, max: u.def.radius * 1.4 });   // a puff of crust where it went down
+  booms.push({ x: u.x, y: u.y, r: 2, ttl: 0.4, max: u.def.radius * 1.4, fx: 'dust' });   // a puff of crust where it went down
 }
 
 export function damage(target: Entity, amount: number, attacker?: Unit) {
@@ -888,11 +900,12 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
       x: from.x, y: from.y, sx: from.x, sy: from.y, tx: to.x, ty: to.y,
       t: 0, dur: Math.max(0.2, d / speed), dmg: damageAmt,
       splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType, by: u.id, slow: u.def.slowHit,
+      fx: u.def.id === 'firebrand' ? 'flame' : fxOf(u.owner),
     });
     if (audible(from.x, from.y)) sfxAt(weaponSound(u), from.x, from.y);
     return;
   }
-  beams.push({ x1: from.x, y1: from.y, x2: to.x + (Math.random() * 8 - 4), y2: to.y + (Math.random() * 8 - 4), ttl: 0.12, color });
+  beams.push({ x1: from.x, y1: from.y, x2: to.x + (Math.random() * 8 - 4), y2: to.y + (Math.random() * 8 - 4), ttl: 0.12, color, fx: u.kind === 'unit' && u.def.id === 'pyro' ? 'flame' : fxOf(u.owner) });
   if (audible(from.x, from.y) || audible(to.x, to.y)) {
     sfxAt(weaponSound(u), from.x, from.y);
     if (!(u.kind === 'unit' && u.def.id === 'pyro')) sfxAt(hitSound(target), to.x, to.y, 0.8);   // the flame roar covers its own hits
@@ -904,7 +917,7 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
 export const EMERGE_TIME = 0.9;
 export function surface(u: Unit) {
   u.emergeT = EMERGE_TIME;
-  booms.push({ x: u.x, y: u.y + 2, r: 3, ttl: 0.5, max: u.def.radius * 2.2 });
+  booms.push({ x: u.x, y: u.y + 2, r: 3, ttl: 0.5, max: u.def.radius * 2.2, fx: 'dust' });
 }
 
 // the Hollow live off crystal: a little always, more for each Geode, most for one sat by a crystal field
@@ -935,7 +948,7 @@ export function translocate(us: Unit[], x: number, y: number): boolean {
     const spot = nearestTile(tx, ty, 6, (sx, sy) => inBounds(sx, sy) && terrain[idx(sx, sy)] === 0 && occupied[idx(sx, sy)] === -1 && !taken.has(idx(sx, sy)));
     if (!spot) continue;
     taken.add(idx(spot.x, spot.y));
-    if (burrow) booms.push({ x: u.x, y: u.y, r: 2, ttl: 0.4, max: u.def.radius * 1.4 });   // a puff of crust where it went down
+    if (burrow) booms.push({ x: u.x, y: u.y, r: 2, ttl: 0.4, max: u.def.radius * 1.4, fx: 'dust' });   // a puff of crust where it went down
     else lightColumns.push({ x: u.x, y: u.y, born: stats.time });
     u.x = centerOfTile(spot.x); u.y = centerOfTile(spot.y); u.path = null;
     if (!burrow) lightColumns.push({ x: u.x, y: u.y, born: stats.time });
@@ -1352,7 +1365,7 @@ function step(dt: number) {
     s.y = s.sy + (s.ty - s.sy) * p;
     if (p >= 1) {
       shells.splice(i, 1);
-      booms.push({ x: s.tx, y: s.ty, r: 4, ttl: 0.5, max: s.splash * 0.95 });
+      booms.push({ x: s.tx, y: s.ty, r: 4, ttl: 0.5, max: s.splash * 0.95, fx: s.fx });
       if (audible(s.tx, s.ty)) sfxAt(s.dmgType === 'flame' ? 'smash' : 'impact', s.tx, s.ty, s.kind === 'rocket' ? 0.8 : 1);   // a firebomb breaks rather than bursts
       const firer = s.by !== undefined ? byId.get(s.by) : undefined;
       const attacker = firer?.kind === 'unit' ? firer : undefined;
