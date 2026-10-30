@@ -504,7 +504,7 @@
     #campaignpanel { display: none; }
     /* the briefing as a fleet command console: chamfered glass, an amber-to-flux edge, scanlines and a tactical grid,
        HUD brackets on the square corners and a signal bar up top (no rivets: this is the dying-sun sci-fi frame, not a fantasy plate) */
-    #briefbox { --cut: 22px; border: none; border-radius: 0; box-shadow: none;
+    #briefbox, #pausebox, #overlaycard { --cut: 22px; border: none; border-radius: 0; box-shadow: none;
       clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
       background:
         repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px),
@@ -512,10 +512,10 @@
         linear-gradient(90deg, rgba(255,120,60,.04) 1px, transparent 1px) 0 0/28px 28px,
         radial-gradient(ellipse at 50% -10%, rgba(255,140,60,.16), transparent 60%),
         linear-gradient(180deg, rgba(14,16,24,.88), rgba(8,10,16,.94)); }
-    #briefbox::before { inset: 0; padding: 1.5px; border: none; clip-path: inherit;
+    #briefbox::before, #pausebox::before, #overlaycard::before { inset: 0; padding: 1.5px; border: none; clip-path: inherit;
       background: linear-gradient(135deg, #ffb04a 0%, rgba(255,120,50,.4) 40%, rgba(220,60,30,.4) 65%, #e0402a 100%);
       -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-    #briefbox::after { inset: 8px; opacity: 1;
+    #briefbox::after, #pausebox::after, #overlaycard::after { inset: 8px; opacity: 1;
       background:
         linear-gradient(#f0a24a, #f0a24a) right top/18px 2px no-repeat, linear-gradient(#f0a24a, #f0a24a) right top/2px 18px no-repeat,
         linear-gradient(#e0402a, #e0402a) left bottom/18px 2px no-repeat, linear-gradient(#e0402a, #e0402a) left bottom/2px 18px no-repeat,
