@@ -3,7 +3,7 @@
 // the objective list and comms queue, and tracks campaign progress.
 // Everything it remembers lives in `run`, which is plain data so it saves.
 
-import { PLAYER, TILE, FACTION_NAMES, BUILDINGS, resetSlots, clearAllies } from '../config';
+import { PLAYER, TILE, FACTION_NAMES, BUILDINGS, resetSlots, clearAllies, hostile } from '../config';
 import * as game from '../game';
 import {
   units, buildings, players, spawnUnit, placeBuilding, issueOrder, centerOfTile, buildingCenter,
@@ -116,6 +116,7 @@ function makeCtx(): Ctx {
       return spot ? placeBuilding(defId, owner, spot.x, spot.y) : null;
     },
     spawn(defIds, owner, tx, ty, group) {
+      if (owner !== PLAYER && hostile(owner, PLAYER)) defIds = scaleGroup(defIds);
       const out: Unit[] = [];
       for (const id of defIds) {
         const spot = nearestTile(tx, ty, 8, (x, y) => tileClear(1, 1, x, y) && !units.some(u => Math.hypot(u.x - centerOfTile(x), u.y - centerOfTile(y)) < TILE * 0.8));
@@ -240,13 +241,14 @@ export function setupMission(id: string) {
   game.setSupernova(0);
   install(d, { id, t: 0, fired: [], done: [], shown: [], vars: {}, groups: {}, flux0: 0 });
   for (const p of players) p.credits = 0;
-  players[PLAYER].credits = d.credits;
+  const cd = campaignDifficulty();
+  players[PLAYER].credits = Math.round(d.credits * (cd === 'easy' ? 1.3 : cd === 'hard' ? 0.85 : 1));
   for (const up of d.startUpgrades ?? []) players[PLAYER].upgrades.add(up);
   const c = makeCtx();
   d.setup(c);
   initBrood(false);
   initKeepers(false);
-  initAI(d.enemies, 'normal', d.aiOwners ?? []);
+  initAI(d.enemies, cd, d.aiOwners ?? []);
   const hq = buildings.find(b => b.owner === PLAYER);
   if (hq) { const p = buildingCenter(hq); centerCameraOn(p.x, p.y); }
   run!.flux0 = stats.flux;
@@ -267,8 +269,21 @@ export function endRun() { def = null; run = null; queue.length = 0; current = n
 
 // ---------- progress ----------
 const KEY = 'ozd-campaign';
-export function progress(): { done: string[]; flags?: Record<string, string> } {
+export type CampaignDifficulty = 'easy' | 'normal' | 'hard';
+export function progress(): { done: string[]; flags?: Record<string, string>; difficulty?: CampaignDifficulty } {
   try { return JSON.parse(localStorage.getItem(KEY) ?? '') ?? { done: [] }; } catch { return { done: [] }; }
+}
+export const campaignDifficulty = (): CampaignDifficulty => progress().difficulty ?? 'normal';
+export function setCampaignDifficulty(d: CampaignDifficulty) {
+  const p = progress(); p.done ??= []; p.difficulty = d;
+  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage may be unavailable */ }
+}
+// scripted enemy groups thin out on Easy (every third one stays home) and thicken on Hard (every third one brings a friend)
+function scaleGroup(defIds: string[]): string[] {
+  const d = campaignDifficulty();
+  if (d === 'easy') return defIds.length < 2 ? defIds : defIds.filter((_, i) => i % 3 !== 2);
+  if (d === 'hard') return defIds.flatMap((id, i) => (i % 3 === 0 ? [id, id] : [id]));
+  return defIds;
 }
 function markComplete(id: string) {
   const p = progress();

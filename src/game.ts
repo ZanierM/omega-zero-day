@@ -455,8 +455,8 @@ export function activateAbility(u: Unit): boolean {
     if (u.owner === PLAYER) sfx('click');
     return true;
   }
-  // active
-  if (u.abilityCd > 0) return false;
+  // active (an aimed one fires through translocate() once the player picks the spot)
+  if (a.target || u.abilityCd > 0) return false;
   u.abilityCd = a.cooldown;
   if (a.duration > 0) u.abilityTimer = a.duration;
   if (a.aoeDmg && a.aoeRadius) {
@@ -893,6 +893,33 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
     if (!(u.kind === 'unit' && u.def.id === 'pyro')) sfxAt(hitSound(target), to.x, to.y, 0.8);   // the flame roar covers its own hits
   }
   damage(target, damageAmt * damageMult(dmgType, target), u.kind === 'unit' ? u : undefined);
+}
+
+// ---------- the Keepers' translocation ----------
+
+/** Selected Keepers that are ready step into the light and arrive around (x, y), which you must be able to see. */
+export function translocate(us: Unit[], x: number, y: number): boolean {
+  const ready = us.filter(u => u.def.ability?.id === 'translocate' && u.abilityCd <= 0 && !u.def.air);
+  if (!ready.length) return false;
+  const tx = tileOf(x), ty = tileOf(y);
+  if (!inBounds(tx, ty) || (ready[0].owner === PLAYER && !visible[idx(tx, ty)])) {
+    if (ready[0].owner === PLAYER) { toast('The light only reaches somewhere you can see'); sfx('error'); }
+    return false;
+  }
+  const taken = new Set<number>();
+  for (const u of ready) {
+    const spot = nearestTile(tx, ty, 6, (sx, sy) => inBounds(sx, sy) && terrain[idx(sx, sy)] === 0 && occupied[idx(sx, sy)] === -1 && !taken.has(idx(sx, sy)));
+    if (!spot) continue;
+    taken.add(idx(spot.x, spot.y));
+    lightColumns.push({ x: u.x, y: u.y, born: stats.time });
+    u.x = centerOfTile(spot.x); u.y = centerOfTile(spot.y); u.path = null;
+    lightColumns.push({ x: u.x, y: u.y, born: stats.time });
+    u.abilityCd = u.def.ability!.cooldown;
+    issueOrder(u, { type: 'idle' }, true);
+    u.guardX = u.x; u.guardY = u.y;
+  }
+  if (audible(x, y)) sfxAt('arrive', x, y);
+  return true;
 }
 
 // ---------- pioneer deployment & building repair ----------

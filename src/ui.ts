@@ -9,7 +9,7 @@ import {
   Unit, deployPioneer, packBuilding, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
-import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting, controlGroupIds, saveControlGroup, recallControlGroup } from './input';
+import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting, startTranslocate, controlGroupIds, saveControlGroup, recallControlGroup } from './input';
 import { sfx, duckMusic } from './audio';
 import { defenceIconUrl, bakeAirSprite, artIconUrl, unitIconUrl } from './render';
 
@@ -230,7 +230,11 @@ export function initUI() {
     if (b.def.packable && (b.hp >= b.maxHp || b.repairing)) { packBuilding(b); return; }
     startRepair(b);
   });
-  abilBtn.addEventListener('pointerdown', () => { for (const u of abilityUnits()) activateAbility(u); });
+  abilBtn.addEventListener('pointerdown', () => {
+    const us = abilityUnits();
+    if (us[0]?.def.ability?.target) startTranslocate();   // aimed: the next click on the map picks the spot
+    else for (const u of us) activateAbility(u);
+  });
   const closeDetails = (returnFocus = false) => {
     selectionDetails.hidden = true;
     detailsBtn.setAttribute('aria-expanded', 'false');
