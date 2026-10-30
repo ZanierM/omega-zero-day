@@ -195,7 +195,7 @@ const FIELD_GAP: Partial<Record<FieldSound, number>> = {
 // how long each sound's own voice lasts (the echo tail rides the shared bus)
 const FIELD_LEN: Partial<Record<FieldSound, number>> = {
   rifle: 0.12, autocannon: 0.2, flame: 0.35, rocket: 0.6, cannon: 0.65, artillery: 1, sniper: 0.22, rail: 0.75, arc: 0.25,
-  hitMetal: 0.2, hitStructure: 0.32, hitSoft: 0.1, impact: 0.7, explodeVehicle: 1.2, explodeBuilding: 2.1, orbital: 3.2,
+  hitMetal: 0.32, hitStructure: 0.45, hitSoft: 0.1, impact: 1.1, explodeVehicle: 1.9, explodeBuilding: 3, orbital: 3.2,
   bite: 0.14, spit: 0.4, squelch: 0.7, lance: 0.45, arrive: 1.6,
   musket: 0.35, oldmg: 0.32, harpoon: 0.45, firebomb: 0.3, smash: 0.8, oldcannon: 1.1, mortar: 0.6, snare: 0.3,
 };
@@ -224,6 +224,21 @@ const ring = (dest: AudioNode, t: number, f: number, dur: number, peak: number) 
   // inharmonic partials: struck metal rather than a musical tone
   for (const [m, a] of [[1, 1], [2.76, 0.6], [5.4, 0.35], [8.93, 0.18]]) osc('sine', f * m, f * m * 0.985, t, dur / m ** 0.4, peak * a, dest);
 };
+
+// blasts drive a soft clipper: it rounds the peak into a fat, compressed whump instead of a clean synth thud
+let satCurve: Float32Array<ArrayBuffer> | null = null;
+function sat(dest: AudioNode, drive = 2.5): AudioNode {
+  if (!satCurve) { satCurve = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; satCurve[i] = Math.tanh(x * drive) / Math.tanh(drive); } }
+  const w = ac!.createWaveShaper(); w.curve = satCurve; w.oversample = '2x'; w.connect(dest);
+  return w;
+}
+// things coming back down after a blast: n short bursts scattered over [t0, t1], fading as they go
+function debris(o: AudioNode, t0: number, t1: number, n: number, peak: number, lo: number, hi: number, q = 2) {
+  for (let k = 0; k < n; k++) {
+    const at = t0 + (t1 - t0) * Math.pow(Math.random(), 0.7), f = lo + Math.random() * (hi - lo);
+    noise(at, 0.02 + Math.random() * 0.04, peak * (1 - (at - t0) / (t1 - t0 + 0.01)) * (0.5 + Math.random() * 0.5), f, f * 0.7, o, 'bandpass', q);
+  }
+}
 
 /** Dev readout: how many positioned sounds are playing right now. */
 export function audioStats() { return { state: ac?.state ?? 'none', liveVoices, played: fieldPlayed }; }
@@ -293,42 +308,68 @@ export function sfxAt(name: FieldSound, x: number, y: number, loud = 1) {
       osc('square', 190 * v, 150, t, 0.16, 0.05, o);
       for (let k = 0; k < 6; k++) noise(t + k * 0.03 + Math.random() * 0.02, 0.012, 0.22, 7000, 3000, o, 'highpass');
       break;
-    case 'hitMetal':    // rounds on armour: a bright ping and a tick
-      noise(t, 0.015, 0.35, 8000, 3000, o, 'highpass');
-      ring(o, t, (900 + Math.random() * 900) * v, 0.18, 0.05);
-      break;
-    case 'hitStructure':// hits on a building: duller clang, grit and dust
-      noise(t, 0.02, 0.3, 6000, 2000, o, 'highpass');
-      ring(o, t, (260 + Math.random() * 260) * v, 0.3, 0.06);
-      noise(t + 0.01, 0.25, 0.14, 900, 200, o);
-      break;
-    case 'hitSoft':     // hits on infantry: muffled thud
-      noise(t, 0.06, 0.25, 500, 150, o);
-      osc('sine', 120 * v, 55, t, 0.07, 0.16, o);
-      break;
-    case 'impact':      // a shell or rocket landing
-      noise(t, 0.05, 0.55, 5000 * v, 900, o, 'highpass');
-      noise(t + 0.01, 0.6, 0.55, 900 * v, 50, o);
-      osc('sine', 62 * v, 24, t, 0.6, 0.55, o);
-      for (let k = 0; k < 4; k++) noise(t + 0.1 + Math.random() * 0.4, 0.03, 0.09, 4000, 900, o);
-      break;
-    case 'explodeVehicle': // fuel and ammo going up, then falling metal
-      noise(t, 0.08, 0.6, 5000, 700, o);
-      noise(t + 0.02, 1.1, 0.65, 900, 40, o);
-      osc('sine', 58, 20, t, 1.0, 0.7, o);
-      noise(t + 0.18, 0.4, 0.3, 700, 60, o);                               // secondary cook-off
-      for (let k = 0; k < 4; k++) ring(o, t + 0.35 + Math.random() * 0.6, 300 + Math.random() * 600, 0.15, 0.025);
-      break;
-    case 'explodeBuilding': // staggered blasts, a collapse rumble and debris rain
-      for (let k = 0; k < 3; k++) {
-        const st = t + k * (0.12 + Math.random() * 0.15);
-        noise(st, 0.07, 0.5, 4500, 700, o);
-        noise(st + 0.02, 0.9, 0.5, 800, 40, o);
+    case 'hitMetal': {  // a round on armour: a hard spang, a short inharmonic ring, sparks; now and then a ricochet whines off
+      noise(t, 0.006, 0.5, 9000, 5000, o, 'highpass');
+      noise(t, 0.03, 0.18, 3200 * v, 2200, o, 'bandpass', 3);
+      ring(o, t, (1500 + Math.random() * 1700) * v, 0.1, 0.03);
+      debris(o, t + 0.01, t + 0.09, 3, 0.06, 4000, 8000, 3);                               // sparks
+      if (Math.random() < 0.28) {
+        const f0 = (3200 + Math.random() * 1600) * v;
+        osc('sine', f0, f0 * 0.38, t + 0.012, 0.24, 0.022, o);                             // the whine of a ricochet
+        noise(t + 0.012, 0.22, 0.05, f0, f0 * 0.4, o, 'bandpass', 14);
       }
-      osc('sine', 45, 18, t, 1.8, 0.75, o);
-      noise(t + 0.4, 1.6, 0.35, 400, 35, o);
-      for (let k = 0; k < 8; k++) noise(t + 0.5 + Math.random() * 1.2, 0.03, 0.12, 3500, 800, o);
       break;
+    }
+    case 'hitStructure': // a hit on concrete and composite: a dull thwack, then grit crumbling and a hiss of dust
+      noise(t, 0.012, 0.36, 2600 * v, 1600, o, 'bandpass', 1);
+      noise(t + 0.004, 0.13, 0.26, 900 * v, 220, o);
+      debris(o, t + 0.02, t + 0.3, 6, 0.08, 1400, 3600, 2.5);
+      noise(t + 0.03, 0.35, 0.035, 5000, 3000, o, 'highpass');
+      break;
+    case 'hitSoft':     // a hit on a body: a muffled thud and a slap, nothing tonal
+      noise(t, 0.05, 0.3, 300 * v, 160, o, 'bandpass', 1.4);
+      noise(t, 0.012, 0.12, 1300 * v, 900, o, 'bandpass', 2);
+      break;
+    case 'impact': {    // a shell or rocket landing: a crack, a whump of earth, then dirt patters back down and the ground rolls
+      const s1 = sat(o, 2);
+      noise(t, 0.03, 0.5, 6000 * v, 2500, s1, 'highpass');
+      noise(t + 0.006, 0.36, 0.6, 1300 * v, 110, s1);
+      osc('sine', 72 * v, 30, t, 0.42, 0.5, s1);
+      debris(o, t + 0.12, t + 0.9, 9, 0.1, 700, 2600, 1.8);
+      noise(t + 0.15, 0.8, 0.14, 320, 70, o);
+      break;
+    }
+    case 'explodeVehicle': { // fuel and ammunition going up: a crack, a fireball, cook-offs, metal raining down, fire
+      const s1 = sat(o, 3);
+      noise(t, 0.025, 0.7, 7000, 3500, s1, 'highpass');                                     // the supersonic crack
+      noise(t + 0.008, 0.62, 0.72, 2400 * v, 85, s1);                                       // the fireball whump
+      osc('sine', 56 * v, 24, t, 0.95, 0.8, s1);
+      for (let k = 0; k < 2 + Math.floor(Math.random() * 2); k++) {                       // secondary cook-offs
+        const at = t + 0.2 + Math.random() * 0.55;
+        noise(at, 0.012, 0.3, 6000, 3000, o, 'highpass');
+        noise(at + 0.005, 0.14, 0.32, 900, 120, s1);
+      }
+      for (let k = 0; k < 5; k++) ring(o, t + 0.3 + Math.random() * 1.1, 260 + Math.random() * 900, 0.12, 0.018);   // falling metal
+      debris(o, t + 0.25, t + 1.4, 10, 0.08, 1500, 4500, 2);
+      debris(o, t + 0.4, t + 1.7, 12, 0.03, 4000, 9000, 3);                                // the fire crackling
+      noise(t + 0.25, 1.45, 0.2, 280, 55, o);                                               // the rolling tail
+      break;
+    }
+    case 'explodeBuilding': { // staggered blasts, a collapse that rumbles in swells, concrete and glass coming down, dust settling
+      const s1 = sat(o, 3.2);
+      for (let k = 0; k < 3; k++) {
+        const st = t + k * (0.12 + Math.random() * 0.16);
+        noise(st, 0.03, 0.55, 6000, 2500, s1, 'highpass');
+        noise(st + 0.01, 0.8, 0.55, 1600, 50, s1);
+      }
+      osc('sine', 46, 17, t, 2, 0.8, s1);
+      for (const [d, a] of [[0.45, 0.32], [0.9, 0.26], [1.35, 0.2]]) noise(t + d, 0.95, a, 420, 70, o);   // the collapse, in swells
+      debris(o, t + 0.5, t + 2.5, 16, 0.12, 380, 1600, 1.6);                               // concrete chunks
+      for (let k = 0; k < 3; k++) ring(o, t + 0.6 + Math.random() * 1.4, 140 + Math.random() * 260, 0.25, 0.02);   // beams
+      for (let k = 0; k < 5; k++) ring(o, t + 0.25 + Math.random() * 0.6, 3000 + Math.random() * 3500, 0.06, 0.012); // glass
+      noise(t + 0.6, 2.2, 0.045, 3200, 2000, o, 'highpass');                                // dust settling
+      break;
+    }
     case 'bite':        // the brood: a wet crunch and a click of mandibles
       noise(t, 0.05, 0.35, 1400 * v, 300, o, 'bandpass', 2);
       noise(t + 0.02, 0.03, 0.25, 6000, 2500, o, 'highpass');
