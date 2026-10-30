@@ -5,7 +5,7 @@ import {
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
   VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES, BROOD, KEEPERS, hostile,
-  kindOf, canMake, producersOf, bonusOf, SLOTS, setSlots, FactionId, rolesOf,
+  kindOf, canMake, producersOf, bonusOf, SLOTS, setSlots, FactionId, rolesOf, isClan,
   VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
 import * as telemetry from './telemetry';
@@ -256,6 +256,7 @@ export function initGame(numEnemies: number) {
   bloom = new Uint8Array(MAP_W * MAP_H); bloomTick = 0;
   lightColumns.length = 0;
   resetStats();
+  hinted.clear();
   telemetry.startMatch(numPlayers);
 }
 
@@ -307,7 +308,16 @@ export let gameOver: 'win' | 'lose' | null = null;
 export let paused = true; // starts paused behind the mission briefing
 export function setPaused(v: boolean) { paused = v; }
 export let toastMsg = { text: '', ttl: 0 };
-export function toast(text: string) { toastMsg = { text, ttl: 3 }; }
+export function toast(text: string, ttl = 3) { toastMsg = { text, ttl }; }
+// one-time field notes: each explains a mechanic the first time it matters, once per match
+const hinted = new Set<string>();
+export function hint(key: string, text: string) { if (hinted.has(key)) return; hinted.add(key); toast(text, 7); }
+// a player Clan in skirmish gets three quick tips while the camp goes up
+const CLAN_TIPS: [number, string][] = [
+  [4, 'Clan tip: no power grid. Build cheap, build fast, spread out.'],
+  [16, 'Clan tip: Snares and Scrap Mines (Defence tab) go anywhere you can see. The enemy never sees them.'],
+  [28, 'Clan tip: select a building and press P to pack it into a Caravan. Wrecking enemy harvesters and buildings pays you flux.'],
+];
 
 // ---------- Helpers ----------
 
@@ -612,6 +622,7 @@ export function damage(target: Entity, amount: number, attacker?: Unit) {
   const raid = attacker ? bonusOf(attacker.owner).raid : 0;
   if (raid && attacker!.owner !== target.owner && (target.kind === 'building' ? !target.def.isWall && !target.def.trap : target.def.harvester))
     players[attacker!.owner].credits += Math.min(amount, Math.max(0, target.hp)) * raid;
+  if (raid && target.owner === PLAYER) hint('raid', 'Clan raiders earn flux for every harvester and building they damage. Guard the economy.');
   target.hp -= amount;
   if (attacker) telemetry.fight(attacker.owner, target.owner);
   // "our base is under attack" — alert when any player structure takes a hit
@@ -1064,6 +1075,7 @@ export function update(dt: number) {
 
 function step(dt: number) {
   if (toastMsg.ttl > 0) toastMsg.ttl -= dt;
+  if (!mission.active && isClan(PLAYER)) for (const [at, text] of CLAN_TIPS) if (stats.time >= at) hint(`clan${at}`, text);
 
   // building upgrades tick like construction (and slow down on low power)
   for (const b of buildings) {
@@ -1244,7 +1256,10 @@ function step(dt: number) {
       if (tr.slow) { u.slowT = 4; u.slowMul = tr.slow; }
     }
     if (audible(c.x, c.y)) sfxAt(tr.slow ? 'snare' : 'explodeVehicle', c.x, c.y, tr.slow ? 0.9 : 1);
-    if (hit.some(u => u.owner === PLAYER)) raiseAlert(c.x, c.y);
+    if (hit.some(u => u.owner === PLAYER)) {
+      raiseAlert(c.x, c.y);
+      hint('trap', 'Hidden trap! The Clans seed the ground with snares and mines. Send something cheap ahead of your armour.');
+    }
     destroy(b);
   }
 
