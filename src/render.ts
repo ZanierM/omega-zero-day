@@ -4,6 +4,7 @@ import { setListener, sfxAt } from './audio';
 import { skinOf, skinBuilding, skinUnit } from './faction-skin';
 import './clan-art';   // adds the Ashen Clans to art.ts's registries
 import './hollow-art';  // and the Hollow
+import './brood-art';   // and the brood
 import './kessler-art'; // and Kessler's own shapes ('k:' entries)
 import './keeper-art';  // and the Keepers
 import { MAP_W, MAP_H, terrain, crystal, idx, land, Land } from './map';
