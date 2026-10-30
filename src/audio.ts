@@ -413,6 +413,76 @@ export function sfxAt(name: FieldSound, x: number, y: number, loud = 1) {
   }
 }
 
+// ---------------- unit voices ----------------
+// A short acknowledgement when you select your units or give them an order. No
+// recordings: a sawtooth "throat" through two vowel formants makes something
+// that reads as speech at a distance, and each faction gets its own colour.
+
+export type VoiceKind = 'select' | 'order' | 'attack';
+const VOWELS: [number, number][] = [[800, 1200], [450, 2000], [450, 800], [330, 700], [300, 2300], [600, 1000]];
+let lastVoice = -9;
+
+// one spoken syllable: pitch glides over it, the vowel is shaped by two band-passes
+function syllable(dest: AudioNode, t: number, dur: number, f0: number, f1: number, vowel: [number, number], peak: number, wave: OscillatorType) {
+  const o = ac!.createOscillator(); o.type = wave;
+  o.frequency.setValueAtTime(f0, t); o.frequency.linearRampToValueAtTime(f1, t + dur);
+  const g = ac!.createGain(); env(g, t, peak, 0.012, dur);
+  for (const [i, f] of vowel.entries()) {
+    const bp = ac!.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 6 + i * 4;
+    const fg = ac!.createGain(); fg.gain.value = i ? 0.55 : 1;
+    o.connect(bp); bp.connect(fg); fg.connect(g);
+  }
+  g.connect(dest);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+// a radio: a band-limited channel with a squelch click at each end
+function radio(t: number, len: number): AudioNode {
+  const hp = ac!.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 320;
+  const lp = ac!.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2900;
+  hp.connect(lp); lp.connect(sfxBus);
+  noise(t, 0.035, 0.07, 6000, 3000, sfxBus, 'highpass');
+  noise(t + len + 0.02, 0.05, 0.06, 5000, 2500, sfxBus, 'highpass');
+  return hp;
+}
+
+/** A unit bark: `faction` is the speaker's faction id, `heavy` deepens it (vehicles, big walkers). */
+export function voice(kind: VoiceKind, faction: string, heavy = false) {
+  if (!ac || muted || ac.state !== 'running') return;
+  const now = ac.currentTime;
+  if (now - lastVoice < 0.45) return;          // a group order is one voice, not twenty
+  lastVoice = now;
+  const t = now + 0.02, r = () => VOWELS[Math.floor(Math.random() * VOWELS.length)];
+  const up = kind === 'select';                // a question lifts at the end; an order falls
+  const n = kind === 'attack' ? 2 : 2 + Math.floor(Math.random() * 2);
+  if (faction === 'helion' || faction === 'kessler') {
+    const base = (faction === 'kessler' ? 92 : 128) * (heavy ? 0.8 : 1), dest = radio(t, n * 0.09);
+    const wave: OscillatorType = faction === 'kessler' ? 'square' : 'sawtooth';
+    for (let k = 0; k < n; k++) {
+      const last = k === n - 1, f = base * (1 + (Math.random() - 0.5) * 0.12);
+      syllable(dest, t + k * 0.09, 0.08, f, last ? f * (up ? 1.25 : 0.82) : f, r(), faction === 'kessler' ? 0.09 : 0.12, wave);
+    }
+  } else if (faction === 'ashen' || faction === 'hearth') {
+    // a shout across open ground: louder, breathier, no radio
+    const base = (heavy ? 120 : 165) * (kind === 'attack' ? 1.15 : 1);
+    noise(t, 0.12, 0.05, 1800, 900, sfxBus, 'bandpass', 1.2);
+    for (let k = 0; k < Math.min(n, 2); k++) syllable(sfxBus, t + k * 0.11, 0.1, base, base * (up ? 1.2 : 0.75), r(), 0.16, 'sawtooth');
+  } else if (faction === 'brood') {
+    // chittering clicks and a wet hiss
+    for (let k = 0; k < 5 + n; k++) noise(t + k * 0.035 + Math.random() * 0.01, 0.012, 0.16, (heavy ? 1800 : 3200) * (0.8 + Math.random() * 0.4), 1500, sfxBus, 'bandpass', 8);
+    noise(t + 0.05, kind === 'attack' ? 0.3 : 0.18, 0.06, 5000, 2000, sfxBus, 'highpass');
+  } else if (faction === 'keepers') {
+    // a slow harmonic hum, rising for a question
+    const root = heavy ? 110 : 165;
+    for (const m of [1, 1.5, 2]) osc('sine', root * m, root * m * (up ? 1.06 : 0.97), t, 0.45, 0.05, sfxBus);
+    noise(t, 0.4, 0.03, 6000, 9000, sfxBus, 'bandpass', 2);
+  } else {
+    // the Hollow: crystal chimes over a breath
+    const root = heavy ? 520 : 780;
+    for (let k = 0; k < n; k++) for (const [m, a] of [[1, 0.06], [2.76, 0.03], [5.4, 0.015]]) osc('sine', root * m * (1 + k * 0.12), root * m * (1 + k * 0.12) * (up ? 1.03 : 0.99), t + k * 0.08, 0.3, a, sfxBus);
+    noise(t, 0.25, 0.04, 1200, 600, sfxBus, 'bandpass', 1.5);
+  }
+}
+
 // ---------------- generative ambient music ----------------
 // A slow synth loop: low drone, evolving pad chords, sparse echoing plucks.
 

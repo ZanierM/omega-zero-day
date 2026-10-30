@@ -11,7 +11,7 @@ import {
 import * as telemetry from './telemetry';
 import { MAP_W, MAP_H, terrain, crystal, occupied, idx, inBounds, nearestTile, neutralSpots } from './map';
 import { findPath } from './path';
-import { sfx, sfxAt, FieldSound } from './audio';
+import { sfx, sfxAt, FieldSound, voice } from './audio';
 
 // ---------- Entity types ----------
 
@@ -761,18 +761,19 @@ const IGNORE_AFTER_GIVING_UP = 2.5;   // s before it will re-acquire the same ta
 // brief marker where the player sent units: one per group order, not per unit
 export interface OrderMarker { x: number; y: number; kind: Order['type']; ttl: number; max: number; targetId?: number }
 export const orderMarkers: OrderMarker[] = [];
-function markOrder(order: Order) {
-  if (order.type === 'idle') return;
+function markOrder(order: Order): boolean {
+  if (order.type === 'idle') return false;
   let x = order.x, y = order.y;
   if (order.type === 'attack' && order.targetId !== undefined) {
     const t = byId.get(order.targetId);
-    if (!t) return;
+    if (!t) return false;
     ({ x, y } = entityPos(t));
   }
-  if (x === undefined || y === undefined) return;
+  if (x === undefined || y === undefined) return false;
   // a group order spreads its units' destinations; keep the one marker
-  for (const m of orderMarkers) if (m.ttl > m.max - 0.1 && m.kind === order.type && Math.hypot(m.x - x, m.y - y) < 120) return;
+  for (const m of orderMarkers) if (m.ttl > m.max - 0.1 && m.kind === order.type && Math.hypot(m.x - x, m.y - y) < 120) return false;
   orderMarkers.push({ x, y, kind: order.type, ttl: 0.7, max: 0.7, targetId: order.targetId });
+  return true;
 }
 
 // quiet: issued by the game itself (factory rally), so no destination marker
@@ -783,7 +784,8 @@ export function issueOrder(u: Unit, order: Order, quiet = false) {
   u.repathTimer = 0; // path on the next tick, not after a leftover retry delay
   u.returning = false; u.ignoreId = -1; u.ignoreTimer = 0;
   if (order.type === 'idle') { u.guardX = u.x; u.guardY = u.y; }   // stop = guard here
-  if (u.owner === PLAYER && !quiet) markOrder(order);
+  // the first unit of a fresh group order answers for all of them
+  if (u.owner === PLAYER && !quiet && markOrder(order)) voice(order.type === 'attack' || order.type === 'attackMove' ? 'attack' : 'order', SLOTS[PLAYER], u.def.tab === 'veh');
   if (u.def.harvester) {
     u.harvestState = order.type === 'harvest' ? 'toField' : 'none';
     if (order.type === 'idle') u.harvestState = 'toField';
@@ -898,10 +900,10 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
 
 // the Hollow live off crystal: a little always, more for each Geode, most for one sat by a crystal field
 export function hollowIncome(owner: number): number {
-  let inc = 12;
+  let inc = 10;
   for (const b of buildings) {
     if (b.owner !== owner || b.def.id !== 'geode') continue;
-    inc += nearestTile(b.tx + 1, b.ty + 1, 4, (x, y) => crystal[idx(x, y)] > 0) ? 14 : 7;
+    inc += nearestTile(b.tx + 1, b.ty + 1, 4, (x, y) => crystal[idx(x, y)] > 0) ? 9 : 5;
   }
   return inc;
 }
@@ -1362,6 +1364,14 @@ function step(dt: number) {
   for (const u of units) {
     if (u.rank > 0 && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + VET_HEAL[u.rank] * dt);
     if (u.slowT) u.slowT = Math.max(0, u.slowT - dt);
+    // a crowd can shove a unit inside a building's footprint, where it can never find a path out: step it clear
+    if (!u.def.air) {
+      const tx = tileOf(u.x), ty = tileOf(u.y);
+      if (inBounds(tx, ty) && occupied[idx(tx, ty)] !== -1) {
+        const free = nearestTile(tx, ty, 6, (x, y) => inBounds(x, y) && terrain[idx(x, y)] === 0 && occupied[idx(x, y)] === -1);
+        if (free) { u.x = centerOfTile(free.x); u.y = centerOfTile(free.y); u.path = null; }
+      }
+    }
   }
 
   // building repairs heal over time (paid when started)
@@ -1431,7 +1441,7 @@ function step(dt: number) {
   // a player brood feeds through its Vein Wells, a player Keeper host through its Shrines
   const pk = kindOf(PLAYER);
   if (pk === 'brood') players[PLAYER].credits += (12 + 7 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'veinwell').length) * dt;
-  else if (pk === 'keepers') players[PLAYER].credits += (14 + 10 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'shrine').length) * dt;
+  else if (pk === 'keepers') players[PLAYER].credits += (11 + 8 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'shrine').length) * dt;
   else if (pk === 'hollow') players[PLAYER].credits += hollowIncome(PLAYER) * dt;
   bloomTick -= dt;
   if (bloomTick <= 0) { bloomTick = 1.5; updateBloom(); }

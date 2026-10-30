@@ -311,6 +311,6 @@ export function isLastMission() { return !!def && MISSIONS[MISSIONS.length - 1].
 
 export function unlocked(id: string) {
   const i = MISSIONS.findIndex(m => m.id === id);
-  return i === 0 || progress().done.includes(MISSIONS[i - 1]?.id);
+  return i === 0 || !!MISSIONS[i - 1]?.optional || progress().done.includes(MISSIONS[i - 1]?.id);
 }
 export { MISSIONS, FACTION_NAMES };

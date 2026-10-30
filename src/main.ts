@@ -54,7 +54,7 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
       const k = kindOf(PLAYER);
       const core = placeBuilding(k === 'brood' ? 'heart' : k === 'hollow' ? 'hearthstone' : 'beacon', PLAYER, b.x, b.y);
       const c = buildingCenter(core);
-      const escort = k === 'brood' ? ['skitter', 'skitter', 'skitter', 'skitter', 'skitter', 'skitter', 'spitter', 'spitter']
+      const escort = k === 'brood' ? ['skitter', 'skitter', 'skitter', 'skitter', 'spitter']
         : k === 'hollow' ? ['shardkin', 'shardkin', 'shardkin', 'shardkin', 'burrower', 'choir'] : ['acolyte', 'acolyte', 'acolyte', 'lancer'];
       escort.forEach((id, k) => spawnUnit(id, PLAYER, c.x + Math.cos(k * 0.8) * TILE * 2.6, c.y + TILE * 2.4 + Math.sin(k * 0.8) * TILE));
       centerCameraOn(c.x, c.y);
@@ -284,9 +284,10 @@ function renderMissions() {
   const done = campaign.progress().done;
   const cd = campaign.campaignDifficulty();
   document.querySelectorAll<HTMLElement>('#campdiffopts .opt').forEach(b => b.classList.toggle('sel', b.dataset.d === cd));
-  const firstOpen = campaign.MISSIONS.find(m => campaign.unlocked(m.id) && !done.includes(m.id)) ?? campaign.MISSIONS[0];
+  // new players start on the boot camp; anyone already into the campaign skips past it
+  const firstOpen = campaign.MISSIONS.find(m => campaign.unlocked(m.id) && !done.includes(m.id) && !(m.optional && done.length)) ?? campaign.MISSIONS[0];
   if (!selectedMission || !campaign.unlocked(selectedMission)) selectedMission = firstOpen.id;
-  const ACTS: Record<number, string> = { 1: 'Act I — Landfall', 2: 'Act II — The Corridor', 3: 'Act III — Last Light' };
+  const ACTS: Record<number, string> = { 0: 'Boot camp', 1: 'Act I — Landfall', 2: 'Act II — The Corridor', 3: 'Act III — Last Light' };
   const button = (m: typeof campaign.MISSIONS[number]) => {
     const open = campaign.unlocked(m.id), fin = done.includes(m.id);
     return `<button class="opt mission${m.id === selectedMission ? ' sel' : ''}" type="button" data-id="${m.id}"${open ? '' : ' disabled'}>`
