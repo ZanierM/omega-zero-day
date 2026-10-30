@@ -30,7 +30,7 @@ function edgeOf(col: string): string {
     if (!m) return 'rgba(26,18,12,0.6)';
     r = +m[1]; gr = +m[2]; b = +m[3];
   }
-  return `rgb(${Math.round(r * 0.4)},${Math.round(gr * 0.4)},${Math.round(b * 0.44)})`;
+  return `rgb(${Math.round(r * 0.32)},${Math.round(gr * 0.32)},${Math.round(b * 0.35)})`;
 }
 const edgeW = () => fine ? 1 : 2;
 

@@ -11,9 +11,9 @@ import {
 } from './art';
 import type { Pt, Ctx, SoldierSpec, Limb } from './art';
 
-const OLIVE = '#5c6248', OLIVE_TOP = '#7d846a', OLIVE_DK = '#3e4232';
+const OLIVE = '#566034', OLIVE_TOP = '#737f48', OLIVE_DK = '#383f22';
 const GUN = '#4a4c52', GUN_TOP = '#6a6d74', GUN_DK = '#2c2e33';
-const CONC = '#6a665e', CONC_TOP = '#8e8a80', CONC_DK = '#4a4740';
+const CONC = '#5e5a52', CONC_TOP = '#7a766c', CONC_DK = '#413e38';
 const SAND = '#9a8a62', SAND_TOP = '#b8a87c';
 const RUST = '#8a4f30';
 
