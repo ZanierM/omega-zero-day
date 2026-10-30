@@ -206,7 +206,7 @@ function cable(g: Ctx, pts: Pt[], wid: number, col = '#3a3c44') {
 
 // ---------------- Nexus HQ ----------------
 
-const HULL_TOP = '#858893', HULL = '#5a5d69', PLINTH_TOP = '#6e6a63', PLINTH = '#4a4640';
+const HULL_TOP = '#dfe4ea', HULL = '#a2acb8', PLINTH_TOP = '#6e6a63', PLINTH = '#4a4640';
 const DOME = '#8d93a3', GOLD = '#e8c66a', GLASS = '#5fe0f0', GLASS_DK = '#16303a';
 
 // beacon at the tip of the mast, relative to the footprint's top-left (world px)
@@ -579,11 +579,11 @@ export function drawBarracks(g: Ctx, w: number, _h: number, level: number, team:
 
   // armoured bunker: straight walls, a sloped armour skirt on the front
   const body = chamfer(10, 12, 56, 50, 6);
-  prism(g, body, 4, 22, null, '#5d6170');
+  prism(g, body, 4, 22, null, '#a8b2be');
   detailWalls(g, body, 4, 22, 7);
   quad(g, [12, 50 - 10], [54, 50 - 10], [56, 55 - 4], [10, 55 - 4], '#4b4f5c');          // skirt
   prism(g, body, 22, 25, null, level >= 3 ? GOLD : team);                                 // trim band
-  prism(g, body, 25, 26, '#7e8290', '#5d6170');
+  prism(g, body, 25, 26, '#e2e7ee', '#a8b2be');
   if (fine) speckle(g, 12, 12 - 26, 54, 50 - 26, 50, 13);
   // roof: hatch, vents, sandbag-style armour blocks along the rim
   prism(g, [[26, 22], [40, 22], [40, 32], [26, 32]], 26, 29, '#5a5d69', HULL);
@@ -804,7 +804,7 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
 
   // base block with a team band
   const base = chamfer(10, 14, 54, 56, 8);
-  prism(g, base, 4, 15, null, '#5d6170');
+  prism(g, base, 4, 15, null, '#a8b2be');
   detailWalls(g, base, 4, 15, 7);
   prism(g, base, 15, 18, null, team);
   prism(g, base, 18, 20, HULL_TOP, HULL);
@@ -826,14 +826,14 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
 
   // shaft with a lit window column and side buttress fins
   const shaft = chamfer(21, 24, 43, 44, 5);
-  prism(g, shaft, 20, 52, null, '#5d6170');
+  prism(g, shaft, 20, 52, null, '#a8b2be');
   detailWalls(g, shaft, 20, 52, 5, 0.3);
   for (let z = 26; z <= 46; z += 6) {
     quad(g, [29, 44 - z - 3], [35, 44 - z - 3], [35, 44 - z], [29, 44 - z], GLASS_DK, false);
     g.fillStyle = GLASS; g.fillRect(30, 44 - z - 2, 4, 1.2);
   }
-  poly(g, [[21, 40 - 46], [21, 40 - 20], [14, 40 - 20]], shade('#5d6170', 1.15));
-  poly(g, [[43, 40 - 46], [43, 40 - 20], [50, 40 - 20]], shade('#5d6170', 0.78));
+  poly(g, [[21, 40 - 46], [21, 40 - 20], [14, 40 - 20]], shade('#a8b2be', 1.15));
+  poly(g, [[43, 40 - 46], [43, 40 - 20], [50, 40 - 20]], shade('#a8b2be', 0.78));
 
   // observation deck: team band, glazed ring, cap
   const deck = chamfer(18, 21, 46, 47, 7);
@@ -847,7 +847,7 @@ export function drawSpire(g: Ctx, w: number, _h: number, _level: number, team: s
   prism(g, deck, 61, 62, HULL_TOP, HULL);
 
   // upper needle and spike
-  prism(g, chamfer(26, 29, 38, 39, 3), 62, 74, '#7e8290', '#5d6170');
+  prism(g, chamfer(26, 29, 38, 39, 3), 62, 74, '#e2e7ee', '#a8b2be');
   poly(g, [[29, 34 - 74], [35, 34 - 74], [32, 34 - 84]], STEEL);
   g.fillStyle = OUT; g.beginPath(); g.arc(32, 34 - 84, 2.6, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#ff6a5a'; g.beginPath(); g.arc(32, 34 - 84, 1.6, 0, Math.PI * 2); g.fill();
@@ -886,7 +886,7 @@ export function drawLab(g: Ctx, w: number, _h: number, _level: number, team: str
 
   // lab block: walls, team band, cap, roof vents
   const block = chamfer(6, 10, 34, 50, 4);
-  prism(g, block, 3, 18, null, '#5d6170');
+  prism(g, block, 3, 18, null, '#a8b2be');
   detailWalls(g, block, 3, 18, 7);
   prism(g, block, 18, 20, null, team);
   prism(g, block, 20, 22, HULL_TOP, HULL);
@@ -977,7 +977,7 @@ export function drawRepairYard(g: Ctx, w: number, _h: number, _level: number, te
   // gantry crane spanning the bay
   for (const x0 of [7, 52]) {
     const leg: Pt[] = [[x0, 31], [x0 + 5, 31], [x0 + 5, 36], [x0, 36]];
-    prism(g, leg, 3, 30, '#6a6d78', '#5d6170');
+    prism(g, leg, 3, 30, '#6a6d78', '#a8b2be');
     detailWalls(g, leg, 3, 30, 0, 0.3);
     quad(g, [x0, 36 - 20], [x0 + 5, 36 - 20], [x0 + 5, 36 - 17], [x0, 36 - 17], team, false);
   }
@@ -985,7 +985,7 @@ export function drawRepairYard(g: Ctx, w: number, _h: number, _level: number, te
   prism(g, beam, 26, 31, GOLD, '#b8923e');
   for (let x = 9; x < 56; x += 5) quad(g, [x, 36 - 30], [x + 2.5, 36 - 30], [x + 1.5, 36 - 27], [x - 1, 36 - 27], 'rgba(16,10,6,0.75)', false);
   // trolley, hoist line and a welding spark on the arm
-  prism(g, [[29, 30], [36, 30], [36, 37], [29, 37]], 22, 26, '#848894', HULL);
+  prism(g, [[29, 30], [36, 30], [36, 37], [29, 37]], 22, 26, '#d0d7e0', HULL);
   cable(g, [[32.5, 37 - 22], [32.5, 37 - 12]], 0.5, '#2a2c32');
   g.fillStyle = '#ffffff'; g.fillRect(32, 37 - 12.5, 1, 1);
   spill(g, 32.5, 37 - 12, 7, 'rgba(160,255,200,0.5)');
@@ -1008,9 +1008,9 @@ export function drawSkyport(g: Ctx, w: number, _h: number, _level: number, team:
   }
   // control tower at the back right with a glazed cab
   const tower: Pt[] = [[49, 5], [59, 5], [59, 15], [49, 15]];
-  prism(g, tower, 3, 22, null, '#5d6170');
+  prism(g, tower, 3, 22, null, '#a8b2be');
   detailWalls(g, tower, 3, 22, 5);
-  prism(g, [[48, 4], [60, 4], [60, 16], [48, 16]], 22, 27, '#848894', GLASS_DK);
+  prism(g, [[48, 4], [60, 4], [60, 16], [48, 16]], 22, 27, '#d0d7e0', GLASS_DK);
   quad(g, [48, 16 - 26], [60, 16 - 26], [60, 16 - 24.6], [48, 16 - 26 + 1.4], GLASS, false);
   spill(g, 54, 16 - 24.5, 6, 'rgba(95,224,240,0.3)');
   cylinder(g, 56, 9, 0.6, 27, 34, '#9a9eaa', HULL);
@@ -1053,12 +1053,12 @@ export function drawUplink(g: Ctx, w: number, _h: number, _level: number, team: 
   capacitor(9, 11); capacitor(55, 11);
   // octagonal base with a team band
   const base = chamfer(13, 17, 51, 53, 8);
-  prism(g, base, 4, 11, null, '#5d6170');
+  prism(g, base, 4, 11, null, '#a8b2be');
   detailWalls(g, base, 4, 11, 6);
   prism(g, base, 11, 13, null, team);
   prism(g, base, 13, 14, HULL_TOP, HULL);
   // yoke arms holding the dish
-  for (const x0 of [19, 42]) { const arm: Pt[] = [[x0, 31], [x0 + 3, 31], [x0 + 3, 37], [x0, 37]]; prism(g, arm, 14, 28, '#848894', TANK); }
+  for (const x0 of [19, 42]) { const arm: Pt[] = [[x0, 31], [x0 + 3, 31], [x0 + 3, 37], [x0, 37]]; prism(g, arm, 14, 28, '#d0d7e0', TANK); }
   // the dish, tilted at the sky: back shell, then the bowl with its ribs
   const cx = 32, cy = 34 - 30, rx = 19, ry = 13;
   g.fillStyle = '#4a4d56'; g.beginPath(); g.ellipse(cx, cy + 3, rx - 1, ry - 1, -0.12, 0, Math.PI * 2); g.fill();
@@ -1104,7 +1104,7 @@ const at = (x: number, y: number, a: number): Pt => rot([[x, y]], a)[0];
 
 // ---------------- Hover Tank ----------------
 
-const TANK_TOP = '#7e8290', TANK = '#5d6170', SKIRT = '#3a3d46';
+const TANK_TOP = '#e2e7ee', TANK = '#a8b2be', SKIRT = '#2c3038';   // Helion's white composite over dark running gear
 
 function drawHoverTankHull(g: Ctx, a: number, team: string) {
   // hover pads: cyan downdraft glowing on the ground under each corner
@@ -1148,14 +1148,14 @@ function drawHoverTankHull(g: Ctx, a: number, team: string) {
 function drawHoverTankTurret(g: Ctx, a: number, team: string) {
   const z0 = 9.5, z1 = 13;
   const barrels = () => {
-    for (const y of [-1.8, 1.8]) prism(g, rot([[7, y - 0.8], [20, y - 0.8], [20, y + 0.8], [7, y + 0.8]], a), 10.6, 12.2, '#9a9eaa', '#4a4d56');
+    for (const y of [-1.8, 1.8]) prism(g, rot([[7, y - 0.8], [20, y - 0.8], [20, y + 0.8], [7, y + 0.8]], a), 10.6, 12.2, '#eef2f6', '#4a4d56');
     prism(g, rot([[19, -3], [22.5, -3], [22.5, 3], [19, 3]], a), 10.2, 12.6, '#6a6d78', '#3a3c44');   // muzzle brake
   };
   cylinder(g, 0, 0, 6.5, 8, z0, HULL_TOP, HULL);                   // turret ring
   const away = Math.sin(a) < 0;                                     // barrels pointing up-screen sit behind the head
   if (away) barrels();
   const head: Pt[] = [[-7.5, -5], [3, -5], [7, -2.5], [7, 2.5], [3, 5], [-7.5, 5]];
-  prism(g, rot(head, a), z0, z1, '#848894', TANK);
+  prism(g, rot(head, a), z0, z1, '#d0d7e0', TANK);
   const top = (x: number, y: number) => { const [px, py] = at(x, y, a); return [px, py - z1] as Pt; };
   poly(g, [top(-6.5, -4), top(-4, -4), top(-4, 4), top(-6.5, 4)], team, false);   // team band across the back
   poly(g, [top(3, -4), top(5.5, -2), top(5.5, -0.5), top(3, -0.5)], GLASS_DK);      // gunner sight
@@ -1188,7 +1188,7 @@ function wheel(g: Ctx, a: number, x: number, y: number, r: number, w: number) {
 }
 // barrels pointing forward along +x, one per y offset
 function barrels(g: Ctx, a: number, ys: number[], x0: number, x1: number, z0: number, z1: number, thick: number) {
-  for (const y of ys) box(g, a, x0, y - thick / 2, x1, y + thick / 2, z0, z1, '#9a9eaa', '#4a4d56');
+  for (const y of ys) box(g, a, x0, y - thick / 2, x1, y + thick / 2, z0, z1, '#eef2f6', '#4a4d56');
 }
 // walker legs: each [hipX, hipY, footX, footY]; feet stride along x on a cycle.
 // side 'back' draws the legs whose feet sit up-screen (behind the body),
@@ -1222,19 +1222,19 @@ function drawRangerHull(g: Ctx, a: number, team: string) {
   box(g, a, -9, -4.5, 9, 4.5, 1.5, 5, TANK_TOP, SKIRT);                                  // chassis
   prism(g, rot([[9, -4.5], [12, -2.5], [12, 2.5], [9, 4.5]], a), 1.5, 4.2, '#6a6d78', SKIRT); // nose wedge
   deckPlate(g, a, 5, -9, -4, -5.5, 4, team);                                             // team tailgate
-  box(g, a, -3.5, -3.5, 4.5, 3.5, 5, 8, '#848894', TANK);                                  // cab
+  box(g, a, -3.5, -3.5, 4.5, 3.5, 5, 8, '#d0d7e0', TANK);                                  // cab
   deckPlate(g, a, 8, 2.5, -3, 4.5, 3, GLASS_DK, true);
   deckPlate(g, a, 8, 3, -2.2, 3.8, 2.2, GLASS);
   // radar mast on the tail with a little dish
   const [mx, my] = at(-7, 0, a);
-  cylinder(g, mx, my, 0.8, 5, 12, '#9a9eaa', '#5a5d69');
+  cylinder(g, mx, my, 0.8, 5, 12, '#eef2f6', '#5a5d69');
   g.fillStyle = '#c4c8d2'; g.beginPath(); g.ellipse(mx, my - 12, 3, 1.4, a, 0, Math.PI * 2); g.fill();
   g.strokeStyle = edgeOf('#8a8f9c'); g.lineWidth = 0.8; g.stroke();
 }
 function drawRangerTurret(g: Ctx, a: number, team: string) {
   cylinder(g, 0, 0, 2.2, 8, 9.6, '#6a6d78', HULL);
   barrels(g, a, [0], 1, 8.5, 9, 10, 1);
-  box(g, a, -2, -1.6, 1.5, 1.6, 9.2, 10.6, '#848894', TANK);
+  box(g, a, -2, -1.6, 1.5, 1.6, 9.2, 10.6, '#d0d7e0', TANK);
   deckPlate(g, a, 10.6, -1.8, -1.2, -0.6, 1.2, team);
 }
 
@@ -1260,7 +1260,7 @@ function drawRaiderHull(g: Ctx, a: number, team: string) {
 function drawRaiderTurret(g: Ctx, a: number, team: string) {
   cylinder(g, 0, 0, 2, 8.5, 9.5, '#6a6d78', HULL);
   barrels(g, a, [-1, 1], 1, 9, 9.6, 10.5, 0.8);
-  box(g, a, -2.5, -2, 1.5, 2, 9.4, 11, '#848894', TANK);
+  box(g, a, -2.5, -2, 1.5, 2, 9.4, 11, '#d0d7e0', TANK);
   deckPlate(g, a, 11, -2.2, -1.6, -1, 1.6, team);
 }
 
@@ -1277,7 +1277,7 @@ function drawWardenHull(g: Ctx, a: number, team: string) {
 function drawWardenTurret(g: Ctx, a: number, team: string) {
   cylinder(g, 0, 0, 3.4, 8, 10, '#6a6d78', HULL);
   barrels(g, a, [-1.6, 1.6], 2, 9.5, 10.2, 11.4, 1.1);
-  box(g, a, -3, -2.6, 2.5, 2.6, 9.6, 12, '#848894', TANK);
+  box(g, a, -3, -2.6, 2.5, 2.6, 9.6, 12, '#d0d7e0', TANK);
   deckPlate(g, a, 12, -2.6, -2, -1, 2, team);
 }
 
@@ -1296,12 +1296,12 @@ function drawThumperTurret(g: Ctx, a: number, team: string) {
   cylinder(g, 0, 0, 4.8, 11, 13.5, '#6a6d78', HULL);
   const away = Math.sin(a) < 0;
   const tube = () => {
-    box(g, a, 2, -2.2, 15, 2.2, 13.5, 17, '#9a9eaa', '#4a4d56');                             // heavy mortar tube
+    box(g, a, 2, -2.2, 15, 2.2, 13.5, 17, '#eef2f6', '#4a4d56');                             // heavy mortar tube
     box(g, a, 6, -2.8, 9, 2.8, 13.2, 17.4, '#6a6d78', '#3a3c44');                            // recoil sleeve
     box(g, a, 14, -2.8, 16.5, 2.8, 13.2, 17.4, '#6a6d78', '#3a3c44');                        // muzzle
   };
   if (away) tube();
-  box(g, a, -5, -4, 3, 4, 13.5, 17, '#848894', TANK);
+  box(g, a, -5, -4, 3, 4, 13.5, 17, '#d0d7e0', TANK);
   deckPlate(g, a, 17, -4.5, -3.2, -2.5, 3.2, team);
   deckPlate(g, a, 17, 0, 1.2, 2.4, 3, GLASS_DK, true);
   if (!away) tube();
@@ -1319,7 +1319,7 @@ function drawDominatorTurret(g: Ctx, a: number, team: string) {
   const away = Math.sin(a) < 0;
   const guns = () => {
     for (const y of [-10.5, 10.5]) {
-      box(g, a, -3, y - 2.8, 5, y + 2.8, 16, 22, '#848894', TANK);                          // shoulder mount
+      box(g, a, -3, y - 2.8, 5, y + 2.8, 16, 22, '#d0d7e0', TANK);                          // shoulder mount
       deckPlate(g, a, 22, -2.5, y - 2.2, 0, y + 2.2, team);
       barrels(g, a, [y - 1.1, y + 1.1], 5, 19, 18.2, 20.2, 1.5);
       box(g, a, 18, y - 2.4, 21, y + 2.4, 17.8, 20.8, '#6a6d78', '#3a3c44');
@@ -1327,7 +1327,7 @@ function drawDominatorTurret(g: Ctx, a: number, team: string) {
   };
   if (away) guns();
   const torso: Pt[] = [[-7, -7.5], [3, -7.5], [7, -4], [7, 4], [3, 7.5], [-7, 7.5], [-8.5, 5], [-8.5, -5]];
-  prism(g, rot(torso, a), 14, 23, '#848894', TANK);
+  prism(g, rot(torso, a), 14, 23, '#d0d7e0', TANK);
   deckPlate(g, a, 23, 3, -3, 6.5, 3, GLASS_DK, true);                                       // cockpit
   deckPlate(g, a, 23, 3.6, -2.2, 5.6, 2.2, GLASS);
   for (const y of [-4.5, -1.5, 1.5, 4.5]) deckPlate(g, a, 23, -7, y - 0.4, -2, y + 0.4, 'rgba(0,0,0,0.3)');
@@ -1354,7 +1354,7 @@ function drawColossusTurret(g: Ctx, a: number, team: string) {
   };
   if (away) guns();
   const head: Pt[] = [[-10, -8], [5, -8], [9, -4.5], [9, 4.5], [5, 8], [-10, 8], [-11.5, 5], [-11.5, -5]];
-  prism(g, rot(head, a), 19, 26, '#848894', TANK);
+  prism(g, rot(head, a), 19, 26, '#d0d7e0', TANK);
   deckPlate(g, a, 26, -10, -6, -6.5, 6, team);
   deckPlate(g, a, 26, 4, -6.5, 7.5, -3, GLASS_DK, true);
   deckPlate(g, a, 26, -4, -2, 2, 2, '#5a5d69', true);                                         // hatch
@@ -1485,7 +1485,7 @@ const VANGUARD: SoldierSpec = {
   extra: bob => [
     { x0: -4.4, y0: -2.8, x1: -2.6, y1: 2.8, z0: 6.8 + bob + 1, z1: 6.8 + bob + 7, top: '#6a6d78', side: '#4a4d56' },        // power pack
     ...rifle(7, bob, 2.9),
-    { x0: 2.8, y0: -4.8, x1: 3.7, y1: -0.6, z0: 2 + bob, z1: 6.8 + bob + 6, top: '#9a9eaa', side: '#6a6d78' },          // shield
+    { x0: 2.8, y0: -4.8, x1: 3.7, y1: -0.6, z0: 2 + bob, z1: 6.8 + bob + 6, top: '#eef2f6', side: '#6a6d78' },          // shield
   ],
   glow: (g, a, bob) => { const [x, y] = at(3.8, -2.7, a); g.fillStyle = 'rgba(95,224,240,0.8)'; g.fillRect(x - 0.6, y - 6.8 - bob - 3, 1.2, 4); },
 };
@@ -1516,7 +1516,7 @@ const JUGGERNAUT: SoldierSpec = {
   extra: bob => [
     { x0: -5.2, y0: -3.4, x1: -3.4, y1: 3.4, z0: 6.8 + bob + 1, z1: 6.8 + bob + 8, top: '#3a3f48', side: '#2c3038' },        // armour backplate
     { x0: 0, y0: 3.6, x1: 4, y1: 6.2, z0: 6.8 + bob + 2.5, z1: 6.8 + bob + 6, top: '#6a6d78', side: '#4a4d56' },             // minigun housing
-    { x0: 3.5, y0: 4.2, x1: 9.5, y1: 5.6, z0: 6.8 + bob + 3.3, z1: 6.8 + bob + 5.2, top: '#9a9eaa', side: '#4a4d56' },       // barrels
+    { x0: 3.5, y0: 4.2, x1: 9.5, y1: 5.6, z0: 6.8 + bob + 3.3, z1: 6.8 + bob + 5.2, top: '#eef2f6', side: '#4a4d56' },       // barrels
   ],
   glow: (g, a, bob) => { const [x, y] = at(2.6, 0, a); g.fillStyle = 'rgba(255,176,46,0.9)'; g.fillRect(x - 1.2, y - 6.8 - bob - 12.6, 2.4, 0.8); },
 };
@@ -1526,22 +1526,22 @@ const JUGGERNAUT: SoldierSpec = {
 
 function drawSkyhawk(g: Ctx, a: number, team: string) {
   // tail stabilisers and fin first (furthest back)
-  box(g, a, -13.5, -4.2, -10.5, 4.2, 2.6, 3.4, '#7e8290', '#5d6170');
+  box(g, a, -13.5, -4.2, -10.5, 4.2, 2.6, 3.4, '#e2e7ee', '#a8b2be');
   const fuselage: Pt[] = [[-11, -2.6], [6, -3], [12, -1.3], [14, 0], [12, 1.3], [6, 3], [-11, 2.6], [-13.5, 0]];
   // stub wings with rocket pods underneath
-  box(g, a, -3, -9.5, 3.5, 9.5, 1.4, 2.6, '#7e8290', '#5d6170');
+  box(g, a, -3, -9.5, 3.5, 9.5, 1.4, 2.6, '#e2e7ee', '#a8b2be');
   for (const y of [-6, 6]) box(g, a, -1.5, y - 0.9, 4.5, y + 0.9, 0.4, 1.4, '#4a4d56', '#2c2e35');
   for (const y of [-8.2, 8.2]) deckPlate(g, a, 2.6, -2.5, y - 0.6, 3, y + 0.6, team);
-  prism(g, rot(fuselage, a), 0, 4, '#9a9eaa', '#5d6170');
+  prism(g, rot(fuselage, a), 0, 4, '#eef2f6', '#a8b2be');
   box(g, a, 12, -0.5, 16, 0.5, 0.4, 1.4, '#3a3c44', '#2a2c32');                              // chin gun
   deckPlate(g, a, 4, 5, -1.7, 10.5, 1.7, GLASS_DK, true);                                    // canopy
   deckPlate(g, a, 4, 6, -1, 9.6, -0.2, GLASS);
   deckPlate(g, a, 4, -9.5, -1.8, -5.5, 1.8, team);                                           // spine marking
-  box(g, a, -13, -0.6, -10, 0.6, 4, 7.5, '#848894', '#5d6170');                              // fin
+  box(g, a, -13, -0.6, -10, 0.6, 4, 7.5, '#d0d7e0', '#a8b2be');                              // fin
   // ducted lift fans at the wingtips, glowing through the grilles
   for (const y of [-10.5, 10.5]) {
     const [fx, fy] = at(0, y, a);
-    cylinder(g, fx, fy, 3.6, 0.5, 3.4, '#24384a', '#5d6170');
+    cylinder(g, fx, fy, 3.6, 0.5, 3.4, '#24384a', '#a8b2be');
     g.save(); g.globalCompositeOperation = 'lighter'; glow(g, fx, fy - 3.4, 4.2, 'rgba(110,210,255,0.85)'); g.restore();
     g.strokeStyle = 'rgba(200,230,255,0.5)'; g.lineWidth = 0.4;
     g.beginPath(); g.moveTo(fx - 3, fy - 3.4); g.lineTo(fx + 3, fy - 3.4); g.moveTo(fx, fy - 6.4); g.lineTo(fx, fy - 0.4); g.stroke();
@@ -1662,7 +1662,7 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
 
 // low armoured plinth with a team band, shared by the gun emplacements
 function plinth(g: Ctx, pts: Pt[], z0: number, z1: number, team: string) {
-  prism(g, pts, z0, z1 - 2, null, '#5d6170');
+  prism(g, pts, z0, z1 - 2, null, '#a8b2be');
   detailWalls(g, pts, z0, z1 - 2, 5);
   prism(g, pts, z1 - 2, z1 - 1, null, team);
   prism(g, pts, z1 - 1, z1, HULL_TOP, HULL);
@@ -1691,7 +1691,7 @@ function drawPulseHead(g: Ctx, a: number, team: string) {
     g.restore();
   };
   if (away) guns();
-  prism(g, rot([[-5, -4], [2.5, -4], [5, -2], [5, 2], [2.5, 4], [-5, 4]], a), 8.6, 12, '#848894', TANK);
+  prism(g, rot([[-5, -4], [2.5, -4], [5, -2], [5, 2], [2.5, 4], [-5, 4]], a), 8.6, 12, '#d0d7e0', TANK);
   deckPlate(g, a, 12, -4.5, -3, -2.8, 3, team);
   deckPlate(g, a, 12, 1.5, -1.2, 3.8, 1.2, GLASS_DK, true);
   if (!away) guns();
@@ -1726,7 +1726,7 @@ function drawRailHead(g: Ctx, a: number, team: string) {
     box(g, a, 31.5, -4, 34, 4, 15, 18.6, '#6a6d78', '#3a3c44');
   };
   if (away) rails();
-  prism(g, rot([[-9, -7], [5, -7], [8.5, -4], [8.5, 4], [5, 7], [-9, 7], [-10.5, 4.5], [-10.5, -4.5]], a), 14, 20, '#848894', TANK);
+  prism(g, rot([[-9, -7], [5, -7], [8.5, -4], [8.5, 4], [5, 7], [-9, 7], [-10.5, 4.5], [-10.5, -4.5]], a), 14, 20, '#d0d7e0', TANK);
   deckPlate(g, a, 20, -9, -5.5, -6, 5.5, team);
   for (const y of [-3, 0, 3]) deckPlate(g, a, 20, -4, y - 0.5, 4, y + 0.5, 'rgba(0,0,0,0.28)');
   if (!away) rails();
@@ -1765,12 +1765,12 @@ export function drawBastion(g: Ctx, w: number, _h: number, _level: number, team:
   detailWalls(g, chamfer(3, 5, 61, 61, 8), 0, 3);
   if (fine) speckle(g, 6, 5 - 3, 58, 61 - 3, 60, 67);
   // round fort with a team band and merlons on the parapet
-  cylinder(g, 32, 34, 25, 3, 9, HULL_TOP, '#5d6170');
+  cylinder(g, 32, 34, 25, 3, 9, HULL_TOP, '#a8b2be');
   cylinder(g, 32, 34, 25, 9, 10.5, team, team);
-  cylinder(g, 32, 34, 25, 10.5, 12, '#7e8290', '#5d6170');
+  cylinder(g, 32, 34, 25, 10.5, 12, '#e2e7ee', '#a8b2be');
   for (let k = 0; k < 9; k++) {
     const t = 0.15 + (k / 8) * (Math.PI - 0.3), x = 32 + Math.cos(t) * 23, y = 34 + Math.sin(t) * 23;
-    prism(g, rot([[-2.2, -1.8], [2.2, -1.8], [2.2, 1.8], [-2.2, 1.8]], t + Math.PI / 2).map(([px, py]) => [px + x, py + y] as Pt), 12, 14.5, '#848894', '#5d6170');
+    prism(g, rot([[-2.2, -1.8], [2.2, -1.8], [2.2, 1.8], [-2.2, 1.8]], t + Math.PI / 2).map(([px, py]) => [px + x, py + y] as Pt), 12, 14.5, '#d0d7e0', '#a8b2be');
   }
   for (const x of [14, 50]) { g.fillStyle = '#ffb02e'; g.fillRect(x - 0.8, 55 - 8.8, 1.6, 1.6); spill(g, x, 55 - 8, 3, 'rgba(255,176,46,0.45)'); }
   g.restore();
@@ -1783,7 +1783,7 @@ function drawBastionHead(g: Ctx, a: number, team: string) {
     box(g, a, 26, -6.8, 29, 6.8, 16, 19, '#6a6d78', '#3a3c44');
   };
   if (away) guns();
-  prism(g, rot([[-11, -9], [5, -9], [10, -5], [10, 5], [5, 9], [-11, 9], [-13, 5.5], [-13, -5.5]], a), 15, 22, '#848894', TANK);
+  prism(g, rot([[-11, -9], [5, -9], [10, -5], [10, 5], [5, 9], [-11, 9], [-13, 5.5], [-13, -5.5]], a), 15, 22, '#d0d7e0', TANK);
   deckPlate(g, a, 22, -11.5, -6.5, -8, 6.5, team);
   deckPlate(g, a, 22, 3, -7.5, 7.5, -4.5, GLASS_DK, true);
   for (const y of [-4, -1, 2, 5]) deckPlate(g, a, 22, -6, y - 0.5, 1, y + 0.5, 'rgba(0,0,0,0.28)');
@@ -1797,16 +1797,16 @@ export function drawSkyguard(g: Ctx, w: number, _h: number, _level: number, team
   const s = w / 32; g.scale(s, s);
   prism(g, chamfer(2, 3, 30, 30, 5), 0, 2, CONCRETE_TOP, CONCRETE);
   detailWalls(g, chamfer(2, 3, 30, 30, 5), 0, 2, 0, 0.3);
-  cylinder(g, 16, 18, 10, 2, 5.5, HULL_TOP, '#5d6170');
+  cylinder(g, 16, 18, 10, 2, 5.5, HULL_TOP, '#a8b2be');
   cylinder(g, 16, 18, 10, 5.5, 6.5, team, team);
-  cylinder(g, 16, 18, 10, 6.5, 7, '#7e8290', '#5d6170');
+  cylinder(g, 16, 18, 10, 6.5, 7, '#e2e7ee', '#a8b2be');
   g.restore();
 }
 function drawSkyguardHead(g: Ctx, a: number, team: string) {
   cylinder(g, 0, 0, 4.5, 7, 9, HULL_TOP, HULL);
   // twin missile pods either side of a sensor block, tubes open to the sky
   for (const y of [-4.5, 4.5]) {
-    box(g, a, -4, y - 2.8, 4.5, y + 2.8, 9, 15, '#848894', TANK);
+    box(g, a, -4, y - 2.8, 4.5, y + 2.8, 9, 15, '#d0d7e0', TANK);
     for (const [dx, dy] of [[-1.5, -1.2], [-1.5, 1.2], [1.8, -1.2], [1.8, 1.2]] as Pt[]) {
       deckPlate(g, a, 15, dx - 1, y + dy - 0.9, dx + 1, y + dy + 0.9, '#14110e');
       deckPlate(g, a, 15, dx - 0.5, y + dy - 0.45, dx + 0.5, y + dy + 0.45, '#ff8c3a');

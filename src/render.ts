@@ -7,6 +7,7 @@ import './hollow-art';  // and the Hollow
 import './brood-art';   // and the brood
 import './kessler-art'; // and Kessler's own shapes ('k:' entries)
 import './keeper-art';  // and the Keepers
+import './helion-art';  // and Helion's troops
 import { MAP_W, MAP_H, terrain, crystal, idx, land, Land } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId, packedAway } from './game';
@@ -732,7 +733,7 @@ function drawDefenceHead(b: Building, px: number, py: number) {
   v.tur = turnToward(v.tur, b.facing, 6 * vizDt);
   const i = headingIndex(v.tur, VEH_ANGLES);
   const head = rotatedPart(`d:${b.def.id}:${b.owner}:${i}`, ta.reach, ta.height,
-    g => ta.head(g, (i / VEH_ANGLES) * Math.PI * 2, TEAM_COLORS[b.owner]), -1, b.owner);
+    g => ta.head(g, (i / VEH_ANGLES) * Math.PI * 2, TEAM_COLORS[b.owner]), own(b.owner) && !TURRET_ART['k:' + b.def.id] ? b.owner : -1, b.owner);
   ctx.drawImage(head, px + ta.pivot[0] * s - head.ox, py + ta.pivot[1] * s - head.oy, head.ww, head.wh);
 }
 const vehViz = new Map<number, { hull: number, tur: number }>();
