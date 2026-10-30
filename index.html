@@ -494,6 +494,10 @@
     /* a long ability or action label shrinks with an ellipsis rather than spilling out of the panel */
     #abilbtn, #actbtn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     #landopts { flex-wrap: wrap; }
+    #hotkeys { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+    #hotkeys dt { font-family: var(--head); color: var(--gold); text-align: right; }
+    #hotkeys dd { margin: 0; }
+    @media (max-height: 520px) { #hotkeys { display: none; } }
     #landopts .opt { flex: 1 1 calc(33% - 9px); min-width: 0; }
     /* ---- campaign: mode switch, mission list, comms box, objective tracker ---- */
     #modeopts { margin: 4px 0 14px; }
@@ -539,7 +543,7 @@
     @media (orientation: portrait), (max-width: 760px) { #comms { top: auto; right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: calc(100vw - 24px); } }
     @media (max-height: 500px) { #commsbadge { width: 44px; height: 44px; } #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
   </style>
-  <script type="module" crossorigin src="./assets/index-BuTDPhL_.js"></script>
+  <script type="module" crossorigin src="./assets/index-RPCzJ4eM.js"></script>
 </head>
 <body>
   <div id="app" inert>
@@ -585,7 +589,10 @@
       <h2 id="pausetitle">Paused</h2>
       <button id="resumebtn">▶ Resume</button>
       <button id="restartbtn">⟲ Restart mission</button>
+      <button id="menubtn">⌂ Quit to menu</button>
       <button id="pausemute">Sound: on</button>
+      <dl id="hotkeys"><dt>A</dt><dd>Attack-move</dd><dt>S</dt><dd>Stop</dd><dt>Q</dt><dd>Unit ability</dd><dt>P</dt><dd>Pack up (Clans)</dd>
+        <dt>Ctrl+1–9</dt><dd>Save a group</dd><dt>1–9</dt><dd>Select a group</dd><dt>Space</dt><dd>Jump to last alert</dd><dt>M</dt><dd>Mute</dd><dt>Esc</dt><dd>Cancel / pause</dd></dl>
     </div>
   </div>
   <div id="toast"></div>
