@@ -4,6 +4,7 @@ import { setListener, sfxAt } from './audio';
 import { skinOf, skinBuilding, skinUnit } from './faction-skin';
 import './clan-art';   // adds the Ashen Clans to art.ts's registries
 import './hollow-art';  // and the Hollow
+import './kessler-art'; // and Kessler's own shapes ('k:' entries)
 import { MAP_W, MAP_H, terrain, crystal, idx, land, Land } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId, packedAway } from './game';
@@ -688,6 +689,13 @@ const kOf = (s: HTMLCanvasElement) => (s as Scaled).k ?? 1;
 const VEH_ANGLES = 48;
 type VehPart = Scaled & { ox: number; oy: number; ww: number; wh: number };
 // walkers bake fewer headings (each has several gait frames)
+// Kessler draws its own art where it has some ('k:<id>' in the registries), Helion's otherwise
+const own = (owner: number) => SLOTS[owner] === 'kessler';
+const vArt = (id: string, owner: number) => (own(owner) && VEHICLE_ART['k:' + id]) || VEHICLE_ART[id];
+const bArt = (id: string, owner: number) => (own(owner) && BUILDING_ART['k:' + id]) || BUILDING_ART[id];
+const tArt = (id: string, owner: number) => (own(owner) && TURRET_ART['k:' + id]) || TURRET_ART[id];
+// the old paint-over only for what Kessler doesn't draw itself
+const skinFor = (owner: number, id: string, kind: 'v' | 'b') => (own(owner) && (kind === 'v' ? VEHICLE_ART : BUILDING_ART)['k:' + id] ? null : skinOf(owner));
 const vehAngles = (defId: string) => VEHICLE_ART[defId]!.frames ? 24 : VEH_ANGLES;
 function rotatedPart(key: string, reach: number, height: number, paint: (g: CanvasRenderingContext2D) => void, skinOwner = -1): VehPart {
   let s = sprites.get(key) as VehPart | undefined;
@@ -709,16 +717,16 @@ function rotatedPart(key: string, reach: number, height: number, paint: (g: Canv
   return s;
 }
 function vehiclePart(defId: string, owner: number, part: 'hull' | 'turret', i: number, frame = 0): VehPart {
-  const va = VEHICLE_ART[defId]!;
+  const va = vArt(defId, owner)!;
   const ang = (i / vehAngles(defId)) * Math.PI * 2;
   return rotatedPart(`v:${defId}:${owner}:${part}:${i}:${frame}`, va.reach, va.height, g => {
     if (part === 'hull') va.hull(g, ang, TEAM_COLORS[owner], frame / (va.frames ?? 1));
     else va.turret?.(g, ang, TEAM_COLORS[owner]);
-  }, owner);
+  }, skinFor(owner, defId, 'v') ? owner : -1);
 }
 // a defence's aiming head, eased toward its target and drawn at its pivot
 function drawDefenceHead(b: Building, px: number, py: number) {
-  const ta = TURRET_ART[b.def.id]!, s = b.def.w * TILE / (b.def.w * 32);
+  const ta = tArt(b.def.id, b.owner)!, s = b.def.w * TILE / (b.def.w * 32);
   const v = vehViz.get(b.id) ?? { hull: b.facing, tur: b.facing };
   vehViz.set(b.id, v);
   v.tur = turnToward(v.tur, b.facing, 6 * vizDt);
@@ -736,7 +744,7 @@ function turnToward(cur: number, want: number, maxStep: number): number {
 }
 const headingIndex = (a: number, n: number) => ((Math.round(a / (Math.PI * 2 / n)) % n) + n) % n;
 function drawVehicle(u: Unit, moving: boolean, lift = 0) {
-  const va = VEHICLE_ART[u.def.id]!, n = vehAngles(u.def.id);
+  const va = vArt(u.def.id, u.owner)!, n = vehAngles(u.def.id);
   const v = vehViz.get(u.id) ?? { hull: u.facing, tur: u.facing };
   vehViz.set(u.id, v);
   v.hull = turnToward(v.hull, u.facing, (va.turn ?? 4) * vizDt);
@@ -882,14 +890,14 @@ function pixelate(c: HTMLCanvasElement) {
 
 function bakeBuildingSprite(defId: string, owner: number, level: number): BldSprite {
   // every structure has hand-drawn art; the procedural bake is only a fallback
-  if (BUILDING_ART[defId]) return bakeRefinedSprite(defId, owner, level);
+  if (bArt(defId, owner)) return bakeRefinedSprite(defId, owner, level);
   return bakeProceduralBuilding(defId, owner);
 }
 
 // refined style: hand-drawn art baked at 2× with no pixelation, thin tinted
 // edges, a soft blurred shadow and a quiet pad
 function bakeRefinedSprite(defId: string, owner: number, level: number): BldSprite {
-  const def = BUILDINGS[defId], art = BUILDING_ART[defId]!;
+  const def = BUILDINGS[defId], art = bArt(defId, owner)!;
   const w = def.w * TILE, h = def.h * TILE, k = 2;
   const head = Math.ceil(w * 0.75), m = 6;
   const sw = w + m * 2, baseY = m + head + h;          // structure canvas, world units
@@ -899,7 +907,7 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   art(sg, w, h, level, TEAM_COLORS[owner]);
   setFineArt(false);
   sg.setTransform(1, 0, 0, 1, 0, 0);
-  const skin = skinOf(owner);
+  const skin = skinFor(owner, defId, 'b');
   if (skin && !def.isWall) skinBuilding(st, skin, defId, k);   // the faction's look over the shared shape
   gradeWarmCool(st, 0.7);
   outline(st, 'rgba(20,12,8,0.55)', 1);                 // one device pixel, not two world pixels
@@ -1205,7 +1213,7 @@ export function artIconUrl(defId: string, owner = PLAYER, level = 1): string | n
   return memoIcon(`a:${SLOTS[owner]}:${defId}:${owner}:${level}`, () => bakeArtIcon(defId, owner, level));
 }
 function bakeArtIcon(defId: string, owner: number, level: number): string | null {
-  const art = BUILDING_ART[defId];
+  const art = bArt(defId, owner);
   if (!art) return null;
   const def = BUILDINGS[defId];
   const w = def.w * TILE, h = def.h * TILE, head = Math.ceil(w * 0.75), m = 4;
@@ -1214,11 +1222,11 @@ function bakeArtIcon(defId: string, owner: number, level: number): string | null
   g.scale(k, k); g.translate(m, m + head);
   setFineArt(true);
   art(g, w, h, level, TEAM_COLORS[owner]);
-  const ta = TURRET_ART[defId];
+  const ta = tArt(defId, owner);
   if (ta) { g.save(); g.translate(ta.pivot[0], ta.pivot[1]); ta.head(g, ICON_AIM, TEAM_COLORS[owner]); g.restore(); }
   setFineArt(false);
   g.setTransform(1, 0, 0, 1, 0, 0);
-  const skin = skinOf(owner);
+  const skin = skinFor(owner, defId, 'b');
   if (skin && !def.isWall) skinBuilding(c, skin, defId, k);
   gradeWarmCool(c, 0.7);
   outline(c, 'rgba(20,12,8,0.55)', 1);
@@ -1231,7 +1239,7 @@ export function unitIconUrl(defId: string, owner = PLAYER): string | null {
   return memoIcon(`u:${SLOTS[owner]}:${defId}:${owner}`, () => bakeUnitIcon(defId, owner));
 }
 function bakeUnitIcon(defId: string, owner: number): string | null {
-  const va = VEHICLE_ART[defId];
+  const va = vArt(defId, owner);
   if (!va) return null;
   const k = 3, ww = va.reach * 2 + 4, wh = ww + va.height;
   const [c, g] = makeCanvas(ww * k, wh * k);
@@ -1241,7 +1249,7 @@ function bakeUnitIcon(defId: string, owner: number): string | null {
   va.turret?.(g, ICON_AIM, TEAM_COLORS[owner]);
   setFineArt(false);
   g.setTransform(1, 0, 0, 1, 0, 0);
-  const skin = skinOf(owner);
+  const skin = skinFor(owner, defId, 'v');
   if (skin) skinUnit(c, skin);
   gradeWarmCool(c, 0.7);
   outline(c, 'rgba(16,10,8,0.6)', 2);
@@ -1491,11 +1499,11 @@ function buildingOverlay(b: Building) {
   const px = b.tx * TILE, py = b.ty * TILE;
   const w = b.def.w * TILE, h = b.def.h * TILE;
   const cx = px + w / 2, cy = py + h / 2;
-  if (TURRET_ART[b.def.id]) {
+  if (tArt(b.def.id, b.owner)) {
     drawDefenceHead(b, px, py);
     // ready lamps on the heavy emplacements
     if (b.def.id === 'bastion' || b.def.id === 'railgun') {
-      const ready = b.cooldown < 0.15, piv = TURRET_ART[b.def.id]!.pivot;
+      const ready = b.cooldown < 0.15, piv = tArt(b.def.id, b.owner)!.pivot;
       const headTop = b.def.id === 'bastion' ? 22 : 20;
       g2Glow(px + piv[0], py + piv[1] - headTop, 2.5, ready ? (b.def.id === 'bastion' ? 'rgba(255,150,60,0.95)' : 'rgba(32,214,255,0.95)') : 'rgba(40,40,50,0.6)');
     }
@@ -2379,7 +2387,7 @@ export function render() {
     const frame = moving ? 1 + (Math.floor(T * 6 + u.id) % 2) : 0;
     const s = sprite('u', u.def.id, u.owner, dirIndex(u.facing) * 3 + frame);
     const sw = s.width / kOf(s), sh = s.height / kOf(s);
-    const va = VEHICLE_ART[u.def.id];
+    const va = vArt(u.def.id, u.owner);
     if (va) {
       // soft shadow and team glow pooled under the hull
       const tr = va.reach * 0.9;
@@ -2587,7 +2595,7 @@ export function render() {
     // ground shadow, offset from the airframe so the altitude reads
     ctx.fillStyle = 'rgba(0,0,0,0.30)';
     ctx.beginPath(); ctx.ellipse(u.x + 8, u.y + 10, u.def.radius * 0.9, u.def.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    if (VEHICLE_ART[u.def.id]) {
+    if (vArt(u.def.id, u.owner)) {
       // baked per heading so the sun stays put as it turns; lifted to altitude
       drawVehicle(u, false, AIR_ALT - bob);
     } else {
