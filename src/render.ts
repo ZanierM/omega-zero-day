@@ -1,10 +1,11 @@
-import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, kindOf, SLOTS } from './config';
+import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, kindOf, SLOTS, hostile, isClan } from './config';
 import * as telemetry from './telemetry';
 import { setListener, sfxAt } from './audio';
 import { skinOf, skinBuilding, skinUnit } from './faction-skin';
+import './clan-art';   // adds the Ashen Clans to art.ts's registries
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
 import * as game from './game';
-import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId } from './game';
+import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId, packedAway } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
 import { BUILDING_ART, VEHICLE_ART, TURRET_ART, arcOrb, setFineArt, nexusBeacon, extractorLights, fusionCore, spireLight, labLight } from './art';
 
@@ -875,7 +876,7 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   const [c, g] = makeCanvas(cw * k, ch * k);
   g.scale(k, k);
   const ox = (cw - w) / 2, oy = ch - h - 6 - reachY;
-  if (!def.isWall && !def.nonBuildable) { g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore(); }   // the brood grows straight out of the ground
+  if (!def.isWall && !def.nonBuildable && !isClan(owner)) { g.save(); g.translate(ox, oy); drawPadRefined(g, w, h, TEAM_COLORS[owner]); g.restore(); }   // the brood grows straight out of the ground; the Clans build on dirt
   const bx = cw / 2, by = oy + h;
   // long low-sun shadow, blurred so it reads as light rather than a decal
   g.save();
@@ -1892,7 +1893,7 @@ const RISE = 1.2;                                          // seconds a new stru
 const bornAt = new Map<number, number>();                  // building id → when it appeared
 const levelSeen = new Map<number, number>();
 const upgradedAt = new Map<number, number>();              // building id → when an upgrade finished
-const knownBld = new Map<number, { tx: number; ty: number; w: number; h: number; wall: boolean }>();
+const knownBld = new Map<number, { tx: number; ty: number; w: number; h: number; wall: boolean; trap: boolean }>();
 interface Rubble { tx: number; ty: number; w: number; h: number; spr: HTMLCanvasElement }
 const rubble: Rubble[] = [];
 const MAX_RUBBLE = 60;
@@ -1904,7 +1905,7 @@ function trackStructures() {
   for (const b of buildings) {
     seen.add(b.id);
     if (!knownBld.has(b.id)) {
-      knownBld.set(b.id, { tx: b.tx, ty: b.ty, w: b.def.w, h: b.def.h, wall: !!b.def.isWall });
+      knownBld.set(b.id, { tx: b.tx, ty: b.ty, w: b.def.w, h: b.def.h, wall: !!b.def.isWall, trap: !!b.def.trap });
       levelSeen.set(b.id, b.level);
       if (!lifeReady) continue;
       bornAt.set(b.id, T);
@@ -1925,6 +1926,7 @@ function trackStructures() {
   for (const [id, k] of knownBld) {
     if (seen.has(id)) continue;
     knownBld.delete(id); bornAt.delete(id); levelSeen.delete(id); upgradedAt.delete(id);
+    if (k.trap || packedAway.delete(id)) continue;   // a sprung trap or a struck camp leaves no ruin
     if (rubble.length >= MAX_RUBBLE) rubble.shift();
     rubble.push({ tx: k.tx, ty: k.ty, w: k.w, h: k.h, spr: bakeRubble(k.w, k.h, k.wall, id) });
   }
@@ -2263,6 +2265,7 @@ export function render() {
   for (const b of drawList) {
     const ci = idx(b.tx + Math.floor(b.def.w / 2), b.ty + Math.floor(b.def.h / 2));
     if (b.owner !== PLAYER && !explored[ci]) continue;
+    if (b.def.trap && hostile(b.owner, PLAYER)) continue;   // you never see their traps
     const px = b.tx * TILE, py = b.ty * TILE;
     const w = b.def.w * TILE, h = b.def.h * TILE;
     const s = bldSprite(b.def.id, b.owner, b.level);
@@ -2709,7 +2712,7 @@ export function renderMinimap() {
   // structures: team plates with a dark rim so they stay crisp on any ground
   mmCtx.lineWidth = 1;
   for (const b of buildings) {
-    if (b.owner !== PLAYER && !explored[idx(b.tx, b.ty)]) continue;
+    if ((b.owner !== PLAYER && !explored[idx(b.tx, b.ty)]) || b.def.trap) continue;
     const bw = Math.max(2.5, b.def.w * sx), bh = Math.max(2.5, b.def.h * sy);
     mmCtx.fillStyle = TEAM_COLORS[b.owner];
     mmCtx.fillRect(b.tx * sx, b.ty * sy, bw, bh);

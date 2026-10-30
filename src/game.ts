@@ -5,7 +5,7 @@ import {
   REPAIR_COST, REPAIR_RATE,
   DmgType, UNIT_ARMOR, UNIT_DMGTYPE, TURRET_DMGTYPE, DMG_TABLE,
   VENT_INCOME, CAPTURE_RADIUS, CAPTURE_TIME, TOWER_VISION, FACTION_NAMES, BROOD, KEEPERS, hostile,
-  kindOf, canMake, producersOf, bonusOf, SLOTS, setSlots, FactionId,
+  kindOf, canMake, producersOf, bonusOf, SLOTS, setSlots, FactionId, rolesOf,
   VET_XP, VET_DMG, VET_HEAL, VET_RELOAD,
 } from './config';
 import * as telemetry from './telemetry';
@@ -49,6 +49,8 @@ export interface Unit {
   returning: boolean;            // walking back to its guard spot after giving up a chase
   ignoreId: number;              // target it just gave up on (-1 none)...
   ignoreTimer: number;           // ...and for how long it won't re-acquire it
+  slowT?: number; slowMul?: number;   // harpooned or snared: speed × slowMul for slowT more seconds
+  packed?: string; packedLevel?: number;   // a Clan Caravan carrying a packed-up building
 }
 
 export interface Building {
@@ -263,6 +265,7 @@ export interface Shell {
   x: number, y: number, sx: number, sy: number, tx: number, ty: number,
   t: number, dur: number, dmg: number, splash: number, owner: number, kind: 'shell' | 'rocket',
   dmgType?: DmgType, by?: number,   // by = firing unit id, for veterancy credit
+  slow?: { mul: number; t: number },  // a harpoon's barb
 }
 // an orbital strike telegraphs a reticle, then a beam slams down and detonates
 export interface Strike { x: number, y: number, t: number, delay: number, owner: number, damage: number, radius: number }
@@ -400,6 +403,9 @@ export function abilityOn(u: Unit): boolean {
 }
 // effective stats fold in any active ability modifiers
 export function unitSpeed(u: Unit): number {
+  return baseSpeed(u) * (u.slowT ? u.slowMul ?? 1 : 1);
+}
+function baseSpeed(u: Unit): number {
   const a = u.def.ability;
   if (a && abilityOn(u)) {
     if (a.immobile) return 0;
@@ -479,7 +485,11 @@ export function canPlace(owner: number, defId: string, tx: number, ty: number, r
         if (tileOf(u.x) === x && tileOf(u.y) === y) return false;
       }
     }
-  if (requireProximity) {
+  // the Clans set traps anywhere they can see, out past the camp
+  if (def.trap && owner === PLAYER) {
+    for (let y = ty; y < ty + def.h; y++) for (let x = tx; x < tx + def.w; x++) if (!visible[idx(x, y)]) return false;
+  }
+  if (requireProximity && !def.trap) {
     let near = false;
     for (const b of buildings) {
       if (b.owner !== owner) continue;
@@ -501,12 +511,13 @@ export function placeBuilding(defId: string, owner: number, tx: number, ty: numb
   };
   buildings.push(b);
   byId.set(b.id, b);
-  for (let y = ty; y < ty + def.h; y++)
+  // traps lie flat in the dirt: nothing paths around them, which is the point
+  if (!def.trap) for (let y = ty; y < ty + def.h; y++)
     for (let x = tx; x < tx + def.w; x++) occupied[idx(x, y)] = b.id;
   emit({ type: 'built', b });
   if (def.grantsHarvester) {
     const spot = nearestTile(tx + def.w, ty + def.h, 8, (x, y) => inBounds(x, y) && terrain[idx(x, y)] === 0 && occupied[idx(x, y)] === -1);
-    if (spot) spawnUnit('harvester', owner, centerOfTile(spot.x), centerOfTile(spot.y));
+    if (spot) spawnUnit(rolesOf(owner).harvester, owner, centerOfTile(spot.x), centerOfTile(spot.y));
   }
   return b;
 }
@@ -597,6 +608,10 @@ export function damage(target: Entity, amount: number, attacker?: Unit) {
     if (sh > 0) { const took = Math.min(sh, amount); target.sh = sh - took; amount -= took; if (amount <= 0) return; }
   }
   if (target.kind === 'unit') amount *= damageTakenMul(target); // Brace soaks damage
+  // the Clans strip what they hit: flux for damage done to harvesters and structures
+  const raid = attacker ? bonusOf(attacker.owner).raid : 0;
+  if (raid && attacker!.owner !== target.owner && (target.kind === 'building' ? !target.def.isWall && !target.def.trap : target.def.harvester))
+    players[attacker!.owner].credits += Math.min(amount, Math.max(0, target.hp)) * raid;
   target.hp -= amount;
   if (attacker) telemetry.fight(attacker.owner, target.owner);
   // "our base is under attack" — alert when any player structure takes a hit
@@ -632,7 +647,7 @@ export function prereqMet(owner: number, tab: Tab, defId: string): boolean {
   if (!techAllowed(owner, defId)) return false;
   if (tab === 'ups') {
     const up = UPGRADES[defId];
-    if (!hasBuilding(owner, 'lab')) return false;
+    if (!hasBuilding(owner, rolesOf(owner).lab)) return false;
     if (players[owner].upgrades.has(defId)) return false;
     if (up.prereqUp && !players[owner].upgrades.has(up.prereqUp)) return false;
     // also not already in queue
@@ -654,7 +669,7 @@ export function requirementText(owner: number, tab: Tab, defId: string): string 
     const up = UPGRADES[defId];
     if (!up) return null;
     if (players[owner].upgrades.has(defId)) return 'Already researched';
-    if (!hasBuilding(owner, 'lab')) return 'Requires a Laboratory';
+    if (!hasBuilding(owner, rolesOf(owner).lab)) return `Requires a ${BUILDINGS[rolesOf(owner).lab].name}`;
     if (up.prereqUp && !players[owner].upgrades.has(up.prereqUp)) return `Requires ${UPGRADES[up.prereqUp].name}`;
     if (players[owner].queues.ups.some(q => q.defId === defId)) return 'Already being researched';
     return null;
@@ -837,8 +852,9 @@ const UNIT_SOUND: Record<string, FieldSound> = {
   shardkin: 'hitMetal', burrower: 'impact', choir: 'arc',   // crystal on crystal: a ringing clink, a crunch, a hum
   skitter: 'bite', spitter: 'spit', carapace: 'bite', moth: 'spit', behemoth: 'artillery',
   acolyte: 'lance', lancer: 'lance', luminar: 'lance', monolith: 'rail',
+  scav: 'rifle', longshot: 'sniper', harpooner: 'rocket', firebrand: 'flame', technical: 'autocannon', rustbucket: 'cannon', mortar: 'artillery',
 };
-const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance' };
+const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance', gunnest: 'autocannon', bombard: 'cannon' };
 const weaponSound = (e: Unit | Building): FieldSound =>
   (e.kind === 'unit' ? UNIT_SOUND[e.def.id] : TURRET_SOUND[e.def.id]) ?? 'rifle';
 // the sound of a round landing on this target
@@ -855,7 +871,7 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
     shells.push({
       x: from.x, y: from.y, sx: from.x, sy: from.y, tx: to.x, ty: to.y,
       t: 0, dur: Math.max(0.2, d / speed), dmg: damageAmt,
-      splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType, by: u.id,
+      splash: (u.def.splash ?? 0.8) * TILE, owner: u.owner, kind: u.def.weapon, dmgType, by: u.id, slow: u.def.slowHit,
     });
     if (audible(from.x, from.y)) sfxAt(weaponSound(u), from.x, from.y);
     return;
@@ -872,7 +888,7 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
 
 export function deployPioneer(u: Unit): boolean {
   if (!u.def.deploysTo) return false;
-  const bid = u.def.deploysTo;
+  const bid = u.packed ?? u.def.deploysTo;
   const spot = nearestTile(tileOf(u.x), tileOf(u.y), 3, (x, y) => canPlace(u.owner, bid, x, y, false));
   if (!spot) {
     if (u.owner === PLAYER) { toast('No room to deploy here'); sfx('error'); }
@@ -880,8 +896,29 @@ export function deployPioneer(u: Unit): boolean {
   }
   units.splice(units.indexOf(u), 1);
   byId.delete(u.id);
-  placeBuilding(bid, u.owner, spot.x, spot.y);
-  if (u.owner === PLAYER) { toast('Command Post deployed — build radius extended'); sfx('place'); }
+  const b = placeBuilding(bid, u.owner, spot.x, spot.y);
+  if (u.packedLevel) { b.level = u.packedLevel; b.maxHp = Math.round(b.maxHp * (1 + BLD_UPGRADE_HP * (b.level - 1))); b.hp = b.maxHp; }
+  if (u.owner === PLAYER) { toast(u.packed ? `${b.def.name} set up` : bid === 'camp' ? 'War Camp set up — build radius extended' : 'Command Post deployed — build radius extended'); sfx('place'); }
+  return true;
+}
+
+// buildings that left without a fight (packed up): the renderer leaves no ruin
+export const packedAway = new Set<number>();
+/** The Clans strike camp: a building folds into a Caravan that can set it up somewhere else. */
+export function packBuilding(b: Building): boolean {
+  if (!b.def.packable || b.upgrading || !byId.has(b.id)) return false;
+  // a producer keeps its queue, but not if it's the last one of its kind
+  const c = buildingCenter(b);
+  byId.delete(b.id);
+  buildings.splice(buildings.indexOf(b), 1);
+  for (let y = b.ty; y < b.ty + b.def.h; y++)
+    for (let x = b.tx; x < b.tx + b.def.w; x++)
+      if (occupied[idx(x, y)] === b.id) occupied[idx(x, y)] = -1;
+  packedAway.add(b.id);
+  const u = spawnUnit('caravan', b.owner, c.x, c.y);
+  u.packed = b.def.id; u.packedLevel = b.level;
+  u.hp = Math.max(1, Math.round(u.maxHp * b.hp / b.maxHp));   // a battered camp packs into a battered wagon
+  if (b.owner === PLAYER) { toast(`${b.def.name} packed up`); sfx('click'); }
   return true;
 }
 
@@ -944,6 +981,7 @@ function findEnemyInRange(e: Entity, rangeTiles: number): Entity | null {
     if (!hostile(t.owner, e.owner)) return;
     // don't auto-acquire walls; they're only attacked on explicit orders or when blocking
     if (t.kind === 'building' && t.def.isWall && e.kind === 'unit' && e.order.type !== 'attack') return;
+    if (t.kind === 'building' && t.def.trap) return;   // nobody sees a trap until it springs
     if (!canHit(e, t)) return;
     const d = distBetween(e, t);
     if (d <= rangePx && d < bestD) { best = t; bestD = d; }
@@ -988,7 +1026,7 @@ function updateHarvester(u: Unit, dt: number) {
   } else if (u.harvestState === 'toBase') {
     let best: Building | null = null, bestD = Infinity;
     for (const b of buildings) {
-      if (b.owner !== u.owner || b.def.id !== 'extractor') continue;
+      if (b.owner !== u.owner || !b.def.grantsHarvester) continue;
       const c = buildingCenter(b);
       const d = Math.hypot(c.x - u.x, c.y - u.y);
       if (d < bestD) { best = b; bestD = d; }
@@ -1193,6 +1231,23 @@ function step(dt: number) {
     }
   }
 
+  // Clan traps spring on the first enemy on foot or wheels to come close, then they're spent
+  for (const b of [...buildings]) {
+    const tr = b.def.trap;
+    if (!tr) continue;
+    const c = buildingCenter(b), r = tr.radius * TILE;
+    const hit = units.filter(u => !u.def.air && hostile(u.owner, b.owner) && Math.hypot(u.x - c.x, u.y - c.y) <= r + u.def.radius * 0.5);
+    if (!hit.length) continue;
+    const victims = tr.slow ? [hit[0]] : hit;   // a snare takes one; a mine takes everyone close
+    for (const u of victims) {
+      damage(u, tr.damage * damageMult(tr.slow ? 'flame' : 'cannon', u));
+      if (tr.slow) { u.slowT = 4; u.slowMul = tr.slow; }
+    }
+    if (audible(c.x, c.y)) sfxAt(tr.slow ? 'hitMetal' : 'explodeVehicle', c.x, c.y, tr.slow ? 0.8 : 1);
+    if (hit.some(u => u.owner === PLAYER)) raiseAlert(c.x, c.y);
+    destroy(b);
+  }
+
   // superweapon buildings recharge over time
   for (const b of buildings) {
     if (b.def.superweapon && b.charge > 0) b.charge = Math.max(0, b.charge - dt);
@@ -1234,7 +1289,9 @@ function step(dt: number) {
       const attacker = firer?.kind === 'unit' ? firer : undefined;
       for (const t of [...units]) {
         if (t.def.air) continue; // ground blasts don't reach aircraft
-        if (hostile(t.owner, s.owner) && Math.hypot(t.x - s.tx, t.y - s.ty) <= s.splash + t.def.radius * 0.5) damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
+        if (!hostile(t.owner, s.owner) || Math.hypot(t.x - s.tx, t.y - s.ty) > s.splash + t.def.radius * 0.5) continue;
+        damage(t, s.dmg * damageMult(s.dmgType, t), attacker);
+        if (s.slow && UNIT_ARMOR[t.def.id] !== 'infantry') { t.slowT = s.slow.t; t.slowMul = s.slow.mul; }   // the barb holds vehicles
       }
       for (const t of [...buildings]) {
         if (t.owner === s.owner) continue;
@@ -1247,6 +1304,7 @@ function step(dt: number) {
   // veterancy self-repair: Veteran+ units slowly regenerate
   for (const u of units) {
     if (u.rank > 0 && u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + VET_HEAL[u.rank] * dt);
+    if (u.slowT) u.slowT = Math.max(0, u.slowT - dt);
   }
 
   // building repairs heal over time (paid when started)
@@ -1328,10 +1386,12 @@ function step(dt: number) {
       if (u.def.harvester || u.def.air) continue; // only ground fighters can hold a point
       if (Math.hypot(u.x - cx, u.y - cy) <= CAPTURE_RADIUS * TILE) present.add(u.owner);
     }
-    n.contested = present.size > 1;
-    if (present.size === 1) {
-      const o = [...present][0];
-      if (n.owner !== o) {
+    // allies standing together don't contest a point; an ally already holding it keeps it
+    const here = [...present];
+    n.contested = here.some(a => here.some(b => hostile(a, b)));
+    if (present.size >= 1 && !n.contested && !present.has(n.owner)) {
+      const o = present.has(PLAYER) ? PLAYER : here[0];
+      {
         if (n.progOwner !== o) { n.progOwner = o; n.prog = 0; }
         n.prog += dt * (bonusOf(o).capture ?? 1);
         if (n.prog >= CAPTURE_TIME) {
@@ -1402,7 +1462,7 @@ function step(dt: number) {
   }
 
   // win / lose: walls don't keep a faction "alive"
-  const alive = (owner: number) => buildings.some(b => b.owner === owner && !b.def.isWall);
+  const alive = (owner: number) => buildings.some(b => b.owner === owner && !b.def.isWall && !b.def.trap) || units.some(u => u.owner === owner && u.packed);
   if (!alive(PLAYER)) { gameOver = 'lose'; endReason = 'eliminated'; }
   else if (mission.checkEnd) {
     const r = mission.checkEnd();

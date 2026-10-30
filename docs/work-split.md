@@ -24,6 +24,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `act3-and-looks`):** `src/ui.ts` takes its campaign end-screen text from `campaign.endingFor(win, eliminated)` (Zero Day has three endings), and clears `iconCache` when the played faction changes, because build icons are now painted with the faction's look (`src/faction-skin.ts`). Keep both when reworking the end screen or the build bar.
 
+**Small cross-file change (Claude, `ashen-clans`):** the Verdant Pact is gone and the Ashen are now the Clans, with their own tech (`isClan`, `rolesOf` in `config.ts`). In `src/ui.ts`: the research tab unlocks from the faction's own lab (`rolesOf(PLAYER).lab`, the Old Forge for the Clans); the action button shows **▲ Pack up [P]** on Clan buildings and **▼ Set up …** on a Caravan; the power pill reads **No grid** when a faction has no power at all. `src/input.ts` has a **P** hotkey for packing up. In `index.html` the third skirmish rival button is hidden unless you play an alien (`main.ts` toggles it).
+
 **Campaign Act II (Claude, `campaign-act2`):** the comms box can carry a choice (`.commschoice` buttons, built in `ui.ts`, styled in `index.html`); the briefing's mission list is grouped by act; `defsFor` in `ui.ts` skips `nonBuildable` units (the Hollow). New portraits in `public/portraits` (Reyes, Vessa Kol, Seren).
 
 **The Vey brood (Claude, `vey-brood`):** new `src/brood.ts` (its AI) and `src/brood-art.ts`. Cross-file: `index.html` has a "The Vey brood: Dormant / Awake" skirmish option (`#broodopts`); `src/main.ts` seeds the brood at the map's centre in `startGame`; `src/ui.ts` keeps `nonBuildable` structures off the build bar.

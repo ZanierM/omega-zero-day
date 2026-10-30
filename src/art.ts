@@ -1421,6 +1421,7 @@ interface SoldierSpec {
   armour: string; armourTop: string;          // body plates
   build: number;                              // 1 = trooper; bulk multiplies width
   helmet: string;
+  visor?: string | null;                      // glint colour across the face (null: none, for a hood or wrap)
   legs?: [string, string, string, string];    // leg top/side, boot top/side (default: dark fatigues)
   extra?: (lift: number) => Limb[];           // kit: weapon, pack, shield...
   glow?: (g: Ctx, a: number, lift: number) => void;   // emissive bits drawn last
@@ -1453,7 +1454,7 @@ function drawSoldier(g: Ctx, a: number, team: string, phase: number, sp: Soldier
     cylinder(g, hx, hy, 1.5 * B, zb + 7, zb + 8, '#4a4d56', '#3a3d46');
     dome(g, hx, hy, 2.9 * B, zb + 8, sp.helmet);
     const [vx, vy] = at(2.2 * B, 0, a);                                     // visor glint, facing forward
-    g.fillStyle = 'rgba(95,224,240,0.9)'; g.fillRect(vx - 1.2, vy - zb - 10.2, 2.4, 1.1);
+    if (sp.visor !== null) { g.fillStyle = sp.visor ?? 'rgba(95,224,240,0.9)'; g.fillRect(vx - 1.2, vy - zb - 10.2, 2.4, 1.1); }
     helmetDone = true;
   };
   for (const l of limbs) {
@@ -1877,3 +1878,7 @@ export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number,
   ...KEEPER_BUILDING_ART,
   ...LANDMARK_ART,
 };
+
+// shared with clan-art.ts, which adds the Ashen Clans to the registries above
+export { OUT, shade, edgeOf, poly, chamfer, prism, cylinder, dome, glow, spill, quad, flag, lamp, rot, at, box, deckPlate, wheel, barrels, detailWalls, speckle, drawSoldier, soldierArt };
+export type { Pt, Ctx, SoldierSpec, Limb };

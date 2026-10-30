@@ -39,8 +39,8 @@ export const SPEAKERS: Record<Speaker, { name: string; role: string; color: stri
   okoye:   { name: 'Sgt. Mara Okoye',   role: 'Helion ground lead',   color: '#4db8ff', portrait: 'okoye.webp' },
   lind:    { name: 'Dr. Teodor Lind',   role: 'Flux engineering',     color: '#43f3ec', portrait: 'lind.webp' },
   kessler: { name: 'Marshal Kessler',   role: 'Kessler Collective',   color: '#e58a3a', portrait: 'kessler.webp' },
-  reyes:   { name: 'Speaker Ama Reyes', role: 'Verdant Pact',         color: '#57c46a', portrait: 'reyes.webp' },
-  vessa:   { name: 'Vessa Kol',         role: 'Ashen Syndicate',      color: '#c2683e', portrait: 'vessa.webp' },
+  reyes:   { name: 'Speaker Ama Reyes', role: 'Hearth Clans',         color: '#57c46a', portrait: 'reyes.webp' },
+  vessa:   { name: 'Vessa Kol',         role: 'Ashen Clans',          color: '#c2683e', portrait: 'vessa.webp' },
   keeper:  { name: 'The Keeper',        role: 'the makers of the Vey', color: '#ffd27a', portrait: 'keeper.webp' },
   seren:   { name: 'Unknown signal',    role: 'source: under the crust', color: '#bfeef2', portrait: 'seren.webp' },
   elder:   { name: 'Seren',             role: 'elder of the Hollow',  color: '#bfeef2', portrait: 'seren.webp' },   // once she has told you her name

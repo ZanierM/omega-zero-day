@@ -1,4 +1,4 @@
-import { PLAYER, TILE, BROOD, KEEPERS, FACTIONS, FactionId, setSlots, resetSlots, kindOf } from './config';
+import { PLAYER, TILE, BROOD, KEEPERS, FACTIONS, FactionId, setSlots, resetSlots, kindOf, rolesOf, isClan } from './config';
 import { generateMap, startBases } from './map';
 import * as game from './game';
 import { update, spawnUnit, placeBuilding, buildingCenter, centerOfTile, initGame } from './game';
@@ -33,14 +33,10 @@ interface SkirmishOpts { credits: number; crystalMul: number; nova: number; broo
 
 async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 5000, crystalMul: 1, nova: 0 }) {
   campaign.endRun();
-  // who sits where: you take slot 0 as your faction; if that's a faction an AI would
-  // have played, Helion stands in for it
-  const slots: FactionId[] = ['helion', 'kessler', 'verdant', 'ashen', 'hollow', 'brood', 'keepers'];
+  // who sits where: you take slot 0 as your faction, the other human factions fill the rivals' slots
   const mine = opts.faction ?? 'helion';
-  const dup = slots.indexOf(mine);
-  if (dup > 0 && dup < 4) slots[dup] = 'helion';
-  slots[0] = mine;
-  setSlots(slots);
+  const rivals = rivalsOf(mine);
+  setSlots([mine, rivals[0], rivals[1], rivals[2] ?? 'hearth', 'hollow', 'brood', 'keepers']);
   generateMap(numEnemies, opts.crystalMul);
   initGame(numEnemies);
   game.setSupernova(opts.nova);
@@ -61,13 +57,12 @@ async function startGame(numEnemies: number, opts: SkirmishOpts = { credits: 500
       centerCameraOn(c.x, c.y);
       continue;
     }
-    const hq = placeBuilding('nexus', owner, b.x, b.y);
-    // starting forces around each HQ
+    const R = rolesOf(owner);
+    const hq = placeBuilding(R.hq, owner, b.x, b.y);
+    // starting forces around each HQ (the Clans bring an extra rifle)
     const cx = hq.tx + 1, cy = hq.ty + 1;
-    spawnUnit('harvester', owner, centerOfTile(cx + 4), centerOfTile(cy));
-    spawnUnit('trooper', owner, centerOfTile(cx - 2), centerOfTile(cy + 3));
-    spawnUnit('trooper', owner, centerOfTile(cx), centerOfTile(cy + 3));
-    spawnUnit('trooper', owner, centerOfTile(cx + 2), centerOfTile(cy + 3));
+    spawnUnit(R.harvester, owner, centerOfTile(cx + 4), centerOfTile(cy));
+    for (const dx of isClan(owner) ? [-3, -1, 1, 3] : [-2, 0, 2]) spawnUnit(R.grunt, owner, centerOfTile(cx + dx), centerOfTile(cy + 3));
     if (owner === PLAYER) {
       const c = buildingCenter(hq);
       centerCameraOn(c.x, c.y);
@@ -134,7 +129,9 @@ window.addEventListener('pagehide', saveNow);
 
 // play-as picker: one card per playable faction
 const factionOpts = document.getElementById('factionopts')!;
-const PLAYABLE: FactionId[] = ['helion', 'kessler', 'verdant', 'ashen', 'brood', 'keepers'];
+const PLAYABLE: FactionId[] = ['helion', 'kessler', 'ashen', 'brood', 'keepers'];
+// the human factions you'd face: the two you aren't (all three if you play an alien)
+function rivalsOf(mine: FactionId): FactionId[] { return (['kessler', 'ashen', 'helion'] as FactionId[]).filter(f => f !== mine); }
 factionOpts.innerHTML = PLAYABLE.map((f, i) => {
   const F = FACTIONS[f];
   return `<button class="opt${i === 0 ? ' sel' : ''}${F.kind !== 'human' ? ' alien' : ''}" type="button" role="radio" aria-checked="${i === 0}" data-f="${f}">`
@@ -143,11 +140,14 @@ factionOpts.innerHTML = PLAYABLE.map((f, i) => {
 function syncAlienOptions() {
   // you can't also fight yourself
   const f = (factionOpts.querySelector('.opt.sel') as HTMLElement | null)?.dataset.f;
-  // the opponent buttons name who you'll actually face (Helion stands in for your faction)
-  const foes = (['kessler', 'verdant', 'ashen'] as FactionId[]).map(x => (x === f ? 'helion' : x));
+  // the opponent buttons name who you'll actually face; a third rival only exists for an alien player
+  const foes = rivalsOf((f ?? 'helion') as FactionId);
   document.querySelectorAll<HTMLElement>('#aiopts .opt span').forEach((sp, i) => {
-    sp.textContent = (i ? '+ ' : '') + FACTIONS[foes[i]].name + (i === 1 ? ' · 76×76' : i === 2 ? ' · 90×90' : '');
+    if (foes[i]) sp.textContent = (i ? '+ ' : '') + FACTIONS[foes[i]].name + (i === 1 ? ' · 76×76' : i === 2 ? ' · 90×90' : '');
   });
+  const third = document.querySelector('#aiopts .opt[data-n="3"]') as HTMLButtonElement;
+  third.hidden = foes.length < 3;
+  if (third.hidden && third.classList.contains('sel')) { third.classList.remove('sel'); document.querySelector('#aiopts .opt[data-n="2"]')!.classList.add('sel'); }
   for (const [row, id] of [['broodopts', 'brood'], ['keeperopts', 'keepers']] as const) {
     const on = document.querySelector(`#${row} .opt[data-v="1"]`) as HTMLButtonElement, off = document.querySelector(`#${row} .opt[data-v="0"]`) as HTMLButtonElement;
     on.disabled = f === id;

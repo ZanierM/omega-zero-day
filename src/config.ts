@@ -46,6 +46,7 @@ export interface UnitDef {
   healAura?: { radius: number; rate: number };   // heals friendly units around it (hp/s; doubled near crystal)
   shield?: number;          // the Keepers: an energy shield that soaks damage first and recharges
   shieldAura?: { radius: number; rate: number };  // restores allies' shields (per second)
+  slowHit?: { mul: number; t: number };            // the Clans' harpoons: a hit slows the target (speed × mul for t s)
 }
 
 // active/toggle unit abilities, fully data-driven
@@ -106,6 +107,8 @@ export interface BuildingDef {
   nonBuildable?: boolean;   // the Vey brood's living structures: never on a build bar
   bloom?: number;           // radius (tiles) of living ground it spreads around itself
   shield?: number;          // the Keepers: an energy shield that soaks damage first and recharges
+  trap?: { damage: number; radius: number; slow?: number };   // the Clans: hidden, springs once on the first enemy to step close
+  packable?: boolean;       // the Clans: can pack up into a Caravan and set up somewhere else
 }
 
 export const UNITS: Record<string, UnitDef> = {
@@ -147,6 +150,25 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'A soldier in a walking bunker. Requires Armor II.' },
   colossus:  { id: 'colossus',  name: 'Colossus',       tab: 'veh', cost: 3000, buildTime: 22, hp: 1500, speed: 1.6, damage: 120, range: 6,  reload: 2.8, vision: 7, radius: 19, model: 'mech', mstep: 3, spriteH: 62, prereq: 'spire', prereqUp: 'wpn2', weapon: 'shell', splash: 1.2, ability: ABILITIES.stomp,
                desc: 'Superheavy siege platform. The ground remembers where it walked. Requires Weapons II.' },
+  // ---- the Ashen Clans: the first miners' grandchildren, left in the deep crust, fighting with what they find ----
+  scav:      { id: 'scav',      name: 'Scav',           tab: 'inf', cost: 140,  buildTime: 4,  hp: 85,   speed: 2.5, damage: 9,   range: 4.5, reload: 1.1, vision: 6, radius: 8,  model: 'soldier', mstep: 1, spriteH: 26, antiAir: true,
+               desc: 'A clan rifle older than the colony charter, and someone who knows every rock to fire it from.' },
+  harpooner: { id: 'harpooner', name: 'Harpooner',      tab: 'inf', cost: 320,  buildTime: 5,  hp: 95,   speed: 2.3, damage: 30,  range: 4.5, reload: 2.2, vision: 6, radius: 8,  model: 'soldier', mstep: 3, spriteH: 26, weapon: 'rocket', slowHit: { mul: 0.5, t: 2.5 },
+               desc: 'A whaling gun from the old mine shafts. The barb pins vehicles in place.' },
+  firebrand: { id: 'firebrand', name: 'Firebrand',      tab: 'inf', cost: 360,  buildTime: 5,  hp: 110,  speed: 2.6, damage: 22,  range: 3.6, reload: 1.6, vision: 5, radius: 8,  model: 'soldier', mstep: 2, spriteH: 26, weapon: 'shell', splash: 0.9,
+               desc: 'Bottles of refinery spirit and a rag. Burns infantry out of cover.' },
+  longshot:  { id: 'longshot',  name: 'Longshot',       tab: 'inf', cost: 550,  buildTime: 8,  hp: 75,   speed: 2.4, damage: 55,  range: 7.5, reload: 3.0, vision: 8, radius: 8,  model: 'soldier', mstep: 3, spriteH: 28, prereq: 'forge', antiAir: true,
+               desc: 'A hunter with a long rifle and a lot of patience. Requires an Old Forge.' },
+  technical: { id: 'technical', name: 'Technical',      tab: 'veh', cost: 450,  buildTime: 6,  hp: 170,  speed: 5.4, damage: 10,  range: 4,   reload: 0.5, vision: 7, radius: 11, model: 'car', mstep: 3, spriteH: 32, antiAir: true, ability: ABILITIES.overdrive,
+               desc: 'A welded pickup with a machine gun bolted in the back. Hit the harvesters, run.' },
+  rustbucket:{ id: 'rustbucket',name: 'Rustbucket',     tab: 'veh', cost: 800,  buildTime: 9,  hp: 520,  speed: 2.4, damage: 36,  range: 4.5, reload: 1.9, vision: 6, radius: 14, model: 'mech2', mstep: 1, spriteH: 36,
+               desc: 'A mining crawler under scrap armour, with a cannon from a museum. It keeps going.' },
+  mortar:    { id: 'mortar',    name: 'Mortar Cart',    tab: 'veh', cost: 950,  buildTime: 10, hp: 210,  speed: 1.9, damage: 70,  range: 9,   reload: 3.8, vision: 7, radius: 13, model: 'car', mstep: 2, spriteH: 30, prereq: 'forge', weapon: 'shell', splash: 1.4,
+               desc: 'A pack beast hauling a tube mortar. Lobs shells from behind the ridge. Requires an Old Forge.' },
+  hauler:    { id: 'hauler',    name: 'Hauler',         tab: 'veh', cost: 1200,  buildTime: 11,  hp: 500,  speed: 2.5, damage: 0,   range: 0,   reload: 0,   vision: 5, radius: 15, model: 'drone', mstep: 1, spriteH: 40, harvester: true,
+               desc: 'A beast-drawn ore wagon. It digs crystal by hand and hauls it to a Smelter.' },
+  caravan:   { id: 'caravan',   name: 'Caravan',        tab: 'veh', cost: 1400, buildTime: 10, hp: 450,  speed: 2.2, damage: 0,   range: 0,   reload: 0,   vision: 6, radius: 15, model: 'drone', mstep: 3, spriteH: 40, prereq: 'smelter', deploysTo: 'camp',
+               desc: 'A wagon train. Sets up a War Camp wherever it stops. A packed-up building rides in one too.' },
   // ---- the Keepers: the Vey's makers, come back to judge (AI only) ----
   acolyte:   { id: 'acolyte',   name: 'Acolyte',        tab: 'inf', cost: 300,  buildTime: 6,  hp: 130,  speed: 2.4, damage: 17,  range: 5.5, reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 3, spriteH: 28, nonBuildable: true, shield: 90, antiAir: true,
                desc: 'Tall, unhurried, wrapped in light. Its rifle is a thread of the sun.' },
@@ -221,8 +243,35 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'Rapid-discharge lightning emitter. Requires Defence Grid I.' },
   bastion:   { id: 'bastion',   name: 'Bastion Battery', tab: 'def',  cost: 3500, buildTime: 18, hp: 1400, power: -60,  w: 2, h: 2, vision: 10, prereq: 'railgun', prereqUp: 'def2', turret: { damage: 150, range: 9, reload: 3.0 }, sprite: 'bld_silo', upgradable: true,
                desc: 'Quad-cannon fortress emplacement. Requires Defence Grid II.' },
+  // ---- the Ashen Clans: cheap, quick, unpowered, and every camp can pack up and move ----
+  hall:      { id: 'hall',      name: 'Great Hall',     tab: 'build', cost: 2500, buildTime: 16, hp: 1300, power: 0,    w: 3, h: 3, vision: 8, upgradable: true, packable: true,
+               desc: 'Timber, hide and a colony hull plate for a roof. The clans meet here. It can pack up and move.' },
+  camp:      { id: 'camp',      name: 'War Camp',       tab: 'build', cost: 1400, buildTime: 1,  hp: 800,  power: 0,    w: 2, h: 2, vision: 8, upgradable: true, packable: true,
+               desc: 'Set up from a Caravan. Lets the clan build (and dig) far from home.' },
+  smelter:   { id: 'smelter',   name: 'Scrap Smelter',  tab: 'build', cost: 1700, buildTime: 11,  hp: 700,  power: 0,    w: 3, h: 2, vision: 5, grantsHarvester: true, packable: true,
+               desc: 'A charcoal furnace that renders crystal into trade flux. Comes with a Hauler.' },
+  longhouse: { id: 'longhouse', name: 'Longhouse',      tab: 'build', cost: 450,  buildTime: 5,  hp: 550,  power: 0,    w: 2, h: 2, vision: 5, produces: 'inf', upgradable: true, packable: true,
+               desc: 'Where the clan sleeps, and arms. Trains infantry.' },
+  scrapyard: { id: 'scrapyard', name: 'Scrapyard',      tab: 'build', cost: 1600, buildTime: 12,  hp: 800,  power: 0,    w: 3, h: 3, vision: 5, prereq: 'smelter', produces: 'veh', upgradable: true, packable: true,
+               desc: 'Wrecks go in one end and something with wheels comes out the other.' },
+  forge:     { id: 'forge',     name: 'Old Forge',      tab: 'build', cost: 1300, buildTime: 9,  hp: 500,  power: 0,    w: 2, h: 2, vision: 5, prereq: 'longhouse', packable: true,
+               desc: 'Smiths who remember the old patterns. Unlocks research, Longshots, Mortars, Bombards and mines.' },
+  lookout:   { id: 'lookout',   name: 'Lookout',        tab: 'build', cost: 300,  buildTime: 4,  hp: 300,  power: 0,    w: 1, h: 1, vision: 13, prereq: 'longhouse', packable: true,
+               desc: 'A tall pole, a platform and someone with good eyes.' },
+  mender:    { id: 'mender',    name: 'Mender\'s Tent', tab: 'build', cost: 900,  buildTime: 8,  hp: 500,  power: 0,    w: 2, h: 2, vision: 5, prereq: 'scrapyard', healRate: 10, packable: true,
+               desc: 'Field surgery and a welding torch. Slowly patches up nearby units.' },
+  palisade:  { id: 'palisade',  name: 'Palisade',       tab: 'def',   cost: 50,   buildTime: 1,  hp: 380,  power: 0,    w: 1, h: 1, vision: 1, isWall: true,
+               desc: 'Sharpened stakes and sheet scrap. Cheap and quick.' },
+  gunnest:   { id: 'gunnest',   name: 'Gun Nest',       tab: 'def',   cost: 600,  buildTime: 5,  hp: 420,  power: 0,    w: 1, h: 1, vision: 7, prereq: 'longhouse', turret: { damage: 20, range: 6, reload: 0.7, antiAir: true }, packable: true,
+               desc: 'Sandbags round an old machine gun. Needs no power.' },
+  bombard:   { id: 'bombard',   name: 'Bombard',        tab: 'def',   cost: 1100, buildTime: 8,  hp: 650,  power: 0,    w: 2, h: 2, vision: 9, prereq: 'forge', turret: { damage: 75, range: 8.5, reload: 2.6 }, packable: true,
+               desc: 'A siege cannon cast in the forge. Slow, loud and heavy.' },
+  snare:     { id: 'snare',     name: 'Snare',          tab: 'def',   cost: 75,   buildTime: 1.5, hp: 60,  power: 0,    w: 1, h: 1, vision: 2, prereq: 'longhouse', limit: 16, trap: { damage: 45, radius: 1.1, slow: 0.35 },
+               desc: 'Wire, a spring and a buried blade. Hidden from the enemy; cuts and slows the first thing to cross it. Set anywhere you can see.' },
+  mine:      { id: 'mine',      name: 'Scrap Mine',     tab: 'def',   cost: 160,  buildTime: 2,  hp: 60,   power: 0,    w: 1, h: 1, vision: 2, prereq: 'forge', limit: 12, trap: { damage: 160, radius: 1.7 },
+               desc: 'Blasting charge from the old shafts, packed with bolts. Hidden from the enemy; set anywhere you can see.' },
   // ---- campaign landmarks ----
-  meridian:  { id: 'meridian',  name: 'The Meridian',   tab: 'build', cost: 0,    buildTime: 1,  hp: 5000, power: 0,    w: 4, h: 3, vision: 7,  nonBuildable: true,
+  meridian:  { id: 'meridian',  name: 'The Meridian',   tab: 'build', cost: 0,    buildTime: 1,  hp: 7000, power: 0,    w: 4, h: 3, vision: 7,  nonBuildable: true,
                desc: 'The first colony ship, two hundred years in the ground. The Hollow were born in her.' },
   lanternshaft:{ id: 'lanternshaft', name: 'Lantern Shaft', tab: 'build', cost: 0, buildTime: 1,  hp: 3200, power: 0,    w: 3, h: 3, vision: 7,  nonBuildable: true,
                desc: 'Project Lantern: Helion\'s deep tap into the heart of the Vey. Something down there is still bleeding light.' },
@@ -251,7 +300,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
 };
 
 // Buildings that can never be queued from the build bar
-export const NON_BUILDABLE = new Set(['nexus', 'outpost']);
+export const NON_BUILDABLE = new Set(['nexus', 'outpost', 'hall', 'camp']);
 
 // building repair: cost fraction of base price for a full heal, healing rate per second
 export const REPAIR_COST = 0.3;
@@ -310,19 +359,21 @@ export const UNIT_ARMOR: Record<string, ArmorClass> = {
   ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light', gunship: 'light', bomber: 'heavy',
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
   shardkin: 'infantry', burrower: 'light', choir: 'infantry',
+  scav: 'infantry', harpooner: 'infantry', firebrand: 'infantry', longshot: 'infantry', technical: 'light', rustbucket: 'heavy', mortar: 'light', hauler: 'light', caravan: 'light',
   skitter: 'light', spitter: 'light', carapace: 'heavy', moth: 'light', behemoth: 'heavy',
   acolyte: 'infantry', lancer: 'light', luminar: 'light', monolith: 'heavy',
 };
 export const UNIT_DMGTYPE: Record<string, DmgType> = {
   trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun', gunship: 'gun', bomber: 'cannon',
   pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
+  scav: 'gun', harpooner: 'rocket', firebrand: 'flame', longshot: 'sniper', technical: 'gun', rustbucket: 'cannon', mortar: 'cannon',
   hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
   shardkin: 'flame', burrower: 'cannon', choir: 'gun',   // shard claws tear soft targets; a burrower crushes
   skitter: 'flame', spitter: 'rocket', carapace: 'cannon', moth: 'gun', behemoth: 'cannon',
   acolyte: 'sniper', lancer: 'rocket', luminar: 'gun', monolith: 'cannon',
 };
 export const TURRET_DMGTYPE: Record<string, DmgType> = {
-  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun', obelisk: 'cannon',
+  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun', obelisk: 'cannon', gunnest: 'gun', bombard: 'cannon',
 };
 // multiplier[weapon dmgType][target armor class]
 export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
@@ -335,26 +386,27 @@ export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
 
 export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes
-export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#a7abb8', '#bfeef2', '#b46cff', '#ffd27a'];   // 4 = the Hollow (campaign), 5 = the Vey brood, 6 = the Keepers
-export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'Verdant Pact', 'Ashen Syndicate', 'The Hollow', 'The Vey Brood', 'The Keepers'];
+export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#d0583a', '#bfeef2', '#b46cff', '#ffd27a'];   // 4 = the Hollow (campaign), 5 = the Vey brood, 6 = the Keepers
+export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'The Hearth Clans', 'The Ashen Clans', 'The Hollow', 'The Vey Brood', 'The Keepers'];
 export const BROOD = 5, KEEPERS = 6;   // the AI slots the aliens use
 
 // ---- factions: who sits in each owner slot this match ----
 // Slots are fixed numbers (0 is always the player); which faction holds each one
 // is set per match, so the player can be any faction. TEAM_COLORS and
 // FACTION_NAMES are rewritten in place to match.
-export type FactionId = 'helion' | 'kessler' | 'verdant' | 'ashen' | 'hollow' | 'brood' | 'keepers';
+// 'hearth' is the campaign's second clan confederation (Reyes's): Clan tech, its own colours
+export type FactionId = 'helion' | 'kessler' | 'ashen' | 'hearth' | 'hollow' | 'brood' | 'keepers';
 export type FactionKind = 'human' | 'hollow' | 'brood' | 'keepers';
 export const FACTIONS: Record<FactionId, { name: string; color: string; kind: FactionKind; blurb: string }> = {
   helion:  { name: 'Helion Dynamics',    color: '#4db8ff', kind: 'human',   blurb: 'Balanced. Harvesters work 20% faster.' },
   kessler: { name: 'Kessler Collective', color: '#e58a3a', kind: 'human',   blurb: 'Armour. Vehicles and defences 15% tougher, turrets hit harder.' },
-  verdant: { name: 'Verdant Pact',       color: '#57c46a', kind: 'human',   blurb: 'Infantry. Troops 20% cheaper and faster to train; vents fall quicker.' },
-  ashen:   { name: 'Ashen Syndicate',    color: '#a7abb8', kind: 'human',   blurb: 'Raids. Fast vehicles and aircraft 20% quicker and 10% cheaper.' },
+  ashen:   { name: 'The Ashen Clans',    color: '#d0583a', kind: 'human',   blurb: 'Guerrillas. Old guns, no power, cheap camps that pack up and move. Hidden traps; raids pay out.' },
+  hearth:  { name: 'The Hearth Clans',   color: '#57c46a', kind: 'human',   blurb: '' },
   hollow:  { name: 'The Hollow',         color: '#bfeef2', kind: 'hollow',  blurb: '' },
   brood:   { name: 'The Vey Brood',      color: '#b46cff', kind: 'brood',   blurb: 'Grow on your bloom, hatch swarms, feed from Vein Wells. No harvesters.' },
   keepers: { name: 'The Keepers',        color: '#ffd27a', kind: 'keepers', blurb: 'Few, shielded, costly. Units arrive by light; Shrines feed you.' },
 };
-const DEFAULT_SLOTS: FactionId[] = ['helion', 'kessler', 'verdant', 'ashen', 'hollow', 'brood', 'keepers'];
+const DEFAULT_SLOTS: FactionId[] = ['helion', 'kessler', 'hearth', 'ashen', 'hollow', 'brood', 'keepers'];   // the campaign's seating
 export const SLOTS: FactionId[] = [...DEFAULT_SLOTS];
 export function setSlots(slots: FactionId[]) {
   SLOTS.splice(0, SLOTS.length, ...slots);
@@ -371,6 +423,21 @@ export const clearAllies = () => ALLIES.clear();
 export const hostile = (a: number, b: number) => a !== b && !ALLIES.has(a < b ? `${a},${b}` : `${b},${a}`)
   && (a === PLAYER || b === PLAYER || !(isVey(a) && isVey(b)));
 
+// the Clans build only their own things; Helion and Kessler build everything else
+export const isClan = (o: number) => SLOTS[o] === 'ashen' || SLOTS[o] === 'hearth';
+const CLAN_TECH = new Set(['smelter', 'longhouse', 'scrapyard', 'forge', 'lookout', 'mender', 'palisade', 'gunnest', 'bombard', 'snare', 'mine',
+  'scav', 'harpooner', 'firebrand', 'longshot', 'technical', 'rustbucket', 'mortar', 'hauler', 'caravan',
+  'wpn1', 'wpn2', 'wpn3', 'arm1', 'arm2', 'arm3', 'def1', 'def2']);
+const CLAN_ONLY = new Set([...CLAN_TECH, 'hall', 'camp'].filter(id => !UPGRADES[id]));
+// the same jobs under each side's names, for code that needs "the HQ" or "the refinery"
+export interface Roles { hq: string; outpost: string; power: string; refinery: string; harvester: string; inf: string; veh: string; lab: string; pioneer: string; grunt: string }
+const HUMAN_ROLES: Roles = { hq: 'nexus', outpost: 'outpost', power: 'solar', refinery: 'extractor', harvester: 'harvester', inf: 'barracks', veh: 'fab', lab: 'lab', pioneer: 'pioneer', grunt: 'trooper' };
+const CLAN_ROLES: Roles = { hq: 'hall', outpost: 'camp', power: '', refinery: 'smelter', harvester: 'hauler', inf: 'longhouse', veh: 'scrapyard', lab: 'forge', pioneer: 'caravan', grunt: 'scav' };
+export const rolesOf = (o: number): Roles => (isClan(o) ? CLAN_ROLES : HUMAN_ROLES);
+export const isHQ = (id: string) => id === 'nexus' || id === 'hall';
+export const isOutpost = (id: string) => id === 'outpost' || id === 'camp';
+export const isLab = (id: string) => id === 'lab' || id === 'forge';
+
 // what each kind of faction can make (humans: everything not marked nonBuildable)
 const BROOD_TECH = new Set(['broodpod', 'veinwell', 'bloomnode', 'spinespire', 'skitter', 'spitter', 'carapace', 'moth', 'behemoth']);
 const KEEPER_TECH = new Set(['sanctum', 'shrine', 'obelisk', 'acolyte', 'lancer', 'luminar', 'monolith']);
@@ -379,6 +446,8 @@ export function canMake(owner: number, id: string): boolean {
   if (k === 'brood') return BROOD_TECH.has(id);
   if (k === 'keepers') return KEEPER_TECH.has(id);
   if (k === 'hollow') return false;
+  if (isClan(owner)) return CLAN_TECH.has(id);
+  if (CLAN_ONLY.has(id)) return false;
   const d = (BUILDINGS as Record<string, { nonBuildable?: boolean }>)[id] ?? (UNITS as Record<string, { nonBuildable?: boolean }>)[id];
   return !!UPGRADES[id] || (!!d && !d.nonBuildable);
 }
@@ -387,15 +456,16 @@ export function producersOf(owner: number, tab: 'inf' | 'veh', air = false): str
   const k = kindOf(owner);
   if (k === 'brood') return ['broodpod', 'heart'];
   if (k === 'keepers') return ['sanctum', 'beacon'];
+  if (isClan(owner)) return tab === 'inf' ? ['longhouse'] : ['scrapyard'];
   return tab === 'inf' ? ['barracks'] : air ? ['skyport', 'fab'] : ['fab'];
 }
 
 // human faction bonuses (also applied to the AI playing that faction)
-export interface FactionBonus { harvest?: number; infCost?: number; infTime?: number; capture?: number; vehHp?: number; defHp?: number; turretDmg?: number; fast?: string[]; fastSpeed?: number; fastCost?: number }
+export interface FactionBonus { raid?: number; harvest?: number; infCost?: number; infTime?: number; capture?: number; vehHp?: number; defHp?: number; turretDmg?: number; fast?: string[]; fastSpeed?: number; fastCost?: number }
 export const BONUS: Partial<Record<FactionId, FactionBonus>> = {
   helion:  { harvest: 1.2 },
   kessler: { vehHp: 1.15, defHp: 1.15, turretDmg: 1.1 },
-  verdant: { infCost: 0.8, infTime: 0.8, capture: 1.4 },
-  ashen:   { fast: ['raider', 'ranger', 'gunship', 'bomber', 'warden'], fastSpeed: 1.2, fastCost: 0.9 },
+  ashen:   { raid: 0.2 },    // flux worth 20% of the damage they do to enemy harvesters and structures
+  hearth:  { raid: 0.2 },
 };
 export const bonusOf = (o: number): FactionBonus => BONUS[SLOTS[o]] ?? {};
