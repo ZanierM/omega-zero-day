@@ -150,10 +150,11 @@ factionOpts.innerHTML = PLAYABLE.map((f, i) => {
 function syncAlienOptions() {
   // you can't also fight yourself
   const f = (factionOpts.querySelector('.opt.sel') as HTMLElement | null)?.dataset.f;
+  document.getElementById('factionblurb')!.textContent = FACTIONS[(f ?? 'helion') as FactionId].blurb;
   // the opponent buttons name who you'll actually face; a third rival only exists for an alien player
   const foes = rivalsOf((f ?? 'helion') as FactionId);
   document.querySelectorAll<HTMLElement>('#aiopts .opt span').forEach((sp, i) => {
-    if (foes[i]) sp.textContent = (i ? '+ ' : '') + FACTIONS[foes[i]].name + (i === 1 ? ' · 76×76' : i === 2 ? ' · 90×90' : '');
+    if (foes[i]) sp.textContent = (i ? '+ ' : '') + FACTIONS[foes[i]].name;
   });
   const third = document.querySelector('#aiopts .opt[data-n="3"]') as HTMLButtonElement;
   third.hidden = foes.length < 3;
@@ -163,6 +164,19 @@ function syncAlienOptions() {
     on.disabled = f === id;
     if (f === id && on.classList.contains('sel')) { on.classList.remove('sel'); off.classList.add('sel'); }
   }
+  syncMoreSummary();
+}
+// the folded options say what's been changed, so nothing set there is a surprise
+function syncMoreSummary() {
+  const sel = (row: string) => document.querySelector<HTMLElement>(`#${row} .opt.sel`);
+  const changed: string[] = [];
+  for (const row of ['creditopts', 'crystalopts', 'landopts', 'novaopts']) {
+    const b = sel(row), first = document.querySelector<HTMLElement>(`#${row} .opt`);
+    const dflt = row === 'landopts' || row === 'novaopts' ? first : document.querySelectorAll<HTMLElement>(`#${row} .opt`)[1];
+    if (b && b !== dflt) changed.push(b.firstChild?.textContent?.trim() ?? '');
+  }
+  for (const [row, name] of [['broodopts', 'Brood'], ['keeperopts', 'Keepers'], ['hollowopts', 'Hollow']]) if (sel(row)?.dataset.v === '1') changed.push(name);
+  document.getElementById('moresummary')!.textContent = changed.length ? changed.join(' · ') : 'Standard match';
 }
 factionOpts.addEventListener('click', e => {
   const btn = e.target instanceof Element ? e.target.closest<HTMLElement>('.opt') : null;
@@ -178,8 +192,10 @@ for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts',
     if (!btn) return;
     document.querySelectorAll(`#${id} .opt`).forEach(b => b.classList.remove('sel'));
     btn.classList.add('sel');
+    syncMoreSummary();
   });
 }
+syncAlienOptions();
 
 // the campaign difficulty is kept with the campaign's progress
 document.getElementById('campdiffopts')!.addEventListener('click', e => {
