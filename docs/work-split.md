@@ -28,6 +28,8 @@ edits the other's files and branches merge cleanly.
 
 **Small cross-file change (Claude, `keeper-translocate-difficulty`):** Keeper ground units have an aimed ability, **Translocate**. In `src/ui.ts` the ability button calls `startTranslocate()` (from `input.ts`) when the unit's ability has `target`; `src/input.ts` takes the next map click (mouse or touch) as the destination, Esc cancels. `index.html` has a campaign-only **Difficulty** row (`#campdiffopts`) under the mission list; `main.ts` saves it with the campaign progress.
 
+**Small cross-file change (Claude, `aliens-hollow-maps-epilogue`):** `index.html` gains two skirmish rows, **The Hollow** (`#hollowopts`) and **Landscape** (`#landopts`, five buttons that wrap on narrow screens). In the landscape-phone media query `.actbtn` now flexes (`1 0 146px`) instead of a fixed 188 px so an action button fits the info strip, and `#abilbtn, #actbtn` ellipsize. `src/ui.ts` drops the `[Q]` / `[P]` / `[S]` key hints below 1000 px or on coarse pointers (`keyHint`), and the last mission's end button opens the epilogue (`src/epilogue.ts`, a self-contained full-screen layer).
+
 **Campaign Act II (Claude, `campaign-act2`):** the comms box can carry a choice (`.commschoice` buttons, built in `ui.ts`, styled in `index.html`); the briefing's mission list is grouped by act; `defsFor` in `ui.ts` skips `nonBuildable` units (the Hollow). New portraits in `public/portraits` (Reyes, Vessa Kol, Seren).
 
 **The Vey brood (Claude, `vey-brood`):** new `src/brood.ts` (its AI) and `src/brood-art.ts`. Cross-file: `index.html` has a "The Vey brood: Dormant / Awake" skirmish option (`#broodopts`); `src/main.ts` seeds the brood at the map's centre in `startGame`; `src/ui.ts` keeps `nonBuildable` structures off the build bar.

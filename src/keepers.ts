@@ -81,7 +81,8 @@ function crystalNear(c: { x: number, y: number }, r: number) {
 
 function pick(): string {
   const t = st.clock, mono = army().filter(u => u.def.id === 'monolith').length;
-  const w: [string, number][] = [['acolyte', 4], ['lancer', t > 60 ? 2.5 : 0], ['luminar', t > 120 ? 1.4 : 0], ['monolith', t > 300 && mono < 3 ? 0.8 : 0]];
+  const w: [string, number][] = [['acolyte', 4], ['seraph', t > 45 ? 2.5 : 0], ['lancer', t > 60 ? 2.5 : 0], ['luminar', t > 120 ? 1.4 : 0], ['oracle', t > 150 ? 1 : 0],
+    ['herald', t > 200 ? 1 : 0], ['arbiter', t > 360 ? 0.7 : 0], ['monolith', t > 300 && mono < 3 ? 0.8 : 0]];
   let r = Math.random() * w.reduce((s, [, v]) => s + v, 0);
   for (const [id, v] of w) if ((r -= v) <= 0) return id;
   return 'acolyte';

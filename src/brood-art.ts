@@ -210,12 +210,67 @@ function drawBehemoth(g: Ctx, a: number, team: string, phase = 0) {
   pillar(true);
 }
 
+
+function drawLurker(g: Ctx, a: number, team: string, phase = 0) {
+  // squat and low, a fan of crystal spines on its back cocked to throw
+  const z = 3.5 + Math.abs(Math.sin(phase * Math.PI * 2)) * 0.4;
+  const legs: LegSpec[] = [{ x: 2, side: -1, reach: 6 }, { x: 2, side: 1, reach: 6 }, { x: -3, side: -1, reach: 6.5 }, { x: -3, side: 1, reach: 6.5 }];
+  shadow(g, 9, 5);
+  walkLegs(g, a, phase, z, legs, 1.3, 1.2, false);
+  const [bx, by] = rotP(-1, 0, a);
+  lobe(g, bx, by - z, 8, 5, a, CHITIN);
+  veins(g, bx, by - z, 8, 5, 3, 21, team + '80');
+  for (const [x, s2, h] of [[-5, -1, 9], [-3, 1, 10], [-1, -1, 11], [-3, 0, 12], [-6, 1, 8]] as number[][]) {
+    const [sx, sy] = rotP(x, s2 * 2, a); spike(g, sx, sy - z - 1, h, 1.4, -0.35 * Math.cos(a));
+  }
+  const [hx, hy] = rotP(5, 0, a);
+  lobe(g, hx, hy - z, 3, 2.4, a, FLESH);
+  eyes(g, a, 6, z + 0.5, team, 1.1);
+  walkLegs(g, a, phase, z, legs, 1.3, 1.2, true);
+}
+
+function drawNurse(g: Ctx, a: number, team: string, phase = 0) {
+  // a swollen sac on short legs, dripping glowing sap
+  const z = 4 + Math.abs(Math.sin(phase * Math.PI * 2)) * 0.8;
+  const legs: LegSpec[] = [{ x: 3, side: -1, reach: 6 }, { x: 3, side: 1, reach: 6 }, { x: -3, side: -1, reach: 6 }, { x: -3, side: 1, reach: 6 }];
+  shadow(g, 9, 5.5);
+  walkLegs(g, a, phase, z, legs, 1.2, 1.1, false);
+  const [bx, by] = rotP(-1, 0, a);
+  g.save(); g.globalAlpha = 0.93;
+  lobe(g, bx, by - z - 2, 8, 7, a, { dk: '#3a1430', mid: '#9a4a78', lt: '#f0b0d8', hi: '#fff' });
+  g.restore();
+  glowAt(g, bx, by - z - 2, 10, 'rgba(140,255,240,0.5)');
+  for (const k of [-3, 0, 3]) { const [dx, dy] = rotP(k - 1, 4, a); g.fillStyle = '#8ef4f0'; g.beginPath(); g.ellipse(dx, dy - z + 2, 0.8, 1.4, 0, 0, Math.PI * 2); g.fill(); }   // drips
+  eyes(g, a, 6, z, team, 1);
+  walkLegs(g, a, phase, z, legs, 1.2, 1.1, true);
+}
+
+function drawStalker(g: Ctx, a: number, team: string, phase = 0) {
+  // long-legged and lean: a narrow body high off the ground, a crystal blade for a head
+  const z = 10 + Math.abs(Math.sin(phase * Math.PI * 2)) * 1.2;
+  const legs: LegSpec[] = [{ x: 5, side: -1, reach: 10 }, { x: 5, side: 1, reach: 10 }, { x: -5, side: -1, reach: 11 }, { x: -5, side: 1, reach: 11 }];
+  shadow(g, 12, 6);
+  walkLegs(g, a, phase, z, legs, 1.6, 3.2, false);
+  const [bx, by] = rotP(-1, 0, a);
+  lobe(g, bx, by - z, 11, 3.6, a, CHITIN);
+  veins(g, bx, by - z, 11, 3.6, 3, 31, team + '90');
+  const [tx, ty] = rotP(-12, 0, a); lobe(g, tx, ty - z + 1, 3.5, 2, a, FLESH);
+  const [hx, hy] = rotP(10, 0, a), [px, py] = rotP(17, 0, a);
+  g.fillStyle = CRY.mid; g.beginPath(); g.moveTo(hx, hy - z - 2); g.lineTo(px, py - z); g.lineTo(hx, hy - z + 2); g.closePath(); g.fill();
+  g.strokeStyle = CRY.hi; g.lineWidth = 0.6; g.beginPath(); g.moveTo(hx, hy - z - 1); g.lineTo(px, py - z); g.stroke();
+  eyes(g, a, 9, z + 1, team, 1.3);
+  walkLegs(g, a, phase, z, legs, 1.6, 3.2, true);
+}
+
 export interface BroodUnitArt { hull: (g: Ctx, a: number, team: string, phase?: number) => void; reach: number; height: number; frames?: number; turn?: number }
 export const BROOD_UNIT_ART: Record<string, BroodUnitArt> = {
   skitter:  { hull: drawSkitter,  reach: 10, height: 14, frames: 4, turn: 12 },
   spitter:  { hull: drawSpitter,  reach: 11, height: 16, frames: 4, turn: 9 },
   carapace: { hull: drawCarapace, reach: 18, height: 26, frames: 4, turn: 5 },
   moth:     { hull: drawMoth,     reach: 17, height: 8, frames: 4, turn: 6 },
+  lurker:   { hull: drawLurker,   reach: 11, height: 16, frames: 4, turn: 8 },
+  nurse:    { hull: drawNurse,    reach: 10, height: 16, frames: 4, turn: 8 },
+  stalker:  { hull: drawStalker,  reach: 18, height: 22, frames: 4, turn: 9 },
   behemoth: { hull: drawBehemoth, reach: 30, height: 48, frames: 4, turn: 2.5 },
 };
 
@@ -309,6 +364,19 @@ function drawSpineSpire(g: Ctx, w: number, _h: number, _level: number, team: str
   g.restore();
 }
 
+
+function drawEvoPit(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save(); const s = w / 64; g.scale(s, s);
+  roots(g, 32, 40, 9, 28, 17);
+  // a churning pit ringed with lips of flesh; shapes half-formed in the glow
+  g.fillStyle = '#1a0614'; g.beginPath(); g.ellipse(32, 40, 22, 11, 0, 0, Math.PI * 2); g.fill();
+  glowAt(g, 32, 40, 20, team + 'a0');
+  for (const [x, y, r] of [[24, 38, 4], [36, 42, 5], [30, 44, 3]] as number[][]) lobe(g, x, y, r, r * 0.7, 0.3, { dk: '#3a1430', mid: '#8a3a68', lt: '#e6a0c8', hi: '#fff' });
+  for (let k = 0; k < 10; k++) { const t = k / 10 * Math.PI * 2; lobe(g, 32 + Math.cos(t) * 22, 40 + Math.sin(t) * 11, 5, 3.4, t, k % 2 ? FLESH : CHITIN); }
+  for (const [x, y, hh, lean] of [[12, 36, 12, -0.2], [52, 34, 14, 0.2], [32, 24, 10, 0]] as number[][]) spike(g, x, y, hh, 2.6, lean);
+  g.restore();
+}
+
 export const BROOD_BUILDING_ART: Record<string, (g: Ctx, w: number, h: number, level: number, team: string) => void> = {
-  heart: drawHeart, broodpod: drawBroodPod, veinwell: drawVeinWell, bloomnode: drawBloomNode, spinespire: drawSpineSpire,
+  heart: drawHeart, broodpod: drawBroodPod, evopit: drawEvoPit, veinwell: drawVeinWell, bloomnode: drawBloomNode, spinespire: drawSpineSpire,
 };

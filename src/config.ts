@@ -66,7 +66,8 @@ export interface AbilityDef {
   immobile?: boolean;  // can't move while the toggle/effect is on
   aoeDmg?: number;     // instant area damage on activation
   aoeRadius?: number;  // tiles
-  target?: boolean;    // aimed: the player clicks a point (the Keepers' translocation)
+  target?: boolean;    // aimed: the player clicks a point (the Keepers' translocation, the Hollow's burrow)
+  reach?: 'visible' | 'explored';   // where an aimed move may land (default: somewhere you can see now)
 }
 
 export const ABILITIES: Record<string, AbilityDef> = {
@@ -80,6 +81,8 @@ export const ABILITIES: Record<string, AbilityDef> = {
                desc: 'Double fire rate for 5s.' },
   translocate:{ id: 'translocate', name: 'Translocate', kind: 'active', cooldown: 45, duration: 0, target: true,
                desc: 'Step into the light and arrive somewhere you can see. Every selected Keeper that is ready goes.' },
+  burrow:     { id: 'burrow',     name: 'Burrow',        kind: 'active', cooldown: 60, duration: 0, target: true, reach: 'explored',
+               desc: 'Go down into the rock and come up anywhere you have scouted. Every selected Hollow that is ready goes.' },
   stomp:      { id: 'stomp',      name: 'Seismic Stomp', kind: 'active', cooldown: 14, duration: 0, aoeDmg: 220, aoeRadius: 2.4,
                desc: 'Slam the ground for heavy damage to everything nearby.' },
 };
@@ -192,12 +195,33 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'Translucent wings veined with light. It drifts over walls and burns what is underneath.' },
   behemoth:  { id: 'behemoth',  name: 'Behemoth',       tab: 'veh', cost: 1700, buildTime: 22,  hp: 2100, speed: 1.3, damage: 110, range: 8.5, reload: 3.6, vision: 8, radius: 22, model: 'mech', mstep: 3, spriteH: 60, nonBuildable: true, weapon: 'shell', splash: 1.7, crystalRegen: 15,
                desc: 'A hill that walks. The crystal on its back fires like a mortar.' },
+  // ---- the Vey brood, more of it ----
+  lurker:    { id: 'lurker',    name: 'Lurker',         tab: 'inf', cost: 300,  buildTime: 6,  hp: 140,  speed: 2.3, damage: 32,  range: 6,   reload: 2.2, vision: 7, radius: 9,  model: 'soldier', mstep: 2, spriteH: 20, nonBuildable: true, weapon: 'rocket', crystalRegen: 3,
+               desc: 'Squats low and flings crystal spines that punch through armour.' },
+  nurse:     { id: 'nurse',     name: 'Brood Nurse',    tab: 'inf', cost: 280,  buildTime: 6,  hp: 170,  speed: 2.4, damage: 5,   range: 3,   reload: 1.0, vision: 6, radius: 9,  model: 'soldier', mstep: 2, spriteH: 20, nonBuildable: true, healAura: { radius: 4, rate: 8 },
+               desc: 'A swollen thing that drips glowing sap. The brood around it knits back together.' },
+  stalker:   { id: 'stalker',   name: 'Stalker',        tab: 'veh', cost: 420,  buildTime: 7,  hp: 300,  speed: 4.6, damage: 22,  range: 1.6, reload: 0.6, vision: 8, radius: 12, model: 'mech', mstep: 2, spriteH: 26, nonBuildable: true, ability: ABILITIES.overdrive, crystalRegen: 4,
+               desc: 'Long-legged and fast. It runs down harvesters and stragglers, then pounces.' },
+  // ---- the Keepers, more of them ----
+  seraph:    { id: 'seraph',    name: 'Seraph',         tab: 'inf', cost: 420,  buildTime: 7,  hp: 160,  speed: 2.2, damage: 20,  range: 2.5, reload: 0.9, vision: 6, radius: 10, model: 'soldier', mstep: 3, spriteH: 30, nonBuildable: true, shield: 220, ability: ABILITIES.translocate,
+               desc: 'A blade of light in each hand and a shield that drinks the first volley.' },
+  oracle:    { id: 'oracle',    name: 'Oracle',         tab: 'inf', cost: 600,  buildTime: 9,  hp: 90,   speed: 2.2, damage: 60,  range: 8,   reload: 3.2, vision: 10, radius: 9, model: 'soldier', mstep: 3, spriteH: 30, nonBuildable: true, shield: 120, antiAir: true, prereq: 'archive', ability: ABILITIES.translocate,
+               desc: 'It sees further than anything on Cinder, and what it sees, it ends. Requires an Archive.' },
+  herald:    { id: 'herald',    name: 'Herald',         tab: 'veh', cost: 700,  buildTime: 9,  hp: 200,  speed: 5.0, damage: 20,  range: 5,   reload: 0.6, vision: 9, radius: 12, model: 'drone', mstep: 3, spriteH: 26, nonBuildable: true, shield: 160, air: true, antiAir: true,
+               desc: 'A gold dart that hunts aircraft. Nothing in the sky is quicker.' },
+  arbiter:   { id: 'arbiter',   name: 'Arbiter',        tab: 'veh', cost: 1300, buildTime: 16, hp: 380,  speed: 1.6, damage: 85,  range: 10,  reload: 3.6, vision: 9, radius: 15, model: 'mech', mstep: 3, spriteH: 40, nonBuildable: true, shield: 300, weapon: 'shell', splash: 1.3, prereq: 'archive',
+               desc: 'A floating lens that gathers sunlight and drops it on whatever it judges. Requires an Archive.' },
+  // ---- the Hollow, as a faction ----
+  delver:    { id: 'delver',    name: 'Delver',         tab: 'veh', cost: 380,  buildTime: 6,  hp: 240,  speed: 4.8, damage: 16,  range: 2,   reload: 0.6, vision: 8, radius: 11, model: 'car', mstep: 2, spriteH: 24, nonBuildable: true, crystalRegen: 5, ability: ABILITIES.burrow,
+               desc: 'A tunnel-runner on all fours, crystal along its spine. First out of the ground, first back in.' },
+  cairn:     { id: 'cairn',     name: 'Cairn',          tab: 'veh', cost: 950,  buildTime: 14, hp: 950,  speed: 1.7, damage: 50,  range: 4.5, reload: 2.0, vision: 6, radius: 16, model: 'mech', mstep: 2, spriteH: 40, nonBuildable: true, crystalRegen: 12, prereq: 'grotto',
+               desc: 'Stones and crystal the Hollow sang into walking. Slow, and very hard to stop. Requires a Grotto.' },
   // ---- the Hollow (campaign): the Meridian's descendants, grown through with the Vey's crystal ----
-  shardkin:  { id: 'shardkin',  name: 'Shardkin',       tab: 'inf', cost: 0,    buildTime: 1,  hp: 150,  speed: 2.7, damage: 15,  range: 2.4, reload: 0.7, vision: 6, radius: 8,  model: 'soldier', mstep: 2, spriteH: 26, nonBuildable: true, crystalRegen: 6,
+  shardkin:  { id: 'shardkin',  name: 'Shardkin',       tab: 'inf', cost: 180,  buildTime: 4,  hp: 150,  speed: 2.7, damage: 15,  range: 2.4, reload: 0.7, vision: 6, radius: 8,  model: 'soldier', mstep: 2, spriteH: 26, nonBuildable: true, crystalRegen: 6, ability: ABILITIES.burrow,
                desc: 'Hollow kin with crystal grown through them. Fast, close in, and they mend standing near crystal.' },
-  burrower:  { id: 'burrower',  name: 'Burrower',       tab: 'inf', cost: 0,    buildTime: 1,  hp: 420,  speed: 2.0, damage: 42,  range: 1.8, reload: 1.4, vision: 5, radius: 11, model: 'soldier', mstep: 2, spriteH: 30, nonBuildable: true, crystalRegen: 10,
+  burrower:  { id: 'burrower',  name: 'Burrower',       tab: 'inf', cost: 450,  buildTime: 8,  hp: 420,  speed: 2.0, damage: 42,  range: 1.8, reload: 1.4, vision: 5, radius: 11, model: 'soldier', mstep: 2, spriteH: 30, nonBuildable: true, crystalRegen: 10, ability: ABILITIES.burrow,
                desc: 'A hunched crystal-backed brute that comes up through the rock under machines and crushes them.' },
-  choir:     { id: 'choir',     name: 'Choir',          tab: 'inf', cost: 0,    buildTime: 1,  hp: 110,  speed: 2.2, damage: 6,   range: 5,   reload: 1.2, vision: 8, radius: 8,  model: 'soldier', mstep: 2, spriteH: 28, nonBuildable: true, healAura: { radius: 4, rate: 9 },
+  choir:     { id: 'choir',     name: 'Choir',          tab: 'inf', cost: 300,  buildTime: 6,  hp: 110,  speed: 2.2, damage: 6,   range: 5,   reload: 1.2, vision: 8, radius: 8,  model: 'soldier', mstep: 2, spriteH: 28, nonBuildable: true, healAura: { radius: 4, rate: 9 },
                desc: 'Hollow singer. Its song closes wounds in every Hollow around it, louder near crystal.' },
 };
 
@@ -278,6 +302,23 @@ export const BUILDINGS: Record<string, BuildingDef> = {
                desc: 'The first colony ship, two hundred years in the ground. The Hollow were born in her.' },
   lanternshaft:{ id: 'lanternshaft', name: 'Lantern Shaft', tab: 'build', cost: 0, buildTime: 1,  hp: 6000, power: 0,    w: 3, h: 3, vision: 7,  nonBuildable: true,
                desc: 'Project Lantern: Helion\'s deep tap into the heart of the Vey. Something down there is still bleeding light.' },
+  // ---- research for the aliens ----
+  evopit:    { id: 'evopit',    name: 'Evolution Pit',  tab: 'build', cost: 900,  buildTime: 14,  hp: 900,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true, bloom: 3,
+               desc: 'A pit of churning flesh where the brood tries new shapes. Unlocks research.' },
+  archive:   { id: 'archive',   name: 'Archive',        tab: 'build', cost: 900,  buildTime: 14,  hp: 700,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true, shield: 500,
+               desc: 'Everything the Keepers remember, folded into a cube of light. Unlocks research, Oracles and Arbiters.' },
+  // ---- the Hollow, as a faction: hearths in the rock, fed by crystal ----
+  hearthstone:{ id: 'hearthstone', name: 'Hollow Hearth', tab: 'build', cost: 0, buildTime: 1,  hp: 2600, power: 0,    w: 3, h: 3, vision: 9,  nonBuildable: true,
+               desc: 'A crystal-lit cavern mouth where the Hollow live. Everything they are comes up out of it.' },
+  tunnelmouth:{ id: 'tunnelmouth', name: 'Tunnel Mouth', tab: 'build', cost: 500, buildTime: 8,  hp: 800,  power: 0,    w: 2, h: 2, vision: 6,  nonBuildable: true,
+               desc: 'A shaft the Hollow dug and lined with crystal. Their kin come up through it.' },
+  geode:     { id: 'geode',     name: 'Geode',          tab: 'build', cost: 450,  buildTime: 9,  hp: 650,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true,
+               desc: 'A cracked-open crystal the Hollow sing to. It gives them flux, more if it stands near a crystal field.' },
+  grotto:    { id: 'grotto',    name: 'Grotto',         tab: 'build', cost: 900,  buildTime: 14,  hp: 750,  power: 0,    w: 2, h: 2, vision: 5,  nonBuildable: true,
+               desc: 'Where the elders keep the old colony\'s books. Unlocks research and Cairns.' },
+  echo:      { id: 'echo',      name: 'Echo Spire',     tab: 'def',   cost: 450,  buildTime: 8,   hp: 600,  power: 0,    w: 1, h: 1, vision: 8,  nonBuildable: true,
+               turret: { damage: 28, range: 6.5, reload: 1.0, antiAir: true },
+               desc: 'A tall crystal that sings a note sharp enough to cut.' },
   // ---- the Keepers: arrive in light, never built (AI only) ----
   beacon:    { id: 'beacon',    name: 'Keeper Beacon',  tab: 'build', cost: 0,    buildTime: 1,  hp: 2200, power: 0,    w: 3, h: 3, vision: 10, nonBuildable: true, shield: 1400,
                desc: 'A spire of pale gold that sings at the sky. Whatever the Keepers send comes down its light.' },
@@ -361,7 +402,8 @@ export const UNIT_ARMOR: Record<string, ArmorClass> = {
   trooper: 'infantry', rocketeer: 'infantry', vanguard: 'infantry', pyro: 'infantry', sniper: 'infantry',
   ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light', gunship: 'light', bomber: 'heavy',
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
-  shardkin: 'infantry', burrower: 'light', choir: 'infantry',
+  shardkin: 'infantry', burrower: 'light', choir: 'infantry', delver: 'light', cairn: 'heavy',
+  lurker: 'infantry', nurse: 'infantry', stalker: 'light', seraph: 'infantry', oracle: 'infantry', herald: 'light', arbiter: 'heavy',
   scav: 'infantry', harpooner: 'infantry', firebrand: 'infantry', longshot: 'infantry', technical: 'light', rustbucket: 'heavy', mortar: 'light', hauler: 'light', caravan: 'light',
   skitter: 'light', spitter: 'light', carapace: 'heavy', moth: 'light', behemoth: 'heavy',
   acolyte: 'infantry', lancer: 'light', luminar: 'light', monolith: 'heavy',
@@ -371,12 +413,13 @@ export const UNIT_DMGTYPE: Record<string, DmgType> = {
   pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
   scav: 'gun', harpooner: 'rocket', firebrand: 'flame', longshot: 'sniper', technical: 'gun', rustbucket: 'cannon', mortar: 'cannon',
   hovertank: 'cannon', artillery: 'cannon', dominator: 'cannon', colossus: 'cannon',
-  shardkin: 'flame', burrower: 'cannon', choir: 'gun',   // shard claws tear soft targets; a burrower crushes
+  shardkin: 'flame', burrower: 'cannon', choir: 'gun', delver: 'flame', cairn: 'cannon',
+  lurker: 'rocket', nurse: 'gun', stalker: 'flame', seraph: 'flame', oracle: 'sniper', herald: 'gun', arbiter: 'cannon',   // shard claws tear soft targets; a burrower crushes
   skitter: 'flame', spitter: 'rocket', carapace: 'cannon', moth: 'gun', behemoth: 'cannon',
   acolyte: 'sniper', lancer: 'rocket', luminar: 'gun', monolith: 'cannon',
 };
 export const TURRET_DMGTYPE: Record<string, DmgType> = {
-  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun', obelisk: 'cannon', gunnest: 'gun', bombard: 'cannon',
+  turret: 'gun', arctower: 'gun', railgun: 'cannon', bastion: 'cannon', spinespire: 'gun', obelisk: 'cannon', gunnest: 'gun', bombard: 'cannon', echo: 'gun',
 };
 // multiplier[weapon dmgType][target armor class]
 export const DMG_TABLE: Record<DmgType, Record<ArmorClass, number>> = {
@@ -391,7 +434,7 @@ export const PLAYER = 0;
 // player is blue; AI opponents take the other Kenney unit palettes
 export const TEAM_COLORS = ['#4db8ff', '#e58a3a', '#57c46a', '#d0583a', '#bfeef2', '#b46cff', '#ffd27a'];   // 4 = the Hollow (campaign), 5 = the Vey brood, 6 = the Keepers
 export const FACTION_NAMES = ['Helion Dynamics', 'Kessler Collective', 'The Hearth Clans', 'The Ashen Clans', 'The Hollow', 'The Vey Brood', 'The Keepers'];
-export const BROOD = 5, KEEPERS = 6;   // the AI slots the aliens use
+export const HOLLOW = 4, BROOD = 5, KEEPERS = 6;   // the AI slots the aliens use
 
 // ---- factions: who sits in each owner slot this match ----
 // Slots are fixed numbers (0 is always the player); which faction holds each one
@@ -405,7 +448,7 @@ export const FACTIONS: Record<FactionId, { name: string; color: string; kind: Fa
   kessler: { name: 'Kessler Collective', color: '#e58a3a', kind: 'human',   blurb: 'Armour. Vehicles and defences 15% tougher, turrets hit harder.' },
   ashen:   { name: 'The Ashen Clans',    color: '#d0583a', kind: 'human',   blurb: 'Guerrillas. Old guns, no power, cheap camps that pack up and move. Hidden traps; raids pay out.' },
   hearth:  { name: 'The Hearth Clans',   color: '#57c46a', kind: 'human',   blurb: '' },
-  hollow:  { name: 'The Hollow',         color: '#bfeef2', kind: 'hollow',  blurb: '' },
+  hollow:  { name: 'The Hollow',         color: '#bfeef2', kind: 'hollow',  blurb: 'Tunnels. Kin heal near crystal; burrow anywhere you have scouted. Geodes feed you.' },
   brood:   { name: 'The Vey Brood',      color: '#b46cff', kind: 'brood',   blurb: 'Grow on your bloom, hatch swarms, feed from Vein Wells. No harvesters.' },
   keepers: { name: 'The Keepers',        color: '#ffd27a', kind: 'keepers', blurb: 'Few, shielded, costly. Units arrive by light; Shrines feed you.' },
 };
@@ -436,19 +479,26 @@ const CLAN_ONLY = new Set([...CLAN_TECH, 'hall', 'camp'].filter(id => !UPGRADES[
 export interface Roles { hq: string; outpost: string; power: string; refinery: string; harvester: string; inf: string; veh: string; lab: string; pioneer: string; grunt: string }
 const HUMAN_ROLES: Roles = { hq: 'nexus', outpost: 'outpost', power: 'solar', refinery: 'extractor', harvester: 'harvester', inf: 'barracks', veh: 'fab', lab: 'lab', pioneer: 'pioneer', grunt: 'trooper' };
 const CLAN_ROLES: Roles = { hq: 'hall', outpost: 'camp', power: '', refinery: 'smelter', harvester: 'hauler', inf: 'longhouse', veh: 'scrapyard', lab: 'forge', pioneer: 'caravan', grunt: 'scav' };
-export const rolesOf = (o: number): Roles => (isClan(o) ? CLAN_ROLES : HUMAN_ROLES);
-export const isHQ = (id: string) => id === 'nexus' || id === 'hall';
+// the aliens only need their research building (and HQ) from this table
+const ALIEN_ROLES: Record<'brood' | 'keepers' | 'hollow', Roles> = {
+  brood:   { ...HUMAN_ROLES, hq: 'heart', power: '', refinery: 'veinwell', inf: 'broodpod', veh: 'broodpod', lab: 'evopit', grunt: 'skitter' },
+  keepers: { ...HUMAN_ROLES, hq: 'beacon', power: '', refinery: 'shrine', inf: 'sanctum', veh: 'sanctum', lab: 'archive', grunt: 'acolyte' },
+  hollow:  { ...HUMAN_ROLES, hq: 'hearthstone', power: '', refinery: 'geode', inf: 'tunnelmouth', veh: 'tunnelmouth', lab: 'grotto', grunt: 'shardkin' },
+};
+export const rolesOf = (o: number): Roles => { const k = kindOf(o); return k === 'human' ? (isClan(o) ? CLAN_ROLES : HUMAN_ROLES) : ALIEN_ROLES[k]; };
+export const isHQ = (id: string) => id === 'nexus' || id === 'hall' || id === 'hearthstone';
 export const isOutpost = (id: string) => id === 'outpost' || id === 'camp';
 export const isLab = (id: string) => id === 'lab' || id === 'forge';
 
 // what each kind of faction can make (humans: everything not marked nonBuildable)
-const BROOD_TECH = new Set(['broodpod', 'veinwell', 'bloomnode', 'spinespire', 'skitter', 'spitter', 'carapace', 'moth', 'behemoth']);
-const KEEPER_TECH = new Set(['sanctum', 'shrine', 'obelisk', 'acolyte', 'lancer', 'luminar', 'monolith']);
+const BROOD_TECH = new Set(['broodpod', 'veinwell', 'bloomnode', 'spinespire', 'evopit', 'skitter', 'spitter', 'lurker', 'nurse', 'carapace', 'stalker', 'moth', 'behemoth', 'wpn1', 'wpn2', 'wpn3', 'arm1', 'arm2', 'arm3', 'def1', 'def2']);
+const KEEPER_TECH = new Set(['sanctum', 'shrine', 'obelisk', 'archive', 'acolyte', 'seraph', 'oracle', 'lancer', 'luminar', 'herald', 'monolith', 'arbiter', 'wpn1', 'wpn2', 'wpn3', 'arm1', 'arm2', 'arm3', 'def1', 'def2']);
+const HOLLOW_TECH = new Set(['tunnelmouth', 'geode', 'grotto', 'echo', 'shardkin', 'burrower', 'choir', 'delver', 'cairn', 'wpn1', 'wpn2', 'wpn3', 'arm1', 'arm2', 'arm3', 'def1', 'def2']);
 export function canMake(owner: number, id: string): boolean {
   const k = kindOf(owner);
   if (k === 'brood') return BROOD_TECH.has(id);
   if (k === 'keepers') return KEEPER_TECH.has(id);
-  if (k === 'hollow') return false;
+  if (k === 'hollow') return HOLLOW_TECH.has(id);
   if (isClan(owner)) return CLAN_TECH.has(id);
   if (CLAN_ONLY.has(id)) return false;
   const d = (BUILDINGS as Record<string, { nonBuildable?: boolean }>)[id] ?? (UNITS as Record<string, { nonBuildable?: boolean }>)[id];
@@ -459,6 +509,7 @@ export function producersOf(owner: number, tab: 'inf' | 'veh', air = false): str
   const k = kindOf(owner);
   if (k === 'brood') return ['broodpod', 'heart'];
   if (k === 'keepers') return ['sanctum', 'beacon'];
+  if (k === 'hollow') return ['tunnelmouth', 'hearthstone'];
   if (isClan(owner)) return tab === 'inf' ? ['longhouse'] : ['scrapyard'];
   return tab === 'inf' ? ['barracks'] : air ? ['skyport', 'fab'] : ['fab'];
 }

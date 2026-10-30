@@ -3,6 +3,7 @@ import {
   FACTION_NAMES, SLOTS, rolesOf,
 } from './config';
 import * as campaign from './campaign/runner';
+import { showEpilogue } from './epilogue';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
   gameOver, endReason, corridor, techAllowed, costFor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
@@ -360,6 +361,9 @@ function selectedOwnPioneer(): Unit | null {
   return null;
 }
 
+// keyboard hints only where there's room and a keyboard: not on a phone or a folded screen
+const keyHint = (k: string) => (innerWidth < 1000 || matchMedia('(pointer: coarse)').matches ? '' : ` [${k}]`);
+
 // selected player units that share an ability (the button acts on all of them)
 function abilityUnits(): Unit[] {
   const out: Unit[] = [];
@@ -459,13 +463,13 @@ export function updateUI() {
     if (ab.kind === 'toggle') {
       const on = abilityOn(u);
       abilBtn.classList.toggle('on', on);
-      abilBtn.textContent = `${on ? '◆' : '◇'} ${ab.name} [Q]`;
+      abilBtn.textContent = `${on ? '◆' : '◇'} ${ab.name}${keyHint('Q')}`;
       abilBtn.disabled = false;
     } else {
       abilBtn.classList.remove('on');
       if (u.abilityTimer > 0) { abilBtn.textContent = `${ab.name} active`; abilBtn.disabled = true; }
       else if (u.abilityCd > 0) { abilBtn.textContent = `${ab.name} ${Math.ceil(u.abilityCd)}s`; abilBtn.disabled = true; }
-      else { abilBtn.textContent = `⚡ ${ab.name} [Q]`; abilBtn.disabled = false; }
+      else { abilBtn.textContent = `⚡ ${ab.name}${keyHint('Q')}`; abilBtn.disabled = false; }
     }
   } else {
     abilBtn.style.visibility = 'hidden';
@@ -505,7 +509,7 @@ export function updateUI() {
   } else if (ob && ob.def.packable && (ob.hp >= ob.maxHp || ob.repairing)) {
     // the Clans strike camp: [P] packs a damaged one too
     actBtn.style.visibility = 'visible';
-    actBtn.textContent = '▲ Pack up [P]';
+    actBtn.textContent = `▲ Pack up${keyHint('P')}`;
     actBtn.disabled = !!ob.upgrading;
   } else if (ob && ob.hp < ob.maxHp) {
     actBtn.style.visibility = 'visible';
@@ -513,7 +517,8 @@ export function updateUI() {
     else { actBtn.textContent = `🔧 Repair — ◈${repairCost(ob)}`; actBtn.disabled = false; }
   } else if (showHalt) {
     actBtn.style.visibility = 'visible';
-    if (actBtn.textContent !== '■ Halt [S]') actBtn.textContent = '■ Halt [S]';
+    const halt = `■ Halt${keyHint('S')}`;
+    if (actBtn.textContent !== halt) actBtn.textContent = halt;
     actBtn.disabled = false;
   } else {
     actBtn.style.visibility = 'hidden';
@@ -601,8 +606,10 @@ export function updateUI() {
       overlayTitle.textContent = end.title;
       overlaySub.textContent = end.text;
       const last = gameOver === 'win' && campaign.isLastMission();
-      againBtn.textContent = last ? 'Back to the campaign' : gameOver === 'win' ? 'Next mission ▸' : 'Retry mission';
-      againBtn.onclick = () => { campaign.queueMission(gameOver === 'win'); location.reload(); };
+      againBtn.textContent = last ? 'Epilogue ▸' : gameOver === 'win' ? 'Next mission ▸' : 'Retry mission';
+      againBtn.onclick = last
+        ? () => showEpilogue(campaign.endingChosen(), campaign.progress().flags ?? {}, () => location.reload())
+        : () => { campaign.queueMission(gameOver === 'win'); location.reload(); };
     }
     if (!overlayStats.childElementCount) {
       const rows: [string, string][] = [

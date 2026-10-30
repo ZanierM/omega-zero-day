@@ -9,10 +9,11 @@ import {
   units, buildings, players, spawnUnit, placeBuilding, issueOrder, centerOfTile, buildingCenter,
   initGame, ensureFaction, mission, resetMission, gameEvents, GameEvent, stats, explored, toast, pings, Unit,
 } from '../game';
-import { generateMap, seedMap, startBases, neutralSpots, terrain, occupied, idx, inBounds, MAP_W, MAP_H, nearestTile } from '../map';
+import { generateMap, seedMap, startBases, neutralSpots, terrain, occupied, idx, inBounds, MAP_W, MAP_H, nearestTile, setLand } from '../map';
 import { initAI } from '../ai';
 import { initBrood } from '../brood';
 import { initKeepers } from '../keepers';
+import { initHollow } from '../hollow';
 import { centerCameraOn } from '../input';
 import { MISSIONS, MissionDef } from './missions';
 
@@ -235,6 +236,7 @@ export function setupMission(id: string) {
   if (!d) throw new Error(`Unknown mission ${id}`);
   resetSlots();   // the campaign is always Helion's story
   seedMap(d.seed);
+  setLand('scrub');   // the campaign's maps are hand-made on the plains
   generateMap(d.enemies, d.crystalMul ?? 1, d.size);
   initGame(d.enemies);
   ensureFaction(4);   // the Hollow's slot exists in every mission, used or not
@@ -248,6 +250,7 @@ export function setupMission(id: string) {
   d.setup(c);
   initBrood(false);
   initKeepers(false);
+  initHollow(false);   // the campaign's Hollow are scripted, not run by the skirmish AI
   initAI(d.enemies, cd, d.aiOwners ?? []);
   const hq = buildings.find(b => b.owner === PLAYER);
   if (hq) { const p = buildingCenter(hq); centerCameraOn(p.x, p.y); }
@@ -258,6 +261,8 @@ export function bootComms() { if (def && run) def.intro(makeCtx()); }
 // ---------- save / resume ----------
 /** Dev: the live run state (for testing mission flows from the console). */
 export const debugRun = () => run;
+/** Which of Zero Day's endings was chosen (1 fire, 2 give, 3 seed), for the epilogue. */
+export const endingChosen = (): number => run?.vars.ending ?? 1;
 export function snapshotRun(): RunState | null { return run && JSON.parse(JSON.stringify(run)); }
 export function resumeRun(r: RunState) {
   const d = MISSIONS.find(m => m.id === r.id);

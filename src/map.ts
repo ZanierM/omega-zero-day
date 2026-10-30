@@ -11,6 +11,11 @@ export let crystal: Uint16Array;
 export let occupied: Int32Array;
 // ground tint variation for rendering
 export let tint: Uint8Array;
+// the landscape a skirmish is fought over: it shapes the terrain here and the ground colours in render.ts
+export type Land = 'scrub' | 'ash' | 'canyon' | 'ruins';
+export const LANDS: Land[] = ['scrub', 'ash', 'canyon', 'ruins'];
+export let land: Land = 'scrub';
+export function setLand(l: Land) { land = l; }
 
 export const idx = (x: number, y: number) => y * MAP_W + x;
 export const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < MAP_W && y < MAP_H;
@@ -81,18 +86,22 @@ export function generateMap(numEnemies: number, crystalMul = 1, sizeOverride?: n
   startBases = pickBasePositions(numEnemies);
   const bases = startBases;
 
+  const nearBase = (x: number, y: number, r: number) => bases.some(b => Math.hypot(x - (b.x + 1), y - (b.y + 1)) < r);
+  if (land === 'canyon') carveCanyons(nearBase);
+  else if (land === 'ruins') buildRuins(nearBase);
   // Rock formations and alien forest scattered around, away from every base
-  const rockCount = Math.floor(MAP_W * MAP_H / 260);
+  // (ash flats: more, smaller basalt spires and no forest; the canyons and the city have their own walls)
+  const rockCount = Math.floor(MAP_W * MAP_H / (land === 'ash' ? 200 : land === 'scrub' ? 260 : 900));
   for (let n = 0; n < rockCount; n++) {
     const x = 8 + Math.floor(rand() * (MAP_W - 16));
     const y = 8 + Math.floor(rand() * (MAP_H - 16));
-    if (bases.some(b => Math.hypot(x - (b.x + 1), y - (b.y + 1)) < 15)) continue;
-    const kind = rand() < 0.4 ? 3 : 1;
-    blob(x, y, 2 + Math.floor(rand() * 3), (tx, ty) => { terrain[idx(tx, ty)] = kind; });
+    if (nearBase(x, y, 15)) continue;
+    const kind = land === 'ash' ? 1 : rand() < (land === 'ruins' ? 0.7 : 0.4) ? 3 : 1;
+    blob(x, y, (land === 'ash' ? 1 : 2) + Math.floor(rand() * 3), (tx, ty) => { terrain[idx(tx, ty)] = kind; });
   }
 
-  // A few small lakes, kept well clear of the bases so home crystal stays dry
-  const lakeCount = Math.floor(MAP_W * MAP_H / 700);
+  // A few small lakes, kept well clear of the bases so home crystal stays dry (none on the ash or in the canyons)
+  const lakeCount = land === 'scrub' ? Math.floor(MAP_W * MAP_H / 700) : land === 'ruins' ? Math.floor(MAP_W * MAP_H / 1800) : 0;
   for (let n = 0; n < lakeCount; n++) {
     const x = 6 + Math.floor(rand() * (MAP_W - 12));
     const y = 6 + Math.floor(rand() * (MAP_H - 12));
@@ -119,6 +128,8 @@ export function generateMap(numEnemies: number, crystalMul = 1, sizeOverride?: n
       5 + Math.floor(rand() * 3),
     ]);
   }
+  // the ash flats scatter their crystal in many small patches
+  if (land === 'ash') for (let i = 0; i < 3 + numEnemies * 2; i++) fields.push([Math.floor(MAP_W * (0.15 + rand() * 0.7)), Math.floor(MAP_H * (0.15 + rand() * 0.7)), 2 + Math.floor(rand() * 2)]);
   fields.forEach(([fx, fy, r], fi) => {
     const rich = fi >= homeFieldCount ? 1.7 : 1;
     blob(fx, fy, r, (x, y) => {
@@ -153,22 +164,49 @@ export function generateMap(numEnemies: number, crystalMul = 1, sizeOverride?: n
   }
 }
 
+// long ridges of rock across the map, each broken by passes so nothing is cut off
+function carveCanyons(nearBase: (x: number, y: number, r: number) => boolean) {
+  const ridges = 3 + Math.floor(MAP_W / 25);
+  for (let n = 0; n < ridges; n++) {
+    let x = 6 + rand() * (MAP_W - 12), y = 6 + rand() * (MAP_H - 12);
+    const ang = rand() * Math.PI, len = 14 + Math.floor(rand() * 14);
+    let gap = 4 + Math.floor(rand() * 4);
+    for (let k = 0; k < len; k++) {
+      x += Math.cos(ang + Math.sin(k * 0.4) * 0.3); y += Math.sin(ang + Math.sin(k * 0.4) * 0.3);
+      if (--gap <= 0) { if (gap <= -2) gap = 5 + Math.floor(rand() * 4); continue; }   // a three-tile pass
+      const tx = Math.round(x), ty = Math.round(y);
+      if (nearBase(tx, ty, 14) || Math.hypot(tx - MAP_W / 2, ty - MAP_H / 2) < 5) continue;
+      for (let dy = 0; dy <= 1; dy++) for (let dx = 0; dx <= 1; dx++) if (inBounds(tx + dx, ty + dy)) terrain[idx(tx + dx, ty + dy)] = 1;
+    }
+  }
+}
+// a dead colony town: blocks of rubble on a street grid, with plazas left open
+function buildRuins(nearBase: (x: number, y: number, r: number) => boolean) {
+  const cell = 7, off = Math.floor(rand() * cell);
+  for (let by = off; by < MAP_H - 4; by += cell) for (let bx = off; bx < MAP_W - 4; bx += cell) {
+    if (rand() < 0.3) continue;                                         // a plaza
+    const w = 2 + Math.floor(rand() * 3), h = 2 + Math.floor(rand() * 3);
+    if (nearBase(bx + w / 2, by + h / 2, 14) || Math.hypot(bx - MAP_W / 2, by - MAP_H / 2) < 7) continue;
+    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) if (inBounds(x, y) && rand() > 0.12) terrain[idx(x, y)] = 1;
+  }
+}
+
 // Find nearest tile matching a predicate via expanding ring search
 // ---------- save / resume ----------
 // occupancy isn't saved: placing the saved buildings rebuilds it
 
 export interface MapSnapshot {
-  w: number; h: number; seed: number;
+  w: number; h: number; seed: number; land?: Land;
   terrain: number[]; crystal: number[]; tint: number[];
   startBases: { x: number, y: number }[];
   neutralSpots: { x: number, y: number, kind: 'vent' | 'tower' }[];
 }
 export function snapshotMap(): MapSnapshot {
-  return { w: MAP_W, h: MAP_H, seed, terrain: Array.from(terrain), crystal: Array.from(crystal), tint: Array.from(tint),
+  return { w: MAP_W, h: MAP_H, seed, land, terrain: Array.from(terrain), crystal: Array.from(crystal), tint: Array.from(tint),
     startBases: startBases.map(b => ({ ...b })), neutralSpots: neutralSpots.map(n => ({ ...n })) };
 }
 export function restoreMap(m: MapSnapshot) {
-  MAP_W = m.w; MAP_H = m.h; seed = m.seed;
+  MAP_W = m.w; MAP_H = m.h; seed = m.seed; land = m.land ?? 'scrub';
   terrain = Uint8Array.from(m.terrain);
   crystal = Uint16Array.from(m.crystal);
   tint = Uint8Array.from(m.tint);

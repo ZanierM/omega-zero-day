@@ -132,7 +132,8 @@ function hatchPick(): string {
   const t = st.clock, n = army();
   const behemoths = n.filter(u => u.def.id === 'behemoth').length;
   const w: [string, number][] = [
-    ['skitter', 5], ['spitter', t > 60 ? 3 : 0], ['carapace', t > 180 ? 2 : 0], ['moth', t > 240 ? 1.5 : 0],
+    ['skitter', 5], ['spitter', t > 60 ? 3 : 0], ['lurker', t > 120 ? 2 : 0], ['stalker', t > 150 ? 2 : 0], ['nurse', t > 200 && !n.some(u => u.def.id === 'nurse') ? 1.5 : 0],
+    ['carapace', t > 180 ? 2 : 0], ['moth', t > 240 ? 1.5 : 0],
     ['behemoth', t > 480 && behemoths < 2 ? 0.6 : 0],
   ];
   let r = Math.random() * w.reduce((s, [, v]) => s + v, 0);
