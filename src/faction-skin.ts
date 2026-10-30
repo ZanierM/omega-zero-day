@@ -1,6 +1,7 @@
 // Faction looks: Helion and Kessler share building and vehicle shapes, so Kessler
 // gets a "skin" painted over the finished art, inside its silhouette only
-// (source-atop), once at bake time. Helion stays clean corporate tech; the
+// (source-atop), once at bake time, over an olive-drab tint of Helion's white
+// composite. Helion stays clean corporate tech; the
 // Ashen Clans have art of their own (clan-art.ts).
 //   Kessler: riveted armour bands, rust stripes, a war banner
 // Units turn through many headings, so they only get smooth, position-free
@@ -12,6 +13,18 @@ export const skinOf = (owner: number): FactionId | null => {
   const f = SLOTS[owner];
   return f === 'kessler' ? f : null;
 };
+
+// multiply everything drawn by a colour, keeping the silhouette: Helion's white
+// composite becomes Kessler's olive steel under the rest of the skin
+const OLIVE_DRAB = '#9a9a6e';
+function tint(c: HTMLCanvasElement, col: string) {
+  const t = document.createElement('canvas'); t.width = c.width; t.height = c.height;
+  const tg = t.getContext('2d')!;
+  tg.drawImage(c, 0, 0);
+  tg.globalCompositeOperation = 'multiply'; tg.fillStyle = col; tg.fillRect(0, 0, t.width, t.height);
+  tg.globalCompositeOperation = 'destination-in'; tg.drawImage(c, 0, 0);
+  const g = c.getContext('2d')!; g.clearRect(0, 0, c.width, c.height); g.drawImage(t, 0, 0);
+}
 
 // bounding box of the drawn art, and the top-most opaque pixel per column
 function silhouette(c: HTMLCanvasElement) {
@@ -29,6 +42,7 @@ function silhouette(c: HTMLCanvasElement) {
 
 /** Paint a faction's look over a baked building canvas (k = bake scale). */
 export function skinBuilding(c: HTMLCanvasElement, faction: FactionId, _defId: string, k: number) {
+  if (faction === 'kessler') tint(c, OLIVE_DRAB);
   const g = c.getContext('2d')!;
   const { x0, y0, x1, y1, top } = silhouette(c);
   if (x1 < 0) return;
@@ -64,6 +78,7 @@ export function skinBuilding(c: HTMLCanvasElement, faction: FactionId, _defId: s
 
 /** A position-free tint for a baked unit/vehicle frame (safe across headings). */
 export function skinUnit(c: HTMLCanvasElement, faction: FactionId) {
+  if (faction === 'kessler') tint(c, OLIVE_DRAB);
   const g = c.getContext('2d')!, W = c.width, H = c.height;
   g.save();
   g.globalCompositeOperation = 'source-atop';
