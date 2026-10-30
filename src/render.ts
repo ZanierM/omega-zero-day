@@ -674,8 +674,7 @@ export function bakeAirSprite(defId: string, owner: number): HTMLCanvasElement {
   g.fillRect(-L * 0.3, -1.6, L * 0.5, 3.2);
   g.globalAlpha = 1;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  gradeWarmCool(c, 0.7);
-  outline(c, 'rgba(16,10,8,0.6)', 2);
+  finish(c, 2);
   (c as Scaled).k = k;
   return c;
 }
@@ -709,8 +708,7 @@ function rotatedPart(key: string, reach: number, height: number, paint: (g: Canv
     g.setTransform(1, 0, 0, 1, 0, 0);
     const skin = skinOwner >= 0 ? skinOf(skinOwner) : null;
     if (skin) skinUnit(c, skin);
-    gradeWarmCool(c, 0.7);
-    outline(c, 'rgba(16,10,8,0.6)', 2);
+    finish(c, 2);
     s = c as VehPart; s.k = k; s.ox = ww / 2; s.oy = ww / 2 + height; s.ww = ww; s.wh = wh;
     sprites.set(key, s);
   }
@@ -765,6 +763,67 @@ function drawVehicle(u: Unit, moving: boolean, lift = 0) {
     ctx.drawImage(s, u.x - s.ox, u.y - s.oy + bob - lift + sink, s.ww, s.wh);
   }
   if (rise) ctx.restore();
+}
+
+// the gritty finish every code-drawn sprite gets after it's drawn: darker
+// toward the ground, worn and dirty, a light sun grade, then more contrast and
+// colour than the raw art so nothing reads washed out; line: outline width
+function finish(c: HTMLCanvasElement, line: number) {
+  underShade(c, 0.35);
+  grime(c, 0.42);
+  gradeWarmCool(c, 0.35);
+  tone(c, 1.3, 1.25, 0.95);
+  outline(c, 'rgba(8,5,4,0.9)', line);
+}
+// contrast round mid-grey, saturation round luma, gamma (>1 deepens midtones)
+function tone(c: HTMLCanvasElement, contrast: number, sat: number, gamma: number) {
+  const g = c.getContext('2d')!, im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  const lut = new Uint8ClampedArray(256);
+  for (let i = 0; i < 256; i++) lut[i] = Math.pow(Math.max(0, Math.min(1, (i / 255 - 0.5) * contrast + 0.5)), gamma) * 255;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const r = lut[d[i]], gr = lut[d[i + 1]], b = lut[d[i + 2]], y = 0.299 * r + 0.587 * gr + 0.114 * b;
+    d[i] = y + (r - y) * sat; d[i + 1] = y + (gr - y) * sat; d[i + 2] = y + (b - y) * sat;
+  }
+  g.putImageData(im, 0, 0);
+}
+// darker toward the ground: ambient occlusion so the sprite sits heavier
+function underShade(c: HTMLCanvasElement, amount: number) {
+  const g = c.getContext('2d')!;
+  g.save(); g.globalCompositeOperation = 'source-atop';
+  const lg = g.createLinearGradient(0, c.height * 0.35, 0, c.height);
+  lg.addColorStop(0, 'rgba(10,6,4,0)'); lg.addColorStop(1, `rgba(10,6,4,${amount})`);
+  g.fillStyle = lg; g.fillRect(0, 0, c.width, c.height); g.restore();
+}
+// dirt and wear, kept inside the sprite: mud caked on the lower half, rust
+// and soot streaks running down, fine speckle and chipped paint. Seeded by
+// size so every heading of a unit wears the same dirt
+function grime(c: HTMLCanvasElement, amount: number) {
+  const g = c.getContext('2d')!, W = c.width, H = c.height;
+  let sd = W * 7919 + H;
+  const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  g.save(); g.globalCompositeOperation = 'source-atop';
+  // mud: soft brown patches, thicker toward the ground
+  for (let i = 0, n = Math.max(3, (W * H) / 2600); i < n; i++) {
+    const x = rnd() * W, y = H * (0.35 + 0.65 * Math.sqrt(rnd())), r = 3 + rnd() * W * 0.12;
+    const mg = g.createRadialGradient(x, y, 0, x, y, r);
+    mg.addColorStop(0, `rgba(58,40,22,${amount * (0.5 + 0.5 * rnd())})`); mg.addColorStop(1, 'rgba(58,40,22,0)');
+    g.fillStyle = mg; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // streaks: rust and soot running down from seams
+  for (let i = 0, n = (W * H) / 900; i < n; i++) {
+    const x = Math.floor(rnd() * W), y = rnd() * H * 0.85, len = 4 + rnd() * H * 0.12, w = 1 + Math.floor(rnd() * 2);
+    const sg = g.createLinearGradient(0, y, 0, y + len);
+    const col = rnd() < 0.45 ? '110,52,24' : '18,12,8';
+    sg.addColorStop(0, `rgba(${col},${amount * (0.6 + 0.4 * rnd())})`); sg.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = sg; g.fillRect(x, y, w, len);
+  }
+  // speckle and chipped paint
+  for (let i = 0, n = (W * H) / 30; i < n; i++) {
+    g.fillStyle = rnd() < 0.75 ? `rgba(20,14,8,${amount * rnd()})` : `rgba(255,236,210,${amount * 0.5 * rnd()})`;
+    g.fillRect(rnd() * W, rnd() * H, 1 + rnd() * 2, 1 + rnd() * 2);
+  }
+  g.restore();
 }
 
 // warm key light from the dying sun in the north-west and a cool sky fill in
@@ -909,8 +968,7 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   sg.setTransform(1, 0, 0, 1, 0, 0);
   const skin = skinFor(owner, defId, 'b');
   if (skin && !def.isWall) skinBuilding(st, skin, defId, k);   // the faction's look over the shared shape
-  gradeWarmCool(st, 0.7);
-  outline(st, 'rgba(20,12,8,0.55)', 1);                 // one device pixel, not two world pixels
+  finish(st, 1);                 // one device pixel, not two world pixels
 
   const reachX = Math.ceil(baseY * 0.42), reachY = Math.ceil(baseY * 0.16);
   const cw = Math.max(w, sw) + 16 + reachX * 2;
@@ -1228,8 +1286,7 @@ function bakeArtIcon(defId: string, owner: number, level: number): string | null
   g.setTransform(1, 0, 0, 1, 0, 0);
   const skin = skinFor(owner, defId, 'b');
   if (skin && !def.isWall) skinBuilding(c, skin, defId, k);
-  gradeWarmCool(c, 0.7);
-  outline(c, 'rgba(20,12,8,0.55)', 1);
+  finish(c, 1);
   return iconUrl(c);
 }
 
@@ -1251,8 +1308,7 @@ function bakeUnitIcon(defId: string, owner: number): string | null {
   g.setTransform(1, 0, 0, 1, 0, 0);
   const skin = skinFor(owner, defId, 'v');
   if (skin) skinUnit(c, skin);
-  gradeWarmCool(c, 0.7);
-  outline(c, 'rgba(16,10,8,0.6)', 2);
+  finish(c, 2);
   return iconUrl(c);
 }
 
@@ -2793,3 +2849,4 @@ export function renderMinimap() {
   mmCtx.moveTo(fx + k, fy + fh); mmCtx.lineTo(fx, fy + fh); mmCtx.lineTo(fx, fy + fh - k);
   mmCtx.stroke();
 }
+
