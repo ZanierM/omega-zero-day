@@ -672,7 +672,8 @@ const meridian: MissionDef = {
     c.place('camp', ASHEN, a.tx, a.ty); c.place('scrapyard', ASHEN, a.tx + 3, a.ty);
     for (const [dx, dy] of [[-2, 3], [4, 3], [1, -3], [6, 0]]) c.place('gunnest', ASHEN, a.tx + dx, a.ty + dy);
   },
-  onInstall(c) { if (c.run.vars.choice === 1) setAllied(PLAYER, HOLLOW, true); },
+  // the Hollow hold their fire until you've chosen; only selling them out makes them enemies
+  onInstall(c) { setAllied(PLAYER, HOLLOW, c.run.vars.choice !== 2); },
   intro(c) {
     c.say('vessa', 'Commander. That wreck is mine: two hundred years of flux grown into her walls. Look the other way and there\'s four thousand in it for you.');
     c.say('seren', 'Root-taker. I am Seren. My mother was born in that ship, and hers. They will cut my children out of her walls. Will you watch?');
@@ -688,6 +689,7 @@ const meridian: MissionDef = {
       c.say('vessa', 'Pity. I liked you. Crews, take the ship. And whoever is standing in front of it.');
     } else {
       c.run.vars.choice = 2; c.setFlag('meridian', 'sold');
+      setAllied(PLAYER, HOLLOW, false);
       players[PLAYER].credits += 4000;
       c.show('survive');
       c.say('vessa', 'Sensible. Stay out of my way for ten minutes and we\'re friends.');
@@ -702,13 +704,13 @@ const meridian: MissionDef = {
     const into = c.t - v.t0;
     v.wave = (v.wave ?? 30) - dt;
     if (v.wave > 0) return;
-    v.wave = v.choice === 1 ? 50 : 38;
+    v.wave = v.choice === 1 ? 45 : 38;
     const ship = byId.get(v.ship);
     if (v.choice === 1) {
       // the Ashen come for the ship, more of them every time
-      const a = c.base(ASHEN), n = 4 + Math.floor(into / 75);
-      // one mortar at most, and only once the fight is well on: it outranges everything guarding her
-      const comp = [...Array.from({ length: n }, (_, i) => ['technical', 'scav', 'harpooner', 'firebrand', 'scav', 'technical', 'rustbucket'][(i + Math.floor(into / 40)) % 7]), ...(into > 200 ? ['mortar'] : [])];
+      const a = c.base(ASHEN), n = 5 + Math.floor(into / 45);
+      // mortars come once the fight is on (a second later): they outrange everything guarding her
+      const comp = [...Array.from({ length: n }, (_, i) => ['technical', 'scav', 'harpooner', 'firebrand', 'scav', 'technical', 'rustbucket'][(i + Math.floor(into / 40)) % 7]), ...(into > 150 ? ['mortar'] : []), ...(into > 300 ? ['mortar'] : [])];
       const tgt = ship ? buildingCenter(ship as any) : hqPos(c);
       c.attackMove(c.spawn(comp, ASHEN, a.tx + 1, a.ty + 5), tgt.x, tgt.y);
     } else {
@@ -760,12 +762,12 @@ const kesslersWall: MissionDef = {
     c.spawn(['dominator', 'hovertank', 'hovertank', 'hovertank', 'artillery', 'rocketeer', 'rocketeer', 'rocketeer', 'rocketeer', 'vanguard', 'vanguard'], PLAYER, b.tx + 1, b.ty + 5);
     const k = c.base(KESSLER);
     const hq = c.place('nexus', KESSLER, k.tx, k.ty);
-    if (hq) c.run.vars.kessler = hq.id;
+    if (hq) { c.run.vars.kessler = hq.id; hq.level = 3; hq.maxHp = hq.hp = hq.maxHp * 2; }   // his command core, fully hardened
     for (const [id, dx, dy] of [['solar', -4, 0], ['solar', -4, 3], ['barracks', 4, 0], ['fab', 4, 4], ['extractor', 0, 5], ['repairyard', -4, 6]] as [string, number, number][]) c.place(id, KESSLER, k.tx + dx, k.ty + dy);
     for (const [id, dx, dy] of [['bastion', -3, -4], ['bastion', 5, -3], ['railgun', 8, 2], ['railgun', -7, 4], ['arctower', 2, -5], ['turret', 9, 6], ['turret', -7, -2], ['turret', 1, 9], ['skyguard', 6, 8]] as [string, number, number][]) c.place(id, KESSLER, k.tx + dx, k.ty + dy);
     for (let i = -8; i <= 10; i++) { c.place('heavywall', KESSLER, k.tx + i, k.ty - 8); c.place('heavywall', KESSLER, k.tx - 9, k.ty + i); }
     c.spawn(['dominator', 'dominator', 'hovertank', 'hovertank', 'hovertank', 'vanguard', 'vanguard', 'vanguard', 'rocketeer', 'rocketeer', 'artillery'], KESSLER, k.tx + 2, k.ty + 10, 'guard');
-    players[KESSLER].credits = 6000;
+    players[KESSLER].credits = 10000;
     // the Lantern shaft, out between the two of you
     const shaft = c.place('lanternshaft', PLAYER, Math.round((b.tx + k.tx) / 2), Math.round((b.ty + k.ty) / 2));
     if (shaft) c.run.vars.shaft = shaft.id;
@@ -776,7 +778,18 @@ const kesslersWall: MissionDef = {
   },
   update(c, dt) {
     const v = c.run.vars;
-    if (c.run.shown.includes('shaft') && !c.done('shaft')) v.held = (v.held ?? 0) + dt;
+    if (c.run.shown.includes('shaft') && !c.done('shaft')) {
+      v.held = (v.held ?? 0) + dt;
+      // Kessler wants the shaft too: armour comes for it every half minute while Lind is down there
+      v.kw = (v.kw ?? 25) - dt;
+      const sh = byId.get(v.shaft), hq = byId.get(v.kessler);
+      if (v.kw <= 0 && sh && hq) {
+        v.kw = 30;
+        const k = c.base(KESSLER), p = buildingCenter(sh as any), n = Math.floor((v.held ?? 0) / 30);
+        c.attackMove(c.spawn(['hovertank', 'hovertank', 'vanguard', 'vanguard', 'rocketeer', 'rocketeer', ...(n >= 1 ? ['dominator'] : []), ...(n >= 2 ? ['artillery', 'hovertank'] : [])], KESSLER, k.tx + 2, k.ty + 10), p.x, p.y);
+        if (!v.kwSaid) { v.kwSaid = 1; c.say('kessler', 'That shaft is Helion\'s crime, Lantern. I\'ll have it as evidence, or I\'ll have it buried.'); }
+      }
+    }
   },
   objectives: [
     { id: 'shaft', text: c => `Hold the Lantern shaft while Lind goes down: ${Math.floor(c.run.vars.held ?? 0)} / 90 s`, hidden: true, check: c => (c.run.vars.held ?? 0) >= 90 },
@@ -871,7 +884,10 @@ const zeroDay: MissionDef = {
       const n = friendly[Math.floor(Math.random() * friendly.length)], a = c.base(ASHEN);
       const size = 5 + Math.floor(c.t / 70);
       c.attackMove(c.spawn(Array.from({ length: size }, (_, i) => ['technical', 'scav', 'harpooner', 'firebrand', 'rustbucket', 'scav', 'technical', 'mortar'][i % 8]), ASHEN, a.tx + 1, a.ty + 4), (n.tx + 0.5) * 32, (n.ty + 0.5) * 32);
-      if (c.flag('meridian') === 'sold' && c.t > 150) c.ambush(n.tx + 3, n.ty + 2, ['shardkin', 'shardkin', 'shardkin', 'burrower', ...(c.t > 400 ? ['shardkin', 'burrower'] : [])], `fury${Math.floor(c.t)}`);
+      if (c.flag('meridian') === 'sold' && c.t > 150) {
+        const fury = c.ambush(n.tx + 3, n.ty + 2, ['shardkin', 'shardkin', 'shardkin', 'burrower', ...(c.t > 400 ? ['shardkin', 'burrower'] : [])], `fury${Math.floor(c.t)}`);
+        for (const u of fury) issueOrder(u, { type: 'attackMove', x: (n.tx + 0.5) * 32, y: (n.ty + 0.5) * 32 });   // they come for the vent, not the base
+      }
       if (!v.raidSaid) { v.raidSaid = 1; c.say('vessa', 'Last seats on the last ship, Commander. I\'m not asking.'); }
     }
     // allies on the vents: the Hollow (if you stood with them) and the Hearth (if you spared them)
@@ -918,6 +934,7 @@ const zeroDay: MissionDef = {
   onEvent: harvesterWarning,
   win: c => (c.run.vars.ending === 1 || c.run.vars.ending === 2) || (c.run.vars.ending === 3 && c.done('seed')),
   lose: () => novaLeft <= 0,
+  endEliminated: { title: 'The last light goes out', text: 'The base falls with the beacon still dark. Varga holds the fleet in orbit until there is nothing left to hold it for.' },
   endWin: c => c.run.vars.ending === 1
     ? { title: 'Last Light', text: 'The beacon burns the vents dry, and the Vey with them. The ark-fleet rides the corridor out as Helios goes. On an open channel, Admiral Varga reads the Resonance Report aloud to forty thousand waking sleepers. Behind them, Cinder is a cinder.' }
     : c.run.vars.ending === 2

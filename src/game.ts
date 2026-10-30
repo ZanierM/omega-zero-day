@@ -852,9 +852,9 @@ const UNIT_SOUND: Record<string, FieldSound> = {
   shardkin: 'hitMetal', burrower: 'impact', choir: 'arc',   // crystal on crystal: a ringing clink, a crunch, a hum
   skitter: 'bite', spitter: 'spit', carapace: 'bite', moth: 'spit', behemoth: 'artillery',
   acolyte: 'lance', lancer: 'lance', luminar: 'lance', monolith: 'rail',
-  scav: 'rifle', longshot: 'sniper', harpooner: 'rocket', firebrand: 'flame', technical: 'autocannon', rustbucket: 'cannon', mortar: 'artillery',
+  scav: 'musket', longshot: 'musket', harpooner: 'harpoon', firebrand: 'firebomb', technical: 'oldmg', rustbucket: 'oldcannon', mortar: 'mortar',
 };
-const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance', gunnest: 'autocannon', bombard: 'cannon' };
+const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance', gunnest: 'oldmg', bombard: 'oldcannon' };
 const weaponSound = (e: Unit | Building): FieldSound =>
   (e.kind === 'unit' ? UNIT_SOUND[e.def.id] : TURRET_SOUND[e.def.id]) ?? 'rifle';
 // the sound of a round landing on this target
@@ -1243,7 +1243,7 @@ function step(dt: number) {
       damage(u, tr.damage * damageMult(tr.slow ? 'flame' : 'cannon', u));
       if (tr.slow) { u.slowT = 4; u.slowMul = tr.slow; }
     }
-    if (audible(c.x, c.y)) sfxAt(tr.slow ? 'hitMetal' : 'explodeVehicle', c.x, c.y, tr.slow ? 0.8 : 1);
+    if (audible(c.x, c.y)) sfxAt(tr.slow ? 'snare' : 'explodeVehicle', c.x, c.y, tr.slow ? 0.9 : 1);
     if (hit.some(u => u.owner === PLAYER)) raiseAlert(c.x, c.y);
     destroy(b);
   }
@@ -1284,7 +1284,7 @@ function step(dt: number) {
     if (p >= 1) {
       shells.splice(i, 1);
       booms.push({ x: s.tx, y: s.ty, r: 4, ttl: 0.5, max: s.splash * 0.95 });
-      if (audible(s.tx, s.ty)) sfxAt('impact', s.tx, s.ty, s.kind === 'rocket' ? 0.8 : 1);
+      if (audible(s.tx, s.ty)) sfxAt(s.dmgType === 'flame' ? 'smash' : 'impact', s.tx, s.ty, s.kind === 'rocket' ? 0.8 : 1);   // a firebomb breaks rather than bursts
       const firer = s.by !== undefined ? byId.get(s.by) : undefined;
       const attacker = firer?.kind === 'unit' ? firer : undefined;
       for (const t of [...units]) {

@@ -151,6 +151,12 @@ Nothing starts until this draft is signed off. The plan keeps the current file o
 - **Act III** (III-7 Meridian, III-8 Kessler's Wall, III-9 Zero Day). Campaign flags carry choices forward: `labs` (II-5, spared or burned), `meridian` (protected or sold), `okoye` (stayed or left), `lind` (gone). Sparing the labs brings Verdant in as allies at Zero Day; protecting the Meridian brings the Hollow as allies and unlocks the third ending.
 - **Three human factions** (the user's call): Helion and Kessler stay futuristic (Kessler gets riveted armour, rust stripes and war banners over Helion's shapes); the Verdant Pact is gone, and **the Ashen Clans** are an older, scavenging people with their own units, buildings and art (`src/clan-art.ts`). In the campaign, Reyes's **Hearth Clans** (green, slot 2) take the Pact's role and Vessa's **Ashen Clans** (slot 3) are the raiders.
 - Balance pass with the fair-play bot against the old build: II-4 and II-5 match; the Meridian defence was too hard before and is now eased (ship 7000 hp, 7:00 timer, smaller waves, mortars late). Zero Day had a bug where allied vents didn't count toward the beacon (and allies blocked each other's captures); fixed, and Vessa's raids now press the vents so the no-ally route isn't a walkover.
+- Act III play-test with a player-like script (forward defence, mortar hunting, focus fire) as well as the passive bot:
+  - **III-7 Meridian:** the Hollow now hold their fire until you choose (an army moving up before the prompt used to shoot the ship down). Waves every 45 s, growing; mortars from 2:30. Good play wins cleanly, ignoring the mortars loses.
+  - **III-8 Kessler's Wall:** Kessler sends armour at the shaft every 30 s while Lind is down; the shaft has 6000 hp, Kessler's Nexus is hardened (level 3) and he starts with 10,000. Good play wins with real losses; a passive player holds the shaft but can't take the wall.
+  - **III-9 Zero Day:** the hardest route (no allies) is a close win with good play. Hollow ambushes go for the vents, not the base, and losing the base has its own ending text.
+- The Mortar Cart was too strong against packed infantry (one cart wiped 45 units): damage 70 → 55, splash 1.4 → 1.1.
+- The Clans have their own sounds: powder rifles, a rattling machine gun, a harpoon spring-gun, firebombs that smash and catch, black-powder cannons, a mortar's cough, a snare's snap.
 
 ## 7. Decisions
 - **Names:** locked. Cinder, Lantern, the Vey, the Hollow, Meridian.

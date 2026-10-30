@@ -178,7 +178,8 @@ export function sfx(name: SfxName) {
 export type FieldSound =
   | 'rifle' | 'autocannon' | 'flame' | 'rocket' | 'cannon' | 'artillery' | 'sniper' | 'rail' | 'arc'
   | 'hitMetal' | 'hitStructure' | 'hitSoft' | 'impact' | 'explodeVehicle' | 'explodeBuilding' | 'orbital'
-  | 'bite' | 'spit' | 'squelch' | 'lance' | 'arrive';
+  | 'bite' | 'spit' | 'squelch' | 'lance' | 'arrive'
+  | 'musket' | 'oldmg' | 'harpoon' | 'firebomb' | 'smash' | 'oldcannon' | 'mortar' | 'snare';   // the Clans: old powder, springs and glass
 
 let lx = 0, ly = 0, lHalf = 600;
 /** Where the player is "standing": the camera centre and half the visible width, in world px. */
@@ -189,12 +190,14 @@ const FIELD_GAP: Partial<Record<FieldSound, number>> = {
   rifle: 0.045, autocannon: 0.05, flame: 0.12, rocket: 0.08, cannon: 0.1, artillery: 0.15, sniper: 0.1, rail: 0.15, arc: 0.08,
   hitMetal: 0.06, hitStructure: 0.09, hitSoft: 0.07, impact: 0.07, explodeVehicle: 0.1, explodeBuilding: 0.2, orbital: 0.5,
   bite: 0.05, spit: 0.09, squelch: 0.08, lance: 0.07, arrive: 0.3,
+  musket: 0.06, oldmg: 0.12, harpoon: 0.1, firebomb: 0.1, smash: 0.08, oldcannon: 0.15, mortar: 0.15, snare: 0.1,
 };
 // how long each sound's own voice lasts (the echo tail rides the shared bus)
 const FIELD_LEN: Partial<Record<FieldSound, number>> = {
   rifle: 0.12, autocannon: 0.2, flame: 0.35, rocket: 0.6, cannon: 0.65, artillery: 1, sniper: 0.22, rail: 0.75, arc: 0.25,
   hitMetal: 0.2, hitStructure: 0.32, hitSoft: 0.1, impact: 0.7, explodeVehicle: 1.2, explodeBuilding: 2.1, orbital: 3.2,
   bite: 0.14, spit: 0.4, squelch: 0.7, lance: 0.45, arrive: 1.6,
+  musket: 0.35, oldmg: 0.32, harpoon: 0.45, firebomb: 0.3, smash: 0.8, oldcannon: 1.1, mortar: 0.6, snare: 0.3,
 };
 const fieldLast = new Map<string, number>();
 let liveVoices = 0;
@@ -354,6 +357,51 @@ export function sfxAt(name: FieldSound, x: number, y: number, loud = 1) {
     case 'arrive':      // something arriving down a column of light: a rising open chord
       for (const [m, d] of [[1, 0], [1.5, 0.08], [2, 0.16], [3, 0.24]]) osc('sine', 330 * m, 330 * m * 1.01, t + d, 1.2, 0.06, o);
       noise(t, 1.1, 0.12, 3000, 9000, o, 'bandpass', 0.8);
+      break;
+    case 'musket':      // an old powder rifle: a fat boom, not a snap, and a little smoke hiss after
+      noise(t, 0.05, 0.5, 4200 * v, 900, o);
+      noise(t + 0.01, 0.28, 0.32, 900 * v, 120, o);
+      osc('sine', 95 * v, 38, t, 0.14, 0.3, o);
+      noise(t + 0.08, 0.22, 0.05, 6000, 3000, o, 'highpass');
+      break;
+    case 'oldmg':       // a worn machine gun: three uneven, rattling rounds
+      for (let k = 0; k < 3; k++) {
+        const st = t + k * (0.085 + Math.random() * 0.02);
+        noise(st, 0.03, 0.42, 5000 * v, 1200, o);
+        osc('sine', 120 * v, 48, st, 0.06, 0.22, o);
+        noise(st + 0.02, 0.03, 0.08, 3000, 1500, o, 'bandpass', 4);   // the loose bolt
+      }
+      break;
+    case 'harpoon':     // a spring-gun: a deep twang, the line paying out
+      osc('triangle', 210 * v, 140 * v, t, 0.25, 0.22, o);
+      osc('sine', 420 * v, 300 * v, t, 0.12, 0.08, o);
+      noise(t + 0.02, 0.4, 0.16, 2400, 900, o, 'bandpass', 3);
+      noise(t, 0.04, 0.25, 3000, 800, o);
+      break;
+    case 'firebomb':    // a bottle thrown: a soft swish
+      noise(t, 0.25, 0.12, 1200, 3000, o, 'bandpass', 1.5);
+      break;
+    case 'smash':       // the bottle lands: glass, then the whoomp of spirit catching
+      for (let k = 0; k < 5; k++) ring(o, t + Math.random() * 0.05, (2500 + Math.random() * 3000) * v, 0.08, 0.025);
+      noise(t, 0.03, 0.3, 9000, 4000, o, 'highpass');
+      noise(t + 0.04, 0.5, 0.38, 600, 150, o);
+      for (let k = 0; k < 5; k++) noise(t + 0.15 + Math.random() * 0.5, 0.02, 0.12, 5000, 2000, o, 'highpass');   // crackle
+      break;
+    case 'oldcannon':   // a cast barrel and black powder: a huge flat boom and a long smoky roll
+      noise(t, 0.07, 0.6, 3800 * v, 700, o);
+      noise(t + 0.01, 1, 0.6, 700 * v, 35, o);
+      osc('sine', 60 * v, 22, t, 0.9, 0.65, o);
+      noise(t + 0.3, 0.7, 0.12, 500, 100, o);
+      break;
+    case 'mortar':      // the tube coughs: a hollow thoonk
+      osc('sine', 180 * v, 70, t, 0.18, 0.5, o);
+      noise(t, 0.06, 0.4, 2200 * v, 300, o);
+      noise(t + 0.02, 0.4, 0.2, 500, 60, o);
+      break;
+    case 'snare':       // a spring trap: a snap of steel and a scrape
+      noise(t, 0.012, 0.5, 9000, 4000, o, 'highpass');
+      ring(o, t, 1400 * v, 0.2, 0.06);
+      noise(t + 0.03, 0.2, 0.14, 2500, 800, o, 'bandpass', 3);
       break;
     case 'orbital':     // the sky tears: a descending shriek, then a blast that shakes everything
       osc('sawtooth', 2400, 300, t, 0.5, 0.06, o);

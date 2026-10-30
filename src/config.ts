@@ -163,7 +163,7 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'A welded pickup with a machine gun bolted in the back. Hit the harvesters, run.' },
   rustbucket:{ id: 'rustbucket',name: 'Rustbucket',     tab: 'veh', cost: 800,  buildTime: 9,  hp: 520,  speed: 2.4, damage: 36,  range: 4.5, reload: 1.9, vision: 6, radius: 14, model: 'mech2', mstep: 1, spriteH: 36,
                desc: 'A mining crawler under scrap armour, with a cannon from a museum. It keeps going.' },
-  mortar:    { id: 'mortar',    name: 'Mortar Cart',    tab: 'veh', cost: 950,  buildTime: 10, hp: 210,  speed: 1.9, damage: 70,  range: 9,   reload: 3.8, vision: 7, radius: 13, model: 'car', mstep: 2, spriteH: 30, prereq: 'forge', weapon: 'shell', splash: 1.4,
+  mortar:    { id: 'mortar',    name: 'Mortar Cart',    tab: 'veh', cost: 950,  buildTime: 10, hp: 210,  speed: 1.9, damage: 55,  range: 9,   reload: 3.8, vision: 7, radius: 13, model: 'car', mstep: 2, spriteH: 30, prereq: 'forge', weapon: 'shell', splash: 1.1,
                desc: 'A pack beast hauling a tube mortar. Lobs shells from behind the ridge. Requires an Old Forge.' },
   hauler:    { id: 'hauler',    name: 'Hauler',         tab: 'veh', cost: 1200,  buildTime: 11,  hp: 500,  speed: 2.5, damage: 0,   range: 0,   reload: 0,   vision: 5, radius: 15, model: 'drone', mstep: 1, spriteH: 40, harvester: true,
                desc: 'A beast-drawn ore wagon. It digs crystal by hand and hauls it to a Smelter.' },
@@ -273,7 +273,7 @@ export const BUILDINGS: Record<string, BuildingDef> = {
   // ---- campaign landmarks ----
   meridian:  { id: 'meridian',  name: 'The Meridian',   tab: 'build', cost: 0,    buildTime: 1,  hp: 7000, power: 0,    w: 4, h: 3, vision: 7,  nonBuildable: true,
                desc: 'The first colony ship, two hundred years in the ground. The Hollow were born in her.' },
-  lanternshaft:{ id: 'lanternshaft', name: 'Lantern Shaft', tab: 'build', cost: 0, buildTime: 1,  hp: 3200, power: 0,    w: 3, h: 3, vision: 7,  nonBuildable: true,
+  lanternshaft:{ id: 'lanternshaft', name: 'Lantern Shaft', tab: 'build', cost: 0, buildTime: 1,  hp: 6000, power: 0,    w: 3, h: 3, vision: 7,  nonBuildable: true,
                desc: 'Project Lantern: Helion\'s deep tap into the heart of the Vey. Something down there is still bleeding light.' },
   // ---- the Keepers: arrive in light, never built (AI only) ----
   beacon:    { id: 'beacon',    name: 'Keeper Beacon',  tab: 'build', cost: 0,    buildTime: 1,  hp: 2200, power: 0,    w: 3, h: 3, vision: 10, nonBuildable: true, shield: 1400,
