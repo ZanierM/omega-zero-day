@@ -1,4 +1,4 @@
-import { TILE, BUILDINGS, UPGRADES, UNITS, PLAYER, FACTION_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, DMG_TABLE, isVey, SLOTS } from './config';
+import { TILE, BUILDINGS, UPGRADES, UNITS, PLAYER, FACTION_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, DMG_TABLE, isVey, SLOTS, rolesOf, isHQ, isOutpost, isClan } from './config';
 import {
   buildings, units, players, startProduction, placeBuilding, canPlace,
   issueOrder, hasBuilding, buildingCenter, powerOf, numPlayers, deployPioneer, tileOf,
@@ -26,6 +26,7 @@ interface Doctrine {
   firstWave: number;                    // multiplier on the first-wave timer
   ventBias: number;                     // chance a wave goes for a flux vent
   raidEcon: number;                     // chance a wave hits harvesters / extractors instead of the HQ
+  researchArmy?: number;                // won't research below this many fighting units (an early forge would starve the army)
 }
 
 const LATE = ['fusion', 'arctower', 'turret', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion'];
@@ -51,29 +52,19 @@ const DOCTRINES: Record<string, Doctrine> = {
     veh: { hovertank: 3, dominator: 3, warden: 1, ranger: 0.5, artillery: 1.5, colossus: 2.5, gunship: 0.4 },
     vehFunding: 600, infShare: 0.35, waveGap: 1.25, waveSize: 4, firstWave: 1.3, ventBias: 0.25, raidEcon: 0,
   },
-  // Verdant Pact: cheap infantry tides that swarm the vents and hold the middle
-  verdant: {
-    tag: 'infantry tide',
-    build: ['solar', 'barracks', 'extractor', 'solar', 'turret', 'lab', 'fab', 'extractor', 'solar', 'turret',
-      'repairyard', 'spire', 'solar', 'extractor', 'turret', 'skyguard', 'solar', 'railgun', 'skyport', 'turret', ...LATE],
-    research: ['wpn1', 'arm1', 'wpn2', 'arm2', 'def1', 'wpn3', 'arm3', 'def2', 'orbital'],
-    inf: { trooper: 3, pyro: 3, rocketeer: 1.5, vanguard: 1, sniper: 1, juggernaut: 0.6 },
-    veh: { ranger: 1, warden: 2, artillery: 1.5, hovertank: 0.8 },
-    vehFunding: 1600, infShare: 1, waveGap: 0.8, waveSize: 0, firstWave: 0.85, ventBias: 0.7, raidEcon: 0.1,
-  },
-  // Ashen Syndicate: fast raiders and aircraft that burn your economy
+  // the Ashen Clans: guerrillas. Cheap camps, traps on the approaches, small fast raids on the economy
   ashen: {
     tag: 'raiding party',
-    build: ['solar', 'extractor', 'barracks', 'fab', 'solar', 'turret', 'skyport', 'extractor', 'solar', 'spire',
-      'lab', 'skyguard', 'solar', 'turret', 'extractor', 'railgun', 'solar', 'repairyard', 'turret', 'skyguard', ...LATE],
-    research: ['wpn1', 'wpn2', 'arm1', 'wpn3', 'orbital', 'def1', 'arm2', 'arm3', 'def2'],
-    inf: { trooper: 1, rocketeer: 1.5, sniper: 2, pyro: 0.5 },
-    veh: { raider: 3, ranger: 1.5, artillery: 2, gunship: 3, bomber: 2, warden: 0.6 },
-    vehFunding: 450, infShare: 0.4, waveGap: 0.9, waveSize: -1, firstWave: 0.8, ventBias: 0.3, raidEcon: 0.6,
+    build: ['longhouse', 'smelter', 'gunnest', 'snare', 'longhouse', 'snare', 'scrapyard', 'smelter', 'lookout', 'gunnest', 'forge', 'snare',
+      'palisade', 'palisade', 'mine', 'gunnest', 'mender', 'smelter', 'bombard', 'mine', 'snare', 'gunnest', 'lookout', 'mine', 'bombard', 'gunnest', 'mine', 'bombard'],
+    research: ['wpn1', 'arm1', 'wpn2', 'def1', 'arm2', 'wpn3', 'arm3', 'def2'],
+    inf: { scav: 3, harpooner: 2, firebrand: 1.5, longshot: 1 },
+    veh: { technical: 3, rustbucket: 1.6, mortar: 1.2 },
+    vehFunding: 500, infShare: 0.7, waveGap: 0.85, waveSize: -1, firstWave: 1.25, ventBias: 0.3, raidEcon: 0.55, researchArmy: 8,
   },
 };
 // a slot's doctrine is its faction's (Helion's when it stands in for the faction the player took)
-export function doctrineOf(owner: number) { return DOCTRINES[SLOTS[owner]] ?? DOCTRINES.kessler; }
+export function doctrineOf(owner: number) { return DOCTRINES[isClan(owner) ? 'ashen' : SLOTS[owner]] ?? DOCTRINES.kessler; }
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -169,7 +160,7 @@ export function restoreAI(s: AISnapshot) {
 }
 
 function myHQ(owner: number) {
-  return buildings.find(b => b.owner === owner && b.def.id === 'nexus')
+  return buildings.find(b => b.owner === owner && isHQ(b.def.id))
       ?? buildings.find(b => b.owner === owner && !b.def.isWall) ?? null;
 }
 
@@ -177,12 +168,14 @@ function placeNear(owner: number, defId: string): boolean {
   // anchor at the HQ first, then at any deployed Command Posts (expansions)
   const anchors = [
     myHQ(owner),
-    ...buildings.filter(b => b.owner === owner && b.def.id === 'outpost'),
+    ...buildings.filter(b => b.owner === owner && isOutpost(b.def.id)),
   ].filter(Boolean) as { tx: number, ty: number }[];
-  // extractors prefer the anchor closest to unmined crystal
-  if (defId === 'extractor') anchors.reverse();
+  // refineries prefer the anchor closest to unmined crystal
+  if (BUILDINGS[defId].grantsHarvester) anchors.reverse();
+  // traps go out on the approaches, a little way from the camp
+  const r0 = BUILDINGS[defId].trap ? 7 : 2;
   for (const a of anchors) {
-    for (let r = 2; r < 20; r++) {
+    for (let r = r0; r < 20; r++) {
       for (let attempt = 0; attempt < 14; attempt++) {
         const tx = a.tx + Math.floor((rand() * 2 - 1) * r);
         const ty = a.ty + Math.floor((rand() * 2 - 1) * r);
@@ -202,7 +195,7 @@ function armyUnits(owner: number) {
 
 function updateOne(ai: AIState, dt: number) {
   const p = players[ai.owner];
-  const doc = doctrineOf(ai.owner);
+  const doc = doctrineOf(ai.owner), R = rolesOf(ai.owner);
   const BUILD_ORDER = doc.build, RESEARCH_ORDER = doc.research;
   ai.clock += dt;
 
@@ -228,12 +221,13 @@ function updateOne(ai: AIState, dt: number) {
   // --- construction (build tab and defence tab share the plan) ---
   // what the AI wants to build next (used to reserve credits below)
   let want: string | null = null;
-  if (!hasBuilding(ai.owner, 'solar')) want = 'solar';
-  else if (!hasBuilding(ai.owner, 'extractor')) want = 'extractor';
+  if (R.power && !hasBuilding(ai.owner, R.power)) want = R.power;
+  else if (!hasBuilding(ai.owner, R.inf) && isClan(ai.owner)) want = R.inf;   // a clan arms before it digs
+  else if (!hasBuilding(ai.owner, R.refinery)) want = R.refinery;
   // prestige priority: once the Orbital Protocol is researched, build the superweapon
   else if (p.upgrades.has('orbital') && hasBuilding(ai.owner, 'spire') && !hasBuilding(ai.owner, 'uplink')) want = 'uplink';
   else if (ai.buildIndex < BUILD_ORDER.length) want = BUILD_ORDER[ai.buildIndex];
-  else if (powerOf(ai.owner).low) want = 'solar';
+  else if (R.power && powerOf(ai.owner).low) want = R.power;
   const reserve = want ? BUILDINGS[want].cost + 300 : 0;
 
   const bq = p.queues.build[0] ?? p.queues.def[0];
@@ -248,8 +242,8 @@ function updateOne(ai: AIState, dt: number) {
       const tab = BUILDINGS[want].tab;
       if (startProduction(ai.owner, want, tab)) {
         if (want === BUILD_ORDER[ai.buildIndex]) ai.buildIndex++;
-      } else if (want === BUILD_ORDER[ai.buildIndex] && BUILDINGS[want].prereqUp && !p.upgrades.has(BUILDINGS[want].prereqUp!)) {
-        ai.buildIndex++; // research not done yet — skip; the order repeats these later
+      } else if (want === BUILD_ORDER[ai.buildIndex] && ((BUILDINGS[want].prereqUp && !p.upgrades.has(BUILDINGS[want].prereqUp!)) || BUILDINGS[want].limit)) {
+        ai.buildIndex++; // research not done yet (or at its limit) — skip; the order repeats these later
       }
     }
   }
@@ -259,8 +253,8 @@ function updateOne(ai: AIState, dt: number) {
   if (hq && ai.buildIndex > 5) {
     const homeCrystal = nearestTile(hq.tx, hq.ty, 15, (x, y) => crystal[idx(x, y)] > 0);
     const pio = units.find(u => u.owner === ai.owner && u.def.deploysTo);
-    if (!homeCrystal && !pio && hasBuilding(ai.owner, 'fab') && !p.queues.veh.length && p.credits > 3500) {
-      startProduction(ai.owner, 'pioneer', 'veh');
+    if (!homeCrystal && !pio && hasBuilding(ai.owner, R.veh) && !p.queues.veh.length && p.credits > 3500) {
+      startProduction(ai.owner, R.pioneer, 'veh');
     }
     if (pio && pio.order.type === 'idle') {
       const field = nearestTile(tileOf(pio.x), tileOf(pio.y), 70, (x, y) => crystal[idx(x, y)] > 0);
@@ -273,7 +267,7 @@ function updateOne(ai: AIState, dt: number) {
   }
 
   // --- research ---
-  if (hasBuilding(ai.owner, 'lab') && ai.researchIndex < RESEARCH_ORDER.length && !p.queues.ups.length) {
+  if (hasBuilding(ai.owner, R.lab) && ai.researchIndex < RESEARCH_ORDER.length && !p.queues.ups.length && armyUnits(ai.owner).length >= (doc.researchArmy ?? 0)) {
     const up = RESEARCH_ORDER[ai.researchIndex];
     if (p.credits > UPGRADES[up].cost + 150 && startProduction(ai.owner, up, 'ups')) {
       ai.researchIndex++;
@@ -290,22 +284,23 @@ function updateOne(ai: AIState, dt: number) {
     const army = armyUnits(ai.owner);
     const harvesters = units.filter(u => u.owner === ai.owner && u.def.harvester).length;
     // keep the next research affordable too, or a busy barracks starves the lab forever
-    const nextUp = hasBuilding(ai.owner, 'lab') ? RESEARCH_ORDER[ai.researchIndex] : undefined;
+    const nextUp = hasBuilding(ai.owner, R.lab) ? RESEARCH_ORDER[ai.researchIndex] : undefined;
     const spare = p.credits - Math.min(reserve, 1600) - (nextUp ? UPGRADES[nextUp].cost * 0.5 : 0);
-    const canHarvest = hasBuilding(ai.owner, 'fab') && hasBuilding(ai.owner, 'extractor');
+    const canHarvest = hasBuilding(ai.owner, R.veh) && hasBuilding(ai.owner, R.refinery);
+    const hcost = UNITS[R.harvester].cost;
     // raided harvesters get replaced before anything else, unless it has almost no army
     const rebuildEcon = canHarvest && harvesters < 2 && army.length >= 4;
-    if (canHarvest && harvesters < 3 && p.credits >= 1400 && !p.queues.veh.length) {
-      startProduction(ai.owner, 'harvester', 'veh');   // economy first
+    if (canHarvest && harvesters < 3 && p.credits >= hcost && !p.queues.veh.length) {
+      startProduction(ai.owner, R.harvester, 'veh');   // economy first
     } else if (!rebuildEcon && army.length < diff.armyCap && spare > 250) {
       // counters read only scouted enemies, weighted toward the faction it means to hit
       const mix = diff.counters ? scoutedMix(ai, waveTargetOwner(ai.owner)) : null;
-      const vehicles = hasBuilding(ai.owner, 'fab');
-      if (hasBuilding(ai.owner, 'barracks') && !p.queues.inf.length && (!vehicles || rand() < doc.infShare)) {
+      const vehicles = hasBuilding(ai.owner, R.veh);
+      if (hasBuilding(ai.owner, R.inf) && !p.queues.inf.length && (!vehicles || rand() < doc.infShare)) {
         const pick = choose(ai.owner, doc.inf, mix, spare);
         if (pick) startProduction(ai.owner, pick, 'inf');
       }
-      if (hasBuilding(ai.owner, 'fab') && !p.queues.veh.length && spare > doc.vehFunding) {
+      if (vehicles && !p.queues.veh.length && spare > doc.vehFunding) {
         const pick = choose(ai.owner, doc.veh, mix, spare);
         if (pick) startProduction(ai.owner, pick, 'veh');
       }
@@ -434,7 +429,7 @@ function pickEconTarget(owner: number): { x: number, y: number } | null {
   if (victim < 0) return null;
   const h = units.find(u => u.owner === victim && u.def.harvester);
   if (h) return { x: h.x, y: h.y };
-  const ex = buildings.find(b => b.owner === victim && b.def.id === 'extractor');
+  const ex = buildings.find(b => b.owner === victim && b.def.grantsHarvester);
   return ex ? buildingCenter(ex) : null;
 }
 
@@ -448,7 +443,7 @@ function pickWaveTarget(owner: number) {
   const myC = buildingCenter(hq);
   let bestOwner = -1, bestD = Infinity, broodSeen = false;
   for (const b of buildings) {
-    if (b.owner === owner || b.def.isWall) continue;
+    if (b.owner === owner || b.def.isWall || b.def.trap) continue;
     // human factions don't go hunting the brood or the Keepers while there's anyone else to fight
     if (isVey(b.owner) && b.owner !== PLAYER) { broodSeen = true; continue; }   // an alien player is fair game
     const c = buildingCenter(b);
@@ -457,8 +452,8 @@ function pickWaveTarget(owner: number) {
   }
   if (bestOwner === -1 && broodSeen) bestOwner = buildings.find(b => isVey(b.owner) && b.owner !== owner)?.owner ?? -1;
   if (bestOwner === -1) return null;
-  return buildings.find(b => b.owner === bestOwner && (b.def.id === 'nexus' || b.def.id === 'heart' || b.def.id === 'beacon'))
-      ?? buildings.find(b => b.owner === bestOwner && !b.def.isWall) ?? null;
+  return buildings.find(b => b.owner === bestOwner && (isHQ(b.def.id) || b.def.id === 'heart' || b.def.id === 'beacon'))
+      ?? buildings.find(b => b.owner === bestOwner && !b.def.isWall && !b.def.trap) ?? null;
 }
 
 export function updateAI(dt: number) {

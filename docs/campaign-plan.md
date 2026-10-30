@@ -28,8 +28,7 @@ Officially, Helios is collapsing through bad luck: a rare instability, *nobody's
 |---|---|---|---|
 | **Helion Dynamics** (player) | The charter company: miners, engineers, its security wing | Launch the fleet, and keep the truth buried with the planet | Balanced |
 | **Kessler Collective** | The colony security corps, broken away under its marshal | To take the fleet *and* put Helion's board on trial in front of the sleepers | Armoured columns behind gun lines |
-| **Verdant Pact** | Terraformers who stopped terraforming when they found out what the crystal is | To stop the harvest and let the Vey try to hold the sun. They will die here if it fails | Infantry tides that swarm the vents |
-| **Ashen Syndicate** | Deep-crust miners turned smugglers | To sell fleet seats, and to keep mining the Hollow's crystal-grown bodies for pure flux | Raids, aircraft, artillery |
+| **The Ashen Clans** | The first miners' grandchildren, left in the deep crust when Helion moved on. Two confederations: **the Hearth** (Reyes; they live beside the crystal and hold the old terraforming station) and **the Ashen** (Vessa; raiders and flux traders) | The Hearth: stop the harvest and let the Vey try to hold the sun. The Ashen: sell fleet seats, and keep cutting the Hollow's crystal-grown bodies for pure flux | Guerrillas. Old rifles, harpoons, firebombs, welded trucks and beast-drawn carts; hidden snares and mines; unpowered camps that pack up and move; raids that pay |
 | **The Hollow** (new, mostly neutral) | Descendants of the colony ship **Meridian**, which landed 200 years ago and was listed as lost. The Vey grew into them: pale, partly crystalline, living in the deep tunnels | To be left alone. Then, as the Vey dies, to make someone pay | Ambushes from tunnels, crystal-grown infantry, units that heal near crystal |
 | **The Vey** (not a faction) | The living crystal under everything | Unknown. It reacts to harvesting with tremors, crystal storms and vents that go dark | A force on the map, not an army |
 
@@ -45,9 +44,9 @@ Officially, Helios is collapsing through bad luck: a rare instability, *nobody's
 
 **Marshal Dieter Kessler**, leader of the Kessler Collective. He held the colony through two famines and found out about Lantern three years too late. He is the campaign's antagonist, and he is **right about Helion**. *Line:* "I don't want your fleet, Lantern. I want your board in a cell when it lands." *Arc:* the wall the player has to break, and the man who offers the only honest deal in the game.
 
-**Speaker Ama Reyes**, elected voice of the Verdant Pact, and the biologist who first understood the Vey. She is gentle, stubborn and has nothing left to lose. *Arc:* she believes that if the harvesting stops, the Vey can hold Helios for decades. She is half right.
+**Speaker Ama Reyes**, a Helion biologist who walked out into the deep crust, was taken in by the Hearth clans and is now their elected voice. She is the one who first understood the Vey. She is gentle, stubborn and has nothing left to lose. *Arc:* she believes that if the harvesting stops, the Vey can hold Helios for decades. She is half right.
 
-**Vessa Kol, "the Cinder Queen"**, who runs the Ashen Syndicate. She is charming and mercenary, and she has been quietly harvesting Hollow captives for the purest flux on Cinder. *Arc:* never an ally, always a deal. Every deal she offers is paid for by the Hollow.
+**Vessa Kol, "the Cinder Queen"**, chief of the Ashen clans. She is charming and mercenary, and she has been quietly harvesting Hollow captives for the purest flux on Cinder. *Arc:* never an ally, always a deal. Every deal she offers is paid for by the Hollow.
 
 **Seren**, an elder of the Hollow, descended from the Meridian's pilot. She speaks through the crystal itself, in fragments and old colony slang two centuries out of date. *Arc:* she is first heard as an unidentified voice on the comms. She becomes a reluctant guide, and her people's fate is the campaign's last decision.
 
@@ -73,7 +72,7 @@ Helios starts flaring and the surface burns. Kessler offers terms: a merged flee
 ### The ending: there is no good one
 To fire, the beacon has to burn the vents dry, which means burning out what is left of the Vey. **The final choice**, made on the last mission's map:
 
-- **Fire the beacon.** The fleet escapes. The Vey dies, Cinder dies, and with it the Hollow and the Verdant Pact. Varga finally confesses on an open channel as the fleet jumps. Forty thousand sleepers wake up on the far side carrying the guilt.
+- **Fire the beacon.** The fleet escapes. The Vey dies, Cinder dies, and with it the Hollow and the clans. Varga finally confesses on an open channel as the fleet jumps. Forty thousand sleepers wake up on the far side carrying the guilt.
 - **Give the vents to Reyes.** The beacon never fires. The Vey, unbled, steadies Helios for a while: years, maybe decades, Reyes can't say. The fleet stays. Humanity lives on Cinder beside the Vey and the Hollow, under a sun that will still die, and the board's crimes are judged in the open.
 
 - **Hidden third ending: carry the seed.** This is only possible if Lantern protected the Hollow at the Meridian. Seren reveals that the Vey can live in a single heart-crystal, and that it can be cut from the Lantern shaft and carried aboard the fleet. Doing it means holding the shaft *and* the corridor at once, and the Vey's absence lets Helios go nova at once instead of in hours. The fleet escapes with a living world-seed and the Hollow's survivors. Cinder, the Verdant Pact and everyone who couldn't reach the corridor in time die. It's the "best" ending, and it still costs a planet.
@@ -87,10 +86,10 @@ The Act II choice changes the details too: whether the Hollow stand with Lantern
 | # | Mission | Enemy | Teaches / uses | Win | Story beat |
 |---|---|---|---|---|---|
 | 1 | **Cold Drop** | Kessler patrols | Building, harvesting, power | Build an Extractor, deliver 3,000 flux, clear the patrol camp | Okoye and Varga introduced. A harvester goes missing at the end |
-| 2 | **Flux Lines** | Verdant scouts, **Hollow ambush** | Capturing vents and towers, vision | Hold 2 vents and a tower for 60 s | Lind introduced. First tunnel ambush; an unknown voice on the comms (Seren) |
+| 2 | **Flux Lines** | Hearth Clan pickets and snares, **Hollow ambush** | Capturing vents and towers, vision | Hold 2 vents and a tower for 60 s | Lind introduced. First tunnel ambush; an unknown voice on the comms (Seren) |
 | 3 | **Iron Weather** | Kessler | Defences, repair, upgrades | Survive 3 scripted waves, then destroy the forward base | Kessler's broadcast: *ask about Project Lantern* |
 | 4 | **Sparks** | Ashen | Protecting the economy, raids | Keep 3 harvesters alive for 8 min while building a Fabricator | Vessa's first deal: the raids stop for 2 min, and she says nothing about where her flux comes from |
-| 5 | **The Green Tide** | Verdant | Infantry counters | Break the Verdant hold on the central vents | Reyes's labs: the crystal is alive. The vents scream on capture (the Vey reacts) |
+| 5 | **The Green Tide** | Hearth Clans | Infantry counters, sweeping for traps | Break the Hearth's hold on the central vents | Reyes's labs: the crystal is alive. The vents scream on capture (the Vey reacts) |
 | 6 | **Resonance** | Kessler and Hollow | Research and orbital strike under a timer | Destroy Kessler's Orbital Uplink before it charges | Lind hands over the Resonance Report. Okoye asks the question |
 | 7 | **Meridian** | Ashen, Hollow | Escort and defence, **choice** | Defend the wreck *or* let the Ashen take it | First choice. Seren speaks clearly for the first time |
 | 8 | **Kessler's Wall** | Kessler | Siege: bastions, walls, colossus | Destroy Kessler's Nexus | Kessler's terms. Lind goes down the Lantern shaft (a side objective: hold the shaft entrance) |
@@ -150,7 +149,8 @@ Nothing starts until this draft is signed off. The plan keeps the current file o
 - **The Keepers** (the Vey's makers) arrive in II-6 *Resonance*, making it a three-way fight with Kessler; also a skirmish option.
 - Changes from the plan: II-6 is *Resonance* (the Uplink mission, with the Report and Okoye's question), so the Meridian choice moves to Act III as planned (mission 7).
 - **Act III** (III-7 Meridian, III-8 Kessler's Wall, III-9 Zero Day). Campaign flags carry choices forward: `labs` (II-5, spared or burned), `meridian` (protected or sold), `okoye` (stayed or left), `lind` (gone). Sparing the labs brings Verdant in as allies at Zero Day; protecting the Meridian brings the Hollow as allies and unlocks the third ending.
-- The human factions now look different from each other: Kessler (riveted armour, rust stripes, war banners), Verdant (moss, vines, patched panels) and Ashen (soot, scorch, embers, scrap spikes). Helion stays clean.
+- **Three human factions** (the user's call): Helion and Kessler stay futuristic (Kessler gets riveted armour, rust stripes and war banners over Helion's shapes); the Verdant Pact is gone, and **the Ashen Clans** are an older, scavenging people with their own units, buildings and art (`src/clan-art.ts`). In the campaign, Reyes's **Hearth Clans** (green, slot 2) take the Pact's role and Vessa's **Ashen Clans** (slot 3) are the raiders.
+- Balance pass with the fair-play bot against the old build: II-4 and II-5 match; the Meridian defence was too hard before and is now eased (ship 7000 hp, 7:00 timer, smaller waves, mortars late). Zero Day had a bug where allied vents didn't count toward the beacon (and allies blocked each other's captures); fixed, and Vessa's raids now press the vents so the no-ally route isn't a walkover.
 
 ## 7. Decisions
 - **Names:** locked. Cinder, Lantern, the Vey, the Hollow, Meridian.

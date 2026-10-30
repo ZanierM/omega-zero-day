@@ -1,12 +1,12 @@
 import {
   BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, VET_NAME,
-  FACTION_NAMES, SLOTS,
+  FACTION_NAMES, SLOTS, rolesOf,
 } from './config';
 import * as campaign from './campaign/runner';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
   gameOver, endReason, corridor, techAllowed, costFor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
-  Unit, deployPioneer, startRepair, repairCost, superReady, novaTotal, novaLeft,
+  Unit, deployPioneer, packBuilding, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
 import { selection, startPlacement, placement, cancelPlacement, setOnBuildingPlaced, startStrikeTargeting, controlGroupIds, saveControlGroup, recallControlGroup } from './input';
@@ -227,6 +227,7 @@ export function initUI() {
       return;
     }
     if (b.def.superweapon && superReady(b)) { startStrikeTargeting(b.id); sfx('click'); return; }
+    if (b.def.packable && (b.hp >= b.maxHp || b.repairing)) { packBuilding(b); return; }
     startRepair(b);
   });
   abilBtn.addEventListener('pointerdown', () => { for (const u of abilityUnits()) activateAbility(u); });
@@ -397,7 +398,8 @@ export function updateUI() {
   const frac = pw.supply > 0 ? Math.min(1, pw.drain / pw.supply) : (pw.drain > 0 ? 1 : 0);
   powerFill.style.width = pw.low ? '100%' : `${Math.max(4, 100 - frac * 100)}%`;
   powerFill.className = pw.low ? 'low' : '';
-  powerText.textContent = pw.low ? `${pw.drain - pw.supply} over — slowed` : `${pw.supply - pw.drain} spare`;
+  // the Clans (and the aliens) run on no grid at all
+  powerText.textContent = !pw.supply && !pw.drain ? 'No grid' : pw.low ? `${pw.drain - pw.supply} over — slowed` : `${pw.supply - pw.drain} spare`;
 
   // supernova countdown
   if (novaTotal > 0) {
@@ -426,7 +428,7 @@ export function updateUI() {
 
   // research tab dims until a Laboratory exists
   const upsTab = tabBtns.get('ups');
-  if (upsTab) upsTab.classList.toggle('locked', !hasBuilding(PLAYER, 'lab'));
+  if (upsTab) upsTab.classList.toggle('locked', !hasBuilding(PLAYER, rolesOf(PLAYER).lab));
 
   for (const b of btns) {
     const q = p.queues[b.tab];
@@ -490,12 +492,17 @@ export function updateUI() {
   if (showHalt !== shownHalt) { actBtn.classList.toggle('halt', showHalt); shownHalt = showHalt; }
   if (pio) {
     actBtn.style.visibility = 'visible';
-    actBtn.textContent = '▼ Deploy command post';
+    actBtn.textContent = pio.packed ? `▼ Set up ${BUILDINGS[pio.packed].name}` : `▼ ${pio.def.deploysTo === 'camp' ? 'Set up war camp' : 'Deploy command post'}`;
     actBtn.disabled = false;
   } else if (ob && ob.def.superweapon) {
     actBtn.style.visibility = 'visible';
     if (superReady(ob)) { actBtn.textContent = '⊕ Launch orbital strike'; actBtn.disabled = false; }
     else { actBtn.textContent = `Charging… ${Math.round((1 - ob.charge / ob.def.superweapon.charge) * 100)}%`; actBtn.disabled = true; }
+  } else if (ob && ob.def.packable && (ob.hp >= ob.maxHp || ob.repairing)) {
+    // the Clans strike camp: [P] packs a damaged one too
+    actBtn.style.visibility = 'visible';
+    actBtn.textContent = '▲ Pack up [P]';
+    actBtn.disabled = !!ob.upgrading;
   } else if (ob && ob.hp < ob.maxHp) {
     actBtn.style.visibility = 'visible';
     if (ob.repairing) { actBtn.textContent = 'Repairing…'; actBtn.disabled = true; }

@@ -1,7 +1,7 @@
 import { TILE, PLAYER, BUILDINGS } from './config';
 import { MAP_W, MAP_H } from './map';
 import {
-  units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding,
+  units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding, packBuilding,
   entityPos, entityRadius, toast, Unit, fireStrike, superReady,
   jumpTargetAlert, starvedHarvesters, activateAbility, visible, explored,
 } from './game';
@@ -235,6 +235,10 @@ export function initInput() {
     // S = stop
     if (e.key === 's' || e.key === 'S') {
       for (const u of selectedUnits()) issueOrder(u, { type: 'idle' });
+    }
+    // P = a Clan building packs up into a Caravan
+    if (e.key === 'p' || e.key === 'P') {
+      for (const id of [...selection]) { const b = byId.get(id); if (b?.kind === 'building' && b.owner === PLAYER && b.def.packable) packBuilding(b); }
     }
     // Q = trigger the selected units' special ability
     if (e.key === 'q' || e.key === 'Q') {
