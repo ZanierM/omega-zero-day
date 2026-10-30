@@ -8,7 +8,6 @@
 type Pt = [number, number];
 type Ctx = CanvasRenderingContext2D;
 import { BROOD_UNIT_ART, BROOD_BUILDING_ART } from './brood-art';
-import { KEEPER_UNIT_ART, KEEPER_BUILDING_ART } from './keeper-art';
 import { LANDMARK_ART } from './landmark-art';
 
 const OUT = '#1a120c';
@@ -1657,7 +1656,6 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   gunship:    { hull: drawSkyhawk, reach: 18, height: 10, turn: 5 },
   bomber:     { hull: drawRavager, reach: 19, height: 8, turn: 3 },
   ...BROOD_UNIT_ART,
-  ...KEEPER_UNIT_ART,
 };
 
 // ---------------- defences ----------------
@@ -1875,7 +1873,6 @@ export const BUILDING_ART: Partial<Record<string, (g: Ctx, w: number, h: number,
   wall: drawWall,
   heavywall: drawHeavyWall,
   ...BROOD_BUILDING_ART,
-  ...KEEPER_BUILDING_ART,
   ...LANDMARK_ART,
 };
 

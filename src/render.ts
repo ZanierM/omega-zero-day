@@ -5,6 +5,7 @@ import { skinOf, skinBuilding, skinUnit } from './faction-skin';
 import './clan-art';   // adds the Ashen Clans to art.ts's registries
 import './hollow-art';  // and the Hollow
 import './kessler-art'; // and Kessler's own shapes ('k:' entries)
+import './keeper-art';  // and the Keepers
 import { MAP_W, MAP_H, terrain, crystal, idx, land, Land } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId, packedAway } from './game';
@@ -674,7 +675,7 @@ export function bakeAirSprite(defId: string, owner: number): HTMLCanvasElement {
   g.fillRect(-L * 0.3, -1.6, L * 0.5, 3.2);
   g.globalAlpha = 1;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  finish(c, 2);
+  finish(c, 2, owner);
   (c as Scaled).k = k;
   return c;
 }
@@ -696,7 +697,7 @@ const tArt = (id: string, owner: number) => (own(owner) && TURRET_ART['k:' + id]
 // the old paint-over only for what Kessler doesn't draw itself
 const skinFor = (owner: number, id: string, kind: 'v' | 'b') => (own(owner) && (kind === 'v' ? VEHICLE_ART : BUILDING_ART)['k:' + id] ? null : skinOf(owner));
 const vehAngles = (defId: string) => VEHICLE_ART[defId]!.frames ? 24 : VEH_ANGLES;
-function rotatedPart(key: string, reach: number, height: number, paint: (g: CanvasRenderingContext2D) => void, skinOwner = -1): VehPart {
+function rotatedPart(key: string, reach: number, height: number, paint: (g: CanvasRenderingContext2D) => void, skinOwner = -1, owner = -1): VehPart {
   let s = sprites.get(key) as VehPart | undefined;
   if (!s) {
     const k = 3, ww = reach * 2 + 4, wh = ww + height;
@@ -708,7 +709,7 @@ function rotatedPart(key: string, reach: number, height: number, paint: (g: Canv
     g.setTransform(1, 0, 0, 1, 0, 0);
     const skin = skinOwner >= 0 ? skinOf(skinOwner) : null;
     if (skin) skinUnit(c, skin);
-    finish(c, 2);
+    finish(c, 2, owner);
     s = c as VehPart; s.k = k; s.ox = ww / 2; s.oy = ww / 2 + height; s.ww = ww; s.wh = wh;
     sprites.set(key, s);
   }
@@ -720,7 +721,7 @@ function vehiclePart(defId: string, owner: number, part: 'hull' | 'turret', i: n
   return rotatedPart(`v:${defId}:${owner}:${part}:${i}:${frame}`, va.reach, va.height, g => {
     if (part === 'hull') va.hull(g, ang, TEAM_COLORS[owner], frame / (va.frames ?? 1));
     else va.turret?.(g, ang, TEAM_COLORS[owner]);
-  }, skinFor(owner, defId, 'v') ? owner : -1);
+  }, skinFor(owner, defId, 'v') ? owner : -1, owner);
 }
 // a defence's aiming head, eased toward its target and drawn at its pivot
 function drawDefenceHead(b: Building, px: number, py: number) {
@@ -730,7 +731,7 @@ function drawDefenceHead(b: Building, px: number, py: number) {
   v.tur = turnToward(v.tur, b.facing, 6 * vizDt);
   const i = headingIndex(v.tur, VEH_ANGLES);
   const head = rotatedPart(`d:${b.def.id}:${b.owner}:${i}`, ta.reach, ta.height,
-    g => ta.head(g, (i / VEH_ANGLES) * Math.PI * 2, TEAM_COLORS[b.owner]));
+    g => ta.head(g, (i / VEH_ANGLES) * Math.PI * 2, TEAM_COLORS[b.owner]), -1, b.owner);
   ctx.drawImage(head, px + ta.pivot[0] * s - head.ox, py + ta.pivot[1] * s - head.oy, head.ww, head.wh);
 }
 const vehViz = new Map<number, { hull: number, tur: number }>();
@@ -767,10 +768,12 @@ function drawVehicle(u: Unit, moving: boolean, lift = 0) {
 
 // the gritty finish every code-drawn sprite gets after it's drawn: darker
 // toward the ground, worn and dirty, a light sun grade, then more contrast and
-// colour than the raw art so nothing reads washed out; line: outline width
-function finish(c: HTMLCanvasElement, line: number) {
-  underShade(c, 0.35);
-  grime(c, 0.42);
+// colour than the raw art so nothing reads washed out; line: outline width.
+// The Keepers keep their polish: the same contrast, none of the dirt.
+function finish(c: HTMLCanvasElement, line: number, owner = -1) {
+  const pristine = owner >= 0 && SLOTS[owner] === 'keepers';
+  underShade(c, pristine ? 0.12 : 0.35);
+  if (!pristine) grime(c, 0.42);
   gradeWarmCool(c, 0.35);
   tone(c, 1.3, 1.25, 0.95);
   outline(c, 'rgba(8,5,4,0.9)', line);
@@ -968,7 +971,7 @@ function bakeRefinedSprite(defId: string, owner: number, level: number): BldSpri
   sg.setTransform(1, 0, 0, 1, 0, 0);
   const skin = skinFor(owner, defId, 'b');
   if (skin && !def.isWall) skinBuilding(st, skin, defId, k);   // the faction's look over the shared shape
-  finish(st, 1);                 // one device pixel, not two world pixels
+  finish(st, 1, owner);          // one device pixel, not two world pixels
 
   const reachX = Math.ceil(baseY * 0.42), reachY = Math.ceil(baseY * 0.16);
   const cw = Math.max(w, sw) + 16 + reachX * 2;
@@ -1286,7 +1289,7 @@ function bakeArtIcon(defId: string, owner: number, level: number): string | null
   g.setTransform(1, 0, 0, 1, 0, 0);
   const skin = skinFor(owner, defId, 'b');
   if (skin && !def.isWall) skinBuilding(c, skin, defId, k);
-  finish(c, 1);
+  finish(c, 1, owner);
   return iconUrl(c);
 }
 
@@ -1308,7 +1311,7 @@ function bakeUnitIcon(defId: string, owner: number): string | null {
   g.setTransform(1, 0, 0, 1, 0, 0);
   const skin = skinFor(owner, defId, 'v');
   if (skin) skinUnit(c, skin);
-  finish(c, 2);
+  finish(c, 2, owner);
   return iconUrl(c);
 }
 
