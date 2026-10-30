@@ -527,7 +527,7 @@
     @media (orientation: portrait), (max-width: 760px) { #comms { top: auto; right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: calc(100vw - 24px); } }
     @media (max-height: 500px) { #commsbadge { width: 44px; height: 44px; } #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
   </style>
-  <script type="module" crossorigin src="./assets/index-CsX2m5Fu.js"></script>
+  <script type="module" crossorigin src="./assets/index-BFF6vhwR.js"></script>
 </head>
 <body>
   <div id="app" inert>
@@ -599,6 +599,12 @@
       </div>
       <div id="campaignpanel">
         <div id="missionlist"></div>
+        <div class="optlabel">Difficulty</div>
+        <div class="paramrow" id="campdiffopts" role="group" aria-label="Campaign difficulty">
+          <button class="opt" type="button" data-d="easy">Easy</button>
+          <button class="opt sel" type="button" data-d="normal">Normal</button>
+          <button class="opt" type="button" data-d="hard">Hard</button>
+        </div>
         <div id="missionbrief"></div>
       </div>
       <ul class="objectives skirmish-only">
