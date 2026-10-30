@@ -1,4 +1,4 @@
-import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, KEEPERS } from './config';
+import { TILE, TEAM_COLORS, BUILDINGS, UNITS, PLAYER, CAPTURE_TIME, CAPTURE_RADIUS, FACTION_NAMES, kindOf } from './config';
 import * as telemetry from './telemetry';
 import { setListener, sfxAt } from './audio';
 import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
@@ -1287,6 +1287,7 @@ function drawCorridorStrip(vw: number) {
   const clock = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
   let status = owner === PLAYER ? `LAUNCH IN ${clock}`
     : owner >= 0 ? `${FACTION_NAMES[owner].split(' ')[0].toUpperCase()} LAUNCHES IN ${clock}`
+    : kindOf(PLAYER) !== 'human' ? `RIVALS NEED ${need} OF ${vents.length} · DENY THEM`   // the aliens have no fleet to launch
     : `HOLD ${need} OF ${vents.length} VENTS · YOU HOLD ${mine}`;
   const danger = owner > 0;
   ctx.font = '800 10px system-ui, sans-serif';
@@ -1297,7 +1298,7 @@ function drawCorridorStrip(vw: number) {
     label = 'CORRIDOR';
     status = owner === PLAYER ? `LAUNCH ${clock}`
       : owner >= 0 ? `${FACTION_NAMES[owner].split(' ')[0].toUpperCase()} ${clock}`
-      : `${need} OF ${vents.length} · YOU ${mine}`;
+      : kindOf(PLAYER) !== 'human' ? `RIVALS ${need}/${vents.length}` : `${need} OF ${vents.length} · YOU ${mine}`;
   }
   const lw = ctx.measureText(label).width, sw = ctx.measureText(status).width;
   const w = Math.min(room, lw + sw + pipW + 44), h = 24;
@@ -2075,7 +2076,7 @@ const arrivedAt = new Map<number, number>();
 let arrivalsReady = false;
 function drawArrivals() {
   for (const e of [...units, ...buildings]) {
-    if (e.owner !== KEEPERS || arrivedAt.has(e.id)) continue;
+    if (kindOf(e.owner) !== 'keepers' || arrivedAt.has(e.id)) continue;
     arrivedAt.set(e.id, arrivalsReady ? T : -9);
     if (arrivalsReady) { const p = game.entityPos(e); sfxAt('arrive', p.x, p.y); }
   }

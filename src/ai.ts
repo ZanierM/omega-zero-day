@@ -1,4 +1,4 @@
-import { TILE, BUILDINGS, UPGRADES, UNITS, PLAYER, FACTION_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, DMG_TABLE, isVey } from './config';
+import { TILE, BUILDINGS, UPGRADES, UNITS, PLAYER, FACTION_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, DMG_TABLE, isVey, SLOTS } from './config';
 import {
   buildings, units, players, startProduction, placeBuilding, canPlace,
   issueOrder, hasBuilding, buildingCenter, powerOf, numPlayers, deployPioneer, tileOf,
@@ -30,6 +30,16 @@ interface Doctrine {
 
 const LATE = ['fusion', 'arctower', 'turret', 'arctower', 'bastion', 'railgun', 'fusion', 'bastion'];
 const DOCTRINES: Record<string, Doctrine> = {
+  // Helion Dynamics: the company itself, balanced and economy-minded
+  helion: {
+    tag: 'strike force',
+    build: ['solar', 'extractor', 'barracks', 'solar', 'extractor', 'fab', 'turret', 'solar', 'lab', 'spire', 'turret',
+      'extractor', 'solar', 'railgun', 'repairyard', 'skyport', 'turret', 'skyguard', 'solar', ...LATE],
+    research: ['wpn1', 'arm1', 'wpn2', 'def1', 'arm2', 'wpn3', 'arm3', 'def2', 'orbital'],
+    inf: { trooper: 2, rocketeer: 2, vanguard: 1.5, sniper: 1, pyro: 1 },
+    veh: { hovertank: 2.5, ranger: 1, warden: 1.5, artillery: 1.2, dominator: 1.2, gunship: 1 },
+    vehFunding: 900, infShare: 0.6, waveGap: 1, waveSize: 1, firstWave: 1, ventBias: 0.4, raidEcon: 0.15,
+  },
   // Kessler Collective: slow, heavy armour behind a wall of guns
   kessler: {
     tag: 'armoured column',
@@ -62,9 +72,8 @@ const DOCTRINES: Record<string, Doctrine> = {
     vehFunding: 450, infShare: 0.4, waveGap: 0.9, waveSize: -1, firstWave: 0.8, ventBias: 0.3, raidEcon: 0.6,
   },
 };
-// faction slot → doctrine (FACTION_NAMES: player, Kessler, Verdant, Ashen)
-const DOCTRINE_OF = ['kessler', 'kessler', 'verdant', 'ashen'];
-export function doctrineOf(owner: number) { return DOCTRINES[DOCTRINE_OF[owner] ?? 'kessler']; }
+// a slot's doctrine is its faction's (Helion's when it stands in for the faction the player took)
+export function doctrineOf(owner: number) { return DOCTRINES[SLOTS[owner]] ?? DOCTRINES.kessler; }
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
@@ -441,7 +450,7 @@ function pickWaveTarget(owner: number) {
   for (const b of buildings) {
     if (b.owner === owner || b.def.isWall) continue;
     // human factions don't go hunting the brood or the Keepers while there's anyone else to fight
-    if (isVey(b.owner)) { broodSeen = true; continue; }
+    if (isVey(b.owner) && b.owner !== PLAYER) { broodSeen = true; continue; }   // an alien player is fair game
     const c = buildingCenter(b);
     const d = Math.hypot(c.x - myC.x, c.y - myC.y);
     if (d < bestD) { bestD = d; bestOwner = b.owner; }
