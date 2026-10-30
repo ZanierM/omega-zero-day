@@ -465,7 +465,7 @@
       #selportrait { display: none !important; }
       #selhealth { grid-column: 1; }
       #detailsbtn.show { display: block; flex: 0 0 42px; width: 42px; height: 40px; min-height: 40px; border: 1px solid var(--edge-hi); border-radius: 4px; background: var(--plate-dk); color: var(--gold); font: 800 var(--type-xs) var(--head); letter-spacing: .06em; cursor: pointer; }
-      .actbtn { flex: 0 0 188px; height: 40px; min-height: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .actbtn { flex: 1 0 146px; height: 40px; min-height: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* fits the strip beside the selection; scrolls if two show */
       #pausebox { padding: 16px 22px; gap: 7px; }
       #pausebox h2 { font-size: 22px; margin-bottom: 0; }
     }
@@ -483,6 +483,11 @@
     #factionopts .opt.alien b { color: #d8c8ff; }
     @media (max-width: 520px) { #factionopts { grid-template-columns: repeat(2, 1fr); } }
     .paramrow .opt:disabled { opacity: .4; cursor: not-allowed; }
+    /* five landscapes: wrap onto two rows on narrow screens rather than run off the panel */
+    /* a long ability or action label shrinks with an ellipsis rather than spilling out of the panel */
+    #abilbtn, #actbtn { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #landopts { flex-wrap: wrap; }
+    #landopts .opt { flex: 1 1 calc(33% - 9px); min-width: 0; }
     /* ---- campaign: mode switch, mission list, comms box, objective tracker ---- */
     #modeopts { margin: 4px 0 14px; }
     #campaignpanel { display: none; }
@@ -639,6 +644,14 @@
           <button class="opt sel" type="button" data-v="1">Normal</button>
           <button class="opt" type="button" data-v="1.6">Abundant</button>
         </div>
+        <div class="optlabel">Landscape</div>
+        <div class="paramrow" id="landopts">
+          <button class="opt sel" type="button" data-l="scrub">Scrub plains</button>
+          <button class="opt" type="button" data-l="ash">Ash flats</button>
+          <button class="opt" type="button" data-l="canyon">Crystal canyons</button>
+          <button class="opt" type="button" data-l="ruins">Dead city</button>
+          <button class="opt" type="button" data-l="random">Random</button>
+        </div>
         <div class="optlabel">The Vey brood</div>
         <div class="paramrow" id="broodopts">
           <button class="opt sel" type="button" data-v="0">Dormant</button>
@@ -648,6 +661,11 @@
         <div class="paramrow" id="keeperopts">
           <button class="opt sel" type="button" data-v="0">Absent</button>
           <button class="opt" type="button" data-v="1">Arrive<span>The Vey's makers come to judge the cutting</span></button>
+        </div>
+        <div class="optlabel">The Hollow</div>
+        <div class="paramrow" id="hollowopts">
+          <button class="opt sel" type="button" data-v="0">Hidden</button>
+          <button class="opt" type="button" data-v="1">Rise<span>The lost colony comes up out of the rock</span></button>
         </div>
         <div class="optlabel">Supernova countdown</div>
         <div class="paramrow" id="novaopts">

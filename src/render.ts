@@ -3,7 +3,8 @@ import * as telemetry from './telemetry';
 import { setListener, sfxAt } from './audio';
 import { skinOf, skinBuilding, skinUnit } from './faction-skin';
 import './clan-art';   // adds the Ashen Clans to art.ts's registries
-import { MAP_W, MAP_H, terrain, crystal, idx } from './map';
+import './hollow-art';  // and the Hollow
+import { MAP_W, MAP_H, terrain, crystal, idx, land, Land } from './map';
 import * as game from './game';
 import { units, buildings, beams, booms, shells, strikes, explored, visible, tileOf, Unit, Building, canPlace, byId, packedAway } from './game';
 import { camera, selection, selectBox, placement, strikeAim } from './input';
@@ -120,6 +121,16 @@ const BAYER = [0, 0.5, 0.75, 0.25];
 interface Pal { out: string, dk: string, mid: string, lt: string, hi: string }
 const ROCK_GREY: Pal = { out: '#2a201d', dk: '#5a4c46', mid: '#85776e', lt: '#ad9f92', hi: '#d8ccbc' };
 const ROCK_RED: Pal = { out: '#2c170f', dk: '#683724', mid: '#93553a', lt: '#bb7b52', hi: '#e6ab7a' };
+const BASALT: Pal = { out: '#141214', dk: '#2e2a2c', mid: '#4a4446', lt: '#6a6264', hi: '#948a88' };
+const CONCRETE: Pal = { out: '#1e1c1a', dk: '#4a4640', mid: '#6e6a62', lt: '#8e8a80', hi: '#b8b2a6' };
+// each landscape's ground: base colour (and how much height lifts it), its second patch colour, how green it gets
+interface Look { base: [number, number, number, number, number, number]; patch: [number, number, number, number, number, number]; patchBias: number; veg: number }
+const LOOKS: Record<Land, Look> = {
+  scrub:  { base: [132, 74, 82, 46, 46, 24], patch: [124, 48, 100, 40, 86, 32], patchBias: 0, veg: 1 },     // ochre sand, ash flats, olive scrub
+  ash:    { base: [112, 50, 104, 46, 98, 42], patch: [66, 30, 62, 28, 62, 26], patchBias: 0.06, veg: 0 },   // grey ash with charcoal drifts
+  canyon: { base: [150, 70, 80, 40, 54, 24], patch: [120, 40, 138, 44, 136, 42], patchBias: -0.04, veg: 0.4 },   // red rock, pale crystal dust
+  ruins:  { base: [118, 54, 110, 50, 96, 44], patch: [72, 26, 72, 26, 76, 26], patchBias: 0.04, veg: 1.3 },   // dusty paving, old asphalt, weeds
+};
 const TREE_TEAL: Pal = { out: '#11231c', dk: '#1f4236', mid: '#2f6b55', lt: '#4f9a72', hi: '#93cf8c' };
 const TREE_PURPLE: Pal = { out: '#1b1226', dk: '#36234c', mid: '#573a76', lt: '#8460a6', hi: '#c49edc' };
 
@@ -216,14 +227,15 @@ async function paintTerrain() {
 
       // sunlit ochre desert under a swollen red sun: warm sand, cooler ash
       // flats and olive scrub, each in crisp-edged patches
-      let r = 132 + m * 74, gg = 82 + m * 46, b = 46 + m * 24;
+      const L = LOOKS[land], B = L.base, Pt = L.patch;
+      let r = B[0] + m * B[1], gg = B[2] + m * B[3], b = B[4] + m * B[5];
       const ashN = ashC[c00] * w00 + ashC[c10] * w10 + ashC[c01] * w01 + ashC[c11] * w11;
-      const ashMix = Math.min(1, Math.max(0, (ashN - 0.56) * 6));
-      r = r * (1 - ashMix) + (124 + m * 48) * ashMix;
-      gg = gg * (1 - ashMix) + (100 + m * 40) * ashMix;
-      b = b * (1 - ashMix) + (86 + m * 32) * ashMix;
+      const ashMix = Math.min(1, Math.max(0, (ashN - 0.56 + L.patchBias) * 6));
+      r = r * (1 - ashMix) + (Pt[0] + m * Pt[1]) * ashMix;
+      gg = gg * (1 - ashMix) + (Pt[2] + m * Pt[3]) * ashMix;
+      b = b * (1 - ashMix) + (Pt[4] + m * Pt[5]) * ashMix;
       const vegN = vegC[c00] * w00 + vegC[c10] * w10 + vegC[c01] * w01 + vegC[c11] * w11;
-      const veg = Math.min(0.9, Math.max(0, (vegN - 0.57) * 5)) * (0.75 + grain * 0.35);
+      const veg = Math.min(0.9, Math.max(0, (vegN - 0.57) * 5)) * (0.75 + grain * 0.35) * Math.min(1, L.veg) * (L.veg > 1 ? 1.2 : 1);
       r = r * (1 - veg) + (88 + m * 40) * veg;
       gg = gg * (1 - veg) + (104 + m * 40) * veg;
       b = b * (1 - veg) + (42 + m * 18) * veg;
@@ -421,7 +433,7 @@ async function paintTerrain() {
       g.fillStyle = grd;
       g.fillRect(cx - 30, cy - 30, 60, 60);
       if (t === 1) {
-        const pal = noise(tx / 6 + 50, ty / 6) > 0.55 ? ROCK_RED : ROCK_GREY;
+        const pal = land === 'ash' ? BASALT : land === 'ruins' ? CONCRETE : land === 'canyon' || noise(tx / 6 + 50, ty / 6) > 0.55 ? ROCK_RED : ROCK_GREY;
         // tiles deep inside a formation get the biggest boulders so outcrops
         // build up into a mound instead of a grid of equal stones
         let inner = 0;
@@ -447,7 +459,7 @@ async function paintTerrain() {
     else g.ellipse(p.x + p.r * 0.45, p.y + p.r * 0.4, p.r * 1.15, p.r * 0.55, 0, 0, Math.PI * 2);
     g.fill();
   }
-  for (const p of pieces) p.tree ? drawTree(g, p.x, p.y, p.r, p.pal, p.seed) : drawBoulder(g, p.x, p.y, p.r, p.pal, p.seed);
+  for (const p of pieces) p.tree ? drawTree(g, p.x, p.y, p.r, p.pal, p.seed) : land === 'ruins' ? drawRuin(g, p.x, p.y, p.r, p.pal, p.seed) : drawBoulder(g, p.x, p.y, p.r, p.pal, p.seed);
 
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (gen === paintGen) terrainTex = tex;
@@ -487,6 +499,23 @@ function drawBoulder(g: CanvasRenderingContext2D, cx: number, cy: number, r: num
     g.globalAlpha = 1;
   }
   g.restore();
+}
+
+// a broken concrete block from the dead colony town: a lit roof slab, a shadowed face, dark window holes
+function drawRuin(g: CanvasRenderingContext2D, cx: number, cy: number, r: number, pal: Pal, seed: number) {
+  const w = r * 1.5, h = r * (0.9 + (seed * 7 % 1) * 0.8), d = r * 0.6;
+  const x0 = cx - w / 2, yb = cy + d / 2;
+  g.lineWidth = 1.2; g.strokeStyle = pal.out;
+  g.fillStyle = pal.dk; g.fillRect(x0, yb - h, w, h); g.strokeRect(x0, yb - h, w, h);   // the face toward us
+  // a broken roofline: the slab stepped down where it fell in
+  const cut = (seed * 13 % 1) * w * 0.6;
+  g.fillStyle = pal.lt;
+  g.beginPath(); g.moveTo(x0, yb - h); g.lineTo(x0 + d * 0.6, yb - h - d); g.lineTo(x0 + w - cut + d * 0.6, yb - h - d); g.lineTo(x0 + w - cut, yb - h); g.closePath(); g.fill(); g.stroke();
+  if (cut > 2) { g.fillStyle = pal.mid; g.fillRect(x0 + w - cut, yb - h * 0.7, cut, h * 0.7); g.strokeRect(x0 + w - cut, yb - h * 0.7, cut, h * 0.7); }
+  g.fillStyle = 'rgba(10,8,8,0.75)';
+  for (let row = 0; row < Math.floor(h / 7); row++) for (let col = 0; col < Math.floor(w / 6); col++)
+    if ((seed * 31 + row * 7 + col * 3) % 1 > 0.35) g.fillRect(x0 + 2 + col * 6, yb - h + 3 + row * 7, 3, 3.5);
+  g.fillStyle = pal.hi; g.fillRect(x0, yb - h, w - cut, 1);
 }
 
 // an alien tree: short trunk under a cluster of round canopy puffs, each

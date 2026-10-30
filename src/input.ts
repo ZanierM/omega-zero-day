@@ -57,7 +57,11 @@ function fireStrikeAt(wx: number, wy: number) {
 }
 // Keeper translocation: the next click picks where the selected Keepers arrive
 export let translocating = false;
-export function startTranslocate() { translocating = true; toast('Click where they should arrive: somewhere you can see'); }
+export function startTranslocate() {
+  translocating = true;
+  const burrow = selectedUnits().some(u => u.def.ability?.reach === 'explored');
+  toast(burrow ? 'Click where they should surface: anywhere you have scouted' : 'Click where they should arrive: somewhere you can see');
+}
 // world point the player is currently aiming a strike at (for the reticle), or null
 export function strikeAim(): { x: number, y: number } | null {
   return strikeTargeting !== null ? toWorld(mouse.x, mouse.y) : null;

@@ -132,12 +132,88 @@ function drawMonolith(g: Ctx, a: number, team: string, phase = 0) {
   jewel(g, 0, -z - 47, 2.6);
 }
 
+
+// a robed Keeper figure (shared by Seraph and Oracle): ivory body, gold mantle, crested head
+function robed(g: Ctx, a: number, z: number, wide: number, tall: number) {
+  const [cx, cy] = rotP(0, 0, a);
+  poly(g, [[cx - wide, cy - z], [cx + wide, cy - z], [cx + wide * 0.6, cy - z - tall], [cx - wide * 0.6, cy - z - tall]], sheen(g, cx, cy - z, cx, cy - z - tall, IVORY));
+  poly(g, [[cx - wide - 1, cy - z - tall + 2], [cx + wide + 1, cy - z - tall + 2], [cx + wide * 0.8, cy - z - tall - 2], [cx - wide * 0.8, cy - z - tall - 2]], sheen(g, cx, cy - z - tall + 2, cx, cy - z - tall - 2, GOLD));
+  g.fillStyle = sheen(g, cx, cy - z - tall - 2, cx, cy - z - tall - 8, IVORY);
+  g.beginPath(); g.ellipse(cx, cy - z - tall - 5, 2.2, 3.3, 0, 0, Math.PI * 2); g.fill();
+  jewel(g, cx - 0.6, cy - z - tall - 8.5, 1.3);
+  const [ex, ey] = rotP(1.6, 0, a);
+  g.fillStyle = '#9ffcf6'; g.fillRect(ex - 0.5, ey - z - tall - 5.5, 1.6, 0.9);
+  return { cx, cy };
+}
+
+function drawSeraph(g: Ctx, a: number, team: string, phase = 0) {
+  const z = 5 + Math.sin(phase * Math.PI * 2) * 0.8;
+  hoverPool(g, 7, 4, team);
+  // a shield of light around it, then the figure, a blade of light in each hand
+  g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = 'rgba(255,230,160,0.35)'; g.lineWidth = 1.2;
+  g.beginPath(); g.ellipse(0, -z - 9, 8, 12, 0, 0, Math.PI * 2); g.stroke(); g.restore();
+  const { cx, cy } = robed(g, a, z, 4, 13);
+  for (const sd of [-1, 1]) {
+    const [h0x, h0y] = rotP(2, sd * 4, a), [h1x, h1y] = rotP(8, sd * 6, a);
+    g.strokeStyle = 'rgba(255,245,210,0.95)'; g.lineWidth = 1.4; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(h0x, h0y - z - 8); g.lineTo(h1x, h1y - z - 12); g.stroke();
+    glowAt(g, h1x, h1y - z - 12, 3.5, 'rgba(255,230,160,0.8)');
+  }
+  g.strokeStyle = team; g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx - 3, cy - z - 4); g.lineTo(cx + 3, cy - z - 9); g.stroke();
+}
+
+function drawOracle(g: Ctx, a: number, team: string, phase = 0) {
+  const z = 6 + Math.sin(phase * Math.PI * 2) * 0.6;
+  hoverPool(g, 6, 3.5, team);
+  const { cx, cy } = robed(g, a, z, 3.2, 15);
+  // a tall staff topped with a seeing-eye crystal, held out in front
+  const [s0x, s0y] = rotP(3, 2.4, a);
+  g.strokeStyle = GOLD.dk; g.lineWidth = 1.6; g.beginPath(); g.moveTo(s0x, s0y - z); g.lineTo(s0x, s0y - z - 27); g.stroke();
+  g.strokeStyle = GOLD.lt; g.lineWidth = 0.6; g.stroke();
+  jewel(g, s0x, s0y - z - 28, 2.2);
+  glowAt(g, s0x, s0y - z - 28, 7, 'rgba(160,255,250,0.6)');
+  g.strokeStyle = team; g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx - 3, cy - z - 4); g.lineTo(cx + 3, cy - z - 10); g.stroke();
+}
+
+function drawHerald(g: Ctx, a: number, team: string) {
+  // a slim gold dart with swept wings and a cyan engine trail
+  const hull: Pt[] = [[13, 0], [3, -2.5], [-4, -9], [-7, -8.5], [-4, -2], [-9, 0], [-4, 2], [-7, 8.5], [-4, 9], [3, 2.5]];
+  const pts = hull.map(([x, y]) => rotP(x, y, a));
+  poly(g, pts, sheen(g, pts[5][0], pts[5][1], pts[0][0], pts[0][1], GOLD));
+  const [r0x, r0y] = rotP(11, 0, a), [r1x, r1y] = rotP(-6, 0, a);
+  g.strokeStyle = IVORY.lt; g.lineWidth = 1.2; g.beginPath(); g.moveTo(r0x, r0y); g.lineTo(r1x, r1y); g.stroke();
+  const [jx, jy] = rotP(3, 0, a); jewel(g, jx, jy, 1.3);
+  for (const sd of [-1, 1]) { const [wx, wy] = rotP(-4, sd * 6, a); g.fillStyle = team; g.beginPath(); g.arc(wx, wy, 1.1, 0, Math.PI * 2); g.fill(); }
+  const [ex, ey] = rotP(-10, 0, a); glowAt(g, ex, ey, 7, 'rgba(120,240,255,0.8)');
+}
+
+function drawArbiter(g: Ctx, a: number, team: string, phase = 0) {
+  // a great floating lens in a gold ring, three ivory vanes under it
+  const bob = Math.sin(phase * Math.PI * 2) * 1.4, z = 12 + bob;
+  hoverPool(g, 13, 7, team);
+  for (let k = 0; k < 3; k++) {
+    const ang = a + k * 2.094, [vx, vy] = rotP(9, 0, ang);
+    poly(g, [[vx * 0.3, vy * 0.3 - z + 2], [vx, vy - z + 6], [vx * 0.8, vy * 0.8 - z - 1]], sheen(g, vx, vy - z + 6, vx, vy - z - 1, IVORY));
+  }
+  g.strokeStyle = sheen(g, 0, -z - 22, 0, -z, GOLD); g.lineWidth = 3.4;
+  g.beginPath(); g.ellipse(0, -z - 12, 10, 11, 0, 0, Math.PI * 2); g.stroke();
+  const lg = g.createRadialGradient(-2, -z - 14, 1, 0, -z - 12, 9);
+  lg.addColorStop(0, '#ffffff'); lg.addColorStop(0.5, 'rgba(255,240,190,0.85)'); lg.addColorStop(1, 'rgba(255,200,110,0.35)');
+  g.fillStyle = lg; g.beginPath(); g.ellipse(0, -z - 12, 8.5, 9.5, 0, 0, Math.PI * 2); g.fill();
+  glowAt(g, 0, -z - 12, 18, team + '60');
+  jewel(g, 0, -z - 25, 1.8);
+}
+
 export interface KeeperUnitArt { hull: (g: Ctx, a: number, team: string, phase?: number) => void; reach: number; height: number; frames?: number; turn?: number }
 export const KEEPER_UNIT_ART: Record<string, KeeperUnitArt> = {
   acolyte:  { hull: drawAcolyte,  reach: 11, height: 30, frames: 4, turn: 8 },
   lancer:   { hull: drawLancer,   reach: 24, height: 14, turn: 6 },
   luminar:  { hull: drawLuminar,  reach: 14, height: 8, frames: 4, turn: 4 },
   monolith: { hull: drawMonolith, reach: 18, height: 62, frames: 4, turn: 2 },
+  seraph:   { hull: drawSeraph,   reach: 12, height: 30, frames: 4, turn: 8 },
+  oracle:   { hull: drawOracle,   reach: 11, height: 36, frames: 4, turn: 8 },
+  herald:   { hull: drawHerald,   reach: 14, height: 8, turn: 7 },
+  arbiter:  { hull: drawArbiter,  reach: 14, height: 40, frames: 4, turn: 2.5 },
 };
 
 // --------------------------------------------------------------------------
@@ -220,6 +296,24 @@ function drawObelisk(g: Ctx, w: number, _h: number, _level: number, team: string
   g.restore();
 }
 
+
+function drawArchive(g: Ctx, w: number, _h: number, _level: number, team: string) {
+  g.save(); const s = w / 64; g.scale(s, s);
+  petals(g, 32, 50, 20, 6);
+  // a cube of light turned on its point, ringed by floating gold tablets
+  const cx = 32, cy = 26;
+  poly(g, [[cx, cy - 18], [cx + 14, cy - 4], [cx, cy + 10], [cx - 14, cy - 4]], 'rgba(255,248,225,0.55)', 'rgba(200,160,80,0.7)');
+  poly(g, [[cx, cy - 18], [cx + 14, cy - 4], [cx, cy + 2], [cx - 14, cy - 4]], 'rgba(255,255,255,0.35)', 'rgba(0,0,0,0)');
+  glowAt(g, cx, cy - 4, 22, 'rgba(255,240,200,0.6)');
+  for (let k = 0; k < 5; k++) {
+    const ang = k / 5 * Math.PI * 2, x = cx + Math.cos(ang) * 22, y = cy + 10 + Math.sin(ang) * 7;
+    poly(g, [[x - 3, y - 7], [x + 3, y - 7], [x + 3, y], [x - 3, y]], sheen(g, x, y, x, y - 7, GOLD));
+  }
+  jewel(g, cx, cy - 4, 3);
+  glowAt(g, cx, cy - 4, 30, team + '40');
+  g.restore();
+}
+
 export const KEEPER_BUILDING_ART: Record<string, (g: Ctx, w: number, h: number, level: number, team: string) => void> = {
-  beacon: drawBeacon, sanctum: drawSanctum, shrine: drawShrine, obelisk: drawObelisk,
+  beacon: drawBeacon, sanctum: drawSanctum, archive: drawArchive, shrine: drawShrine, obelisk: drawObelisk,
 };

@@ -8,6 +8,7 @@ import {
 import { rand, crystal, idx, nearestTile } from './map';
 import { updateBrood, snapshotBrood, restoreBrood, BroodState } from './brood';
 import { updateKeepers, snapshotKeepers, restoreKeepers, KeeperState } from './keepers';
+import { updateHollow, snapshotHollow, restoreHollow, HollowState } from './hollow';
 
 // Each AI opponent follows a long build order toward a large fortified base,
 // keeps its economy running, researches upgrades, and attacks in growing waves.
@@ -147,14 +148,15 @@ export function initAI(numEnemies: number, difficulty: Difficulty = 'normal', on
 }
 
 // ---------- save / resume ----------
-export interface AISnapshot { difficulty: Difficulty; ais: AIState[]; brood?: BroodState; keepers?: KeeperState }
+export interface AISnapshot { difficulty: Difficulty; ais: AIState[]; brood?: BroodState; keepers?: KeeperState; hollow?: HollowState }
 export function snapshotAI(difficulty: Difficulty): AISnapshot {
-  return { difficulty, ais: ais.map(a => ({ ...a, intel: { ...a.intel } })), brood: snapshotBrood(), keepers: snapshotKeepers() };
+  return { difficulty, ais: ais.map(a => ({ ...a, intel: { ...a.intel } })), brood: snapshotBrood(), keepers: snapshotKeepers(), hollow: snapshotHollow() };
 }
 export function restoreAI(s: AISnapshot) {
   diff = DIFF[s.difficulty];
   restoreBrood(s.brood);
   restoreKeepers(s.keepers);
+  restoreHollow(s.hollow);
   // older saves predate scouting intel
   ais = s.ais.map(a => ({ ...a, clock: a.clock ?? 0, intel: { ...(a.intel ?? {}) }, intelTimer: a.intelTimer ?? 0, scoutId: a.scoutId ?? -1, scoutTimer: a.scoutTimer ?? 30 }));
 }
@@ -459,6 +461,7 @@ function pickWaveTarget(owner: number) {
 export function updateAI(dt: number) {
   updateBrood(dt);
   updateKeepers(dt);
+  updateHollow(dt);
   for (const ai of ais) {
     if (ai.owner >= numPlayers) continue;
     updateOne(ai, dt);

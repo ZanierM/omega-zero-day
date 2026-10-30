@@ -863,9 +863,10 @@ const UNIT_SOUND: Record<string, FieldSound> = {
   shardkin: 'hitMetal', burrower: 'impact', choir: 'arc',   // crystal on crystal: a ringing clink, a crunch, a hum
   skitter: 'bite', spitter: 'spit', carapace: 'bite', moth: 'spit', behemoth: 'artillery',
   acolyte: 'lance', lancer: 'lance', luminar: 'lance', monolith: 'rail',
+  lurker: 'spit', nurse: 'spit', stalker: 'bite', seraph: 'lance', oracle: 'lance', herald: 'lance', arbiter: 'rail', delver: 'hitMetal', cairn: 'impact',
   scav: 'musket', longshot: 'musket', harpooner: 'harpoon', firebrand: 'firebomb', technical: 'oldmg', rustbucket: 'oldcannon', mortar: 'mortar',
 };
-const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance', gunnest: 'oldmg', bombard: 'oldcannon' };
+const TURRET_SOUND: Record<string, FieldSound> = { turret: 'rifle', skyguard: 'autocannon', arctower: 'arc', railgun: 'rail', bastion: 'rail', spinespire: 'spit', obelisk: 'lance', gunnest: 'oldmg', bombard: 'oldcannon', echo: 'arc' };
 const weaponSound = (e: Unit | Building): FieldSound =>
   (e.kind === 'unit' ? UNIT_SOUND[e.def.id] : TURRET_SOUND[e.def.id]) ?? 'rifle';
 // the sound of a round landing on this target
@@ -895,15 +896,27 @@ function fireAt(u: Unit | Building, target: Entity, damageAmt: number, color: st
   damage(target, damageAmt * damageMult(dmgType, target), u.kind === 'unit' ? u : undefined);
 }
 
+// the Hollow live off crystal: a little always, more for each Geode, most for one sat by a crystal field
+export function hollowIncome(owner: number): number {
+  let inc = 12;
+  for (const b of buildings) {
+    if (b.owner !== owner || b.def.id !== 'geode') continue;
+    inc += nearestTile(b.tx + 1, b.ty + 1, 4, (x, y) => crystal[idx(x, y)] > 0) ? 14 : 7;
+  }
+  return inc;
+}
+
 // ---------- the Keepers' translocation ----------
 
-/** Selected Keepers that are ready step into the light and arrive around (x, y), which you must be able to see. */
+/** Aimed moves: selected Keepers step into the light and arrive around (x, y), which you must be able
+ *  to see; selected Hollow go down into the rock and come up there, anywhere you have scouted. */
 export function translocate(us: Unit[], x: number, y: number): boolean {
-  const ready = us.filter(u => u.def.ability?.id === 'translocate' && u.abilityCd <= 0 && !u.def.air);
+  const ready = us.filter(u => u.def.ability?.target && u.abilityCd <= 0 && !u.def.air);
   if (!ready.length) return false;
-  const tx = tileOf(x), ty = tileOf(y);
-  if (!inBounds(tx, ty) || (ready[0].owner === PLAYER && !visible[idx(tx, ty)])) {
-    if (ready[0].owner === PLAYER) { toast('The light only reaches somewhere you can see'); sfx('error'); }
+  const tx = tileOf(x), ty = tileOf(y), burrow = ready[0].def.ability!.reach === 'explored';
+  const seen = burrow ? explored : visible;
+  if (!inBounds(tx, ty) || (ready[0].owner === PLAYER && !seen[idx(tx, ty)])) {
+    if (ready[0].owner === PLAYER) { toast(burrow ? 'They can only surface somewhere you have scouted' : 'The light only reaches somewhere you can see'); sfx('error'); }
     return false;
   }
   const taken = new Set<number>();
@@ -911,14 +924,16 @@ export function translocate(us: Unit[], x: number, y: number): boolean {
     const spot = nearestTile(tx, ty, 6, (sx, sy) => inBounds(sx, sy) && terrain[idx(sx, sy)] === 0 && occupied[idx(sx, sy)] === -1 && !taken.has(idx(sx, sy)));
     if (!spot) continue;
     taken.add(idx(spot.x, spot.y));
-    lightColumns.push({ x: u.x, y: u.y, born: stats.time });
+    if (burrow) booms.push({ x: u.x, y: u.y, r: 2, ttl: 0.4, max: u.def.radius * 1.4 });   // a puff of crust where it went down
+    else lightColumns.push({ x: u.x, y: u.y, born: stats.time });
     u.x = centerOfTile(spot.x); u.y = centerOfTile(spot.y); u.path = null;
-    lightColumns.push({ x: u.x, y: u.y, born: stats.time });
+    if (!burrow) lightColumns.push({ x: u.x, y: u.y, born: stats.time });
     u.abilityCd = u.def.ability!.cooldown;
     issueOrder(u, { type: 'idle' }, true);
     u.guardX = u.x; u.guardY = u.y;
   }
-  if (audible(x, y)) sfxAt('arrive', x, y);
+  if (burrow) openTunnel(tx, ty);
+  if (audible(x, y)) sfxAt(burrow ? 'impact' : 'arrive', x, y, burrow ? 0.7 : 1);
   return true;
 }
 
@@ -1417,6 +1432,7 @@ function step(dt: number) {
   const pk = kindOf(PLAYER);
   if (pk === 'brood') players[PLAYER].credits += (12 + 7 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'veinwell').length) * dt;
   else if (pk === 'keepers') players[PLAYER].credits += (14 + 10 * buildings.filter(b => b.owner === PLAYER && b.def.id === 'shrine').length) * dt;
+  else if (pk === 'hollow') players[PLAYER].credits += hollowIncome(PLAYER) * dt;
   bloomTick -= dt;
   if (bloomTick <= 0) { bloomTick = 1.5; updateBloom(); }
 
