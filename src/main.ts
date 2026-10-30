@@ -162,7 +162,7 @@ factionOpts.addEventListener('click', e => {
 });
 
 // faction-count + difficulty selectors: segmented buttons (delegated)
-for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts', 'broodopts', 'keeperopts']) {
+for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts', 'broodopts', 'keeperopts', 'campdiffopts']) {
   document.getElementById(id)!.addEventListener('click', e => {
     const btn = (e.target as HTMLElement).closest('.opt');
     if (!btn) return;
@@ -170,6 +170,12 @@ for (const id of ['aiopts', 'diffopts', 'creditopts', 'crystalopts', 'novaopts',
     btn.classList.add('sel');
   });
 }
+
+// the campaign difficulty is kept with the campaign's progress
+document.getElementById('campdiffopts')!.addEventListener('click', e => {
+  const b = e.target instanceof Element ? e.target.closest<HTMLElement>('.opt') : null;
+  if (b?.dataset.d) campaign.setCampaignDifficulty(b.dataset.d as campaign.CampaignDifficulty);
+});
 
 // sound: mute button + M hotkey
 const muteBtn = document.getElementById('mutebtn')!;
@@ -234,7 +240,12 @@ deployBtn.addEventListener('click', async () => {
     brood: pick('broodopts', 0) === 1 && faction !== 'brood', keepers: pick('keeperopts', 0) === 1 && faction !== 'keepers', faction };
   try {
     initAudio(); // must start from a user gesture (browser autoplay rules)
-    if (mode === 'campaign') await startMission(selectedMission);
+    if (mode === 'campaign') {
+      const cd = ((document.querySelector('#campdiffopts .opt.sel') as HTMLElement | null)?.dataset.d ?? 'normal') as campaign.CampaignDifficulty;
+      campaign.setCampaignDifficulty(cd);
+      difficulty = cd;   // the save remembers it for the AI on resume
+      await startMission(selectedMission);
+    }
     else await startGame(n, opts);
     briefing.style.display = 'none';
     app.inert = false;
@@ -259,6 +270,8 @@ const missionList = document.getElementById('missionlist')!;
 const missionBrief = document.getElementById('missionbrief')!;
 function renderMissions() {
   const done = campaign.progress().done;
+  const cd = campaign.campaignDifficulty();
+  document.querySelectorAll<HTMLElement>('#campdiffopts .opt').forEach(b => b.classList.toggle('sel', b.dataset.d === cd));
   const firstOpen = campaign.MISSIONS.find(m => campaign.unlocked(m.id) && !done.includes(m.id)) ?? campaign.MISSIONS[0];
   if (!selectedMission || !campaign.unlocked(selectedMission)) selectedMission = firstOpen.id;
   const ACTS: Record<number, string> = { 1: 'Act I — Landfall', 2: 'Act II — The Corridor', 3: 'Act III — Last Light' };

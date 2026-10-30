@@ -66,6 +66,7 @@ export interface AbilityDef {
   immobile?: boolean;  // can't move while the toggle/effect is on
   aoeDmg?: number;     // instant area damage on activation
   aoeRadius?: number;  // tiles
+  target?: boolean;    // aimed: the player clicks a point (the Keepers' translocation)
 }
 
 export const ABILITIES: Record<string, AbilityDef> = {
@@ -77,6 +78,8 @@ export const ABILITIES: Record<string, AbilityDef> = {
                desc: '+90% speed for 4s. Strike the harvesters and run.' },
   overcharge: { id: 'overcharge', name: 'Overcharge',    kind: 'active', cooldown: 14, duration: 5, reloadMul: 0.45,
                desc: 'Double fire rate for 5s.' },
+  translocate:{ id: 'translocate', name: 'Translocate', kind: 'active', cooldown: 45, duration: 0, target: true,
+               desc: 'Step into the light and arrive somewhere you can see. Every selected Keeper that is ready goes.' },
   stomp:      { id: 'stomp',      name: 'Seismic Stomp', kind: 'active', cooldown: 14, duration: 0, aoeDmg: 220, aoeRadius: 2.4,
                desc: 'Slam the ground for heavy damage to everything nearby.' },
 };
@@ -170,13 +173,13 @@ export const UNITS: Record<string, UnitDef> = {
   caravan:   { id: 'caravan',   name: 'Caravan',        tab: 'veh', cost: 1400, buildTime: 10, hp: 450,  speed: 2.2, damage: 0,   range: 0,   reload: 0,   vision: 6, radius: 15, model: 'drone', mstep: 3, spriteH: 40, prereq: 'smelter', deploysTo: 'camp',
                desc: 'A wagon train. Sets up a War Camp wherever it stops. A packed-up building rides in one too.' },
   // ---- the Keepers: the Vey's makers, come back to judge (AI only) ----
-  acolyte:   { id: 'acolyte',   name: 'Acolyte',        tab: 'inf', cost: 300,  buildTime: 6,  hp: 130,  speed: 2.4, damage: 17,  range: 5.5, reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 3, spriteH: 28, nonBuildable: true, shield: 90, antiAir: true,
+  acolyte:   { id: 'acolyte',   name: 'Acolyte',        tab: 'inf', cost: 300,  buildTime: 6,  hp: 130,  speed: 2.4, damage: 17,  range: 5.5, reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 3, spriteH: 28, nonBuildable: true, shield: 90, antiAir: true, ability: ABILITIES.translocate,
                desc: 'Tall, unhurried, wrapped in light. Its rifle is a thread of the sun.' },
-  lancer:    { id: 'lancer',    name: 'Lancer',         tab: 'veh', cost: 650,  buildTime: 9,  hp: 260,  speed: 4.6, damage: 46,  range: 3.2, reload: 1.5, vision: 7, radius: 13, model: 'car', mstep: 3, spriteH: 32, nonBuildable: true, shield: 160,
+  lancer:    { id: 'lancer',    name: 'Lancer',         tab: 'veh', cost: 650,  buildTime: 9,  hp: 260,  speed: 4.6, damage: 46,  range: 3.2, reload: 1.5, vision: 7, radius: 13, model: 'car', mstep: 3, spriteH: 32, nonBuildable: true, shield: 160, ability: ABILITIES.translocate,
                desc: 'A gold skimmer that runs down armour and pins it with a lance of light.' },
   luminar:   { id: 'luminar',   name: 'Luminar',        tab: 'veh', cost: 550,  buildTime: 9,  hp: 180,  speed: 3.2, damage: 8,   range: 4,   reload: 1.0, vision: 9, radius: 11, model: 'drone', mstep: 3, spriteH: 28, nonBuildable: true, air: true, antiAir: true, shield: 140, shieldAura: { radius: 4.5, rate: 18 },
                desc: 'A floating orb in a cage of rings. It pours light back into the shields around it.' },
-  monolith:  { id: 'monolith',  name: 'Monolith',       tab: 'veh', cost: 1600, buildTime: 20,  hp: 900,  speed: 1.2, damage: 95,  range: 9,   reload: 3.2, vision: 9, radius: 18, model: 'mech', mstep: 3, spriteH: 56, nonBuildable: true, shield: 700,
+  monolith:  { id: 'monolith',  name: 'Monolith',       tab: 'veh', cost: 1600, buildTime: 20,  hp: 900,  speed: 1.2, damage: 95,  range: 9,   reload: 3.2, vision: 9, radius: 18, model: 'mech', mstep: 3, spriteH: 56, nonBuildable: true, shield: 700, ability: ABILITIES.translocate,
                desc: 'A walking obelisk. When it opens, the light it fires can cut a building in half.' },
   // ---- the Vey brood: crystal grown through flesh (AI only) ----
   skitter:   { id: 'skitter',   name: 'Skitter',        tab: 'inf', cost: 110,  buildTime: 3,  hp: 95,   speed: 3.6, damage: 9,   range: 1.4, reload: 0.45, vision: 6, radius: 7,  model: 'soldier', mstep: 2, spriteH: 18, nonBuildable: true, crystalRegen: 3,

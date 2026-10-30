@@ -1,7 +1,7 @@
 import { TILE, PLAYER, BUILDINGS } from './config';
 import { MAP_W, MAP_H } from './map';
 import {
-  units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding, packBuilding,
+  units, buildings, byId, players, issueOrder, tileOf, canPlace, placeBuilding, packBuilding, translocate,
   entityPos, entityRadius, toast, Unit, fireStrike, superReady,
   jumpTargetAlert, starvedHarvesters, activateAbility, visible, explored,
 } from './game';
@@ -55,6 +55,9 @@ function fireStrikeAt(wx: number, wy: number) {
   strikeTargeting = null;
   if (b?.kind === 'building' && superReady(b)) fireStrike(b, wx, wy);
 }
+// Keeper translocation: the next click picks where the selected Keepers arrive
+export let translocating = false;
+export function startTranslocate() { translocating = true; toast('Click where they should arrive: somewhere you can see'); }
 // world point the player is currently aiming a strike at (for the reticle), or null
 export function strikeAim(): { x: number, y: number } | null {
   return strikeTargeting !== null ? toWorld(mouse.x, mouse.y) : null;
@@ -143,10 +146,15 @@ export function initInput() {
       return;
     }
     if (e.button === 0) {
-      // orbital-strike targeting consumes the next click
+      // orbital-strike targeting (and translocation) consume the next click
       if (strikeTargeting !== null) {
         const w = toWorld(mouse.x, mouse.y);
         fireStrikeAt(w.x, w.y);
+        return;
+      }
+      if (translocating) {
+        const w = toWorld(mouse.x, mouse.y);
+        translocating = false; translocate(selectedUnits(), w.x, w.y);
         return;
       }
       if (placement) {
@@ -224,7 +232,7 @@ export function initInput() {
     const target = e.target instanceof Element ? e.target : null;
     if (target?.closest('[role="dialog"]') || (e.key === ' ' && target?.closest('button'))) return;
     keys.add(e.key);
-    if (e.key === 'Escape') { placement = null; attackMovePending = false; strikeTargeting = null; }
+    if (e.key === 'Escape') { placement = null; attackMovePending = false; strikeTargeting = null; translocating = false; }
     // +/- zoom about the middle of the view
     if (e.key === '=' || e.key === '+') zoomAt(1.15, canvas.clientWidth / 2, canvas.clientHeight / 2);
     if (e.key === '-' || e.key === '_') zoomAt(1 / 1.15, canvas.clientWidth / 2, canvas.clientHeight / 2);
@@ -242,7 +250,8 @@ export function initInput() {
     }
     // Q = trigger the selected units' special ability
     if (e.key === 'q' || e.key === 'Q') {
-      for (const u of selectedUnits()) if (u.def.ability) activateAbility(u);
+      if (selectedUnits().some(u => u.def.ability?.target)) startTranslocate();
+      else for (const u of selectedUnits()) if (u.def.ability) activateAbility(u);
     }
     // Space = snap camera to the last "under attack" alert
     if (e.key === ' ') {
@@ -379,6 +388,11 @@ export function initInput() {
     if (strikeTargeting !== null) {
       const w = toWorld(t.x, t.y);
       fireStrikeAt(w.x, w.y);
+      return;
+    }
+    if (translocating) {
+      const w = toWorld(t.x, t.y);
+      translocating = false; translocate(selectedUnits(), w.x, w.y);
       return;
     }
     if (placement) {
@@ -595,7 +609,7 @@ function updateCursor() {
   if (usingTouch || (!mouse.inside && !pan)) return;
   let c: string;
   if (pan) c = 'grabbing';
-  else if (strikeTargeting !== null) c = CUR_ATTACK;
+  else if (strikeTargeting !== null || translocating) c = CUR_ATTACK;
   else if (placement) c = 'crosshair';
   else if (attackMovePending) c = CUR_ATTACK_MOVE;
   else if (dragStart || selectMode) c = 'crosshair';
