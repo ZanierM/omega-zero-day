@@ -133,6 +133,7 @@ const fluxLines: MissionDef = {
   briefing: [
     'Lantern, Varga. Your crystal yields are good, but not good enough. Dr. Lind says the real flux comes up through the vents, straight from the deep crust.',
     'The Hearth Clans sit on two of them: miners\' grandchildren, left in the deep crust when the company moved on. Old rifles, and they know every rock. Take the vents and a watchtower, and hold them long enough for Lind\'s survey.',
+    'Okoye\'s notes on the clans: they need no power and their camps can pack up and move. They hide snares in the dirt round anything they hold, and you won\'t see one until it springs. Walk a cheap squad in first.',
   ],
   goals: ['Capture two flux vents', 'Capture a watchtower', 'Hold them for 90 seconds'],
   seed: 22073, enemies: 2, credits: 3000,
@@ -330,7 +331,7 @@ const sparks: MissionDef = {
   id: 'act2-4', act: 2, code: 'II-4', title: 'Sparks', tagline: 'Keep the harvesters alive under Ashen raids',
   briefing: [
     'Lantern, Varga. A supply convoy lands at Depot Six in eight minutes, and it needs flux on the pad when it does.',
-    'The Ashen Clans have started hitting harvesters across the valley: technicals in fast, cutters out, gone before the guns turn. Keep yours running. Get a Fabricator up so you have something that can catch them.',
+    'The Ashen Clans have started hitting harvesters across the valley: technicals in fast, cutters out, gone before the guns turn. Every harvester they wreck pays them. Keep yours running. Get a Fabricator up so you have something that can catch them.',
   ],
   goals: ['Build a Fabricator', 'Keep harvesting until the convoy lands (8:00)', 'Lose no more than three harvesters'],
   seed: 44107, enemies: 3, size: 64, credits: 4500,

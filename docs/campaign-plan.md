@@ -157,6 +157,8 @@ Nothing starts until this draft is signed off. The plan keeps the current file o
   - **III-9 Zero Day:** the hardest route (no allies) is a close win with good play. Hollow ambushes go for the vents, not the base, and losing the base has its own ending text.
 - The Mortar Cart was too strong against packed infantry (one cart wiped 45 units): damage 70 → 55, splash 1.4 → 1.1.
 - The Clans have their own sounds: powder rifles, a rattling machine gun, a harpoon spring-gun, firebombs that smash and catch, black-powder cannons, a mortar's cough, a snare's snap.
+- How the Clans fight is explained in play: Okoye's notes in the I-2 briefing, a line in II-4's, one-time field notes the first time a hidden trap springs on you or a raider earns flux off you, and three tips at the start of a skirmish as the Clans.
+- New portraits for Reyes (a Hearth settlement in the deep rock, crystal greenhouse) and Vessa (a raider chief in scrap armour by a burning drum).
 
 ## 7. Decisions
 - **Names:** locked. Cinder, Lantern, the Vey, the Hollow, Meridian.
