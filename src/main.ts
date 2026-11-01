@@ -242,7 +242,7 @@ refreshMuteBtn();
 // pause menu: ☰ opens it (pausing the sim), resume / restart
 const pauseMenu = document.getElementById('pausemenu')!;
 const menuBtn = document.getElementById('menubtn')!;
-function openPause() { if (started && !game.gameOver) { game.setPaused(true); app.inert = true; pauseMenu.style.display = 'flex'; document.getElementById('resumebtn')!.focus(); } }
+function openPause() { if (started && !game.gameOver) { game.setPaused(true); app.inert = true; pauseMenu.style.display = 'flex'; document.getElementById('restartbtn')!.textContent = campaign.activeMission() ? '⟲ Restart mission' : '⟲ Restart skirmish'; document.getElementById('resumebtn')!.focus(); } }
 function closePause() { pauseMenu.style.display = 'none'; app.inert = false; game.setPaused(false); last = performance.now(); menuBtn.focus(); }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && pauseMenu.style.display !== 'flex') openPause();
@@ -258,7 +258,7 @@ document.getElementById('restartbtn')!.addEventListener('click', () => {
   else try { sessionStorage.setItem(AUTOSTART, '1'); } catch { /* storage may be unavailable */ }
   location.reload();
 });
-document.getElementById('menubtn')!.addEventListener('click', () => { clearSave(); location.reload(); });
+document.getElementById('quitbtn')!.addEventListener('click', () => { started = false; clearSave(); location.reload(); });
 pauseMenu.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); closePause(); } });
 function trapDialogTabs(dialog: HTMLElement, heading?: HTMLElement) {
   dialog.addEventListener('keydown', e => {

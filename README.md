@@ -1,60 +1,58 @@
 # Omega Zero Day
 
-A Red Alert 2–style real-time strategy game in TypeScript + HTML5 Canvas.
-You command **Helion Dynamics** (blue) against 1–3 rogue AI factions
-fighting over flux crystal on Kepler-442b. Destroy every hostile structure to win.
+A real-time strategy game in TypeScript and HTML5 Canvas. On the dying world of Cinder, command Helion Dynamics through a story campaign or choose a faction for a skirmish over flux crystal and the launch corridor.
 
-Buildings & units: ["Sci-Fi Strategy Mech Buildings Isometric Asset Pack" by acdrnx](https://opengameart.org/content/sci-fi-strategy-mech-buildings-isometric-asset-pack) (CC0) —
-isometric pixel art with 8-direction units and three visual tech stages per building (shown as upgrade levels LV1→LV3).
-Environment props: ["Sci-Fi RTS" by Kenney](https://kenney.nl/assets/sci-fi-rts) (CC0).
-
-## Run it
+## Run locally
 
 ```sh
 npm install
 npx vite
 ```
 
-## How to play
+Open the local URL printed by Vite. Run `npm test` for the TypeScript check and `npx vite build` for a production build.
 
-- **Left-drag** — box-select units; left-click selects one unit/building
-- **Right-click / two-finger click** — move; on an enemy: attack; harvesters sent to crystal will mine
-- **Arrows / WASD / screen edges** — scroll; click the minimap (bottom-left) to jump
-- **Build bar (bottom)** — pick a category from the dropdown, click an item to queue it.
-  Units: every click queues one more (badge shows the count); right-click removes one.
-  Buildings: click queues the next build; clicking the queued one again removes it.
-  When a building shows PLACE, click its button then click the map.
-- **Power** — buildings drain it, Solar Arrays supply it; a deficit slows production to 40% and disables turrets
-- **Research** — build a Laboratory to unlock the Research tab: Weapons/Armor/Defence Grid upgrade lines
-- **Building upgrades** — select your Nexus/Barracks/Fabricator/turrets and click UPGRADE (up to LV3: +50% HP per level, +30% turret damage, repairs on upgrade)
-- **Walls** — cheap 1×1 barriers in the Defence tab; block pathing and soak damage
+## Modes
 
-## Sound
+**Campaign:** Play as Helion through an optional Boot Camp and nine missions in three acts. Briefings, comms and an objective tracker guide each mission. Choices about the Hearth Clans and the Hollow affect later allies and the ending. Easy, Normal and Hard difficulty are available. Completed missions and choices are saved locally.
 
-All audio is synthesized live with WebAudio (no files): generative ambient music plus
-effects for weapons, explosions, construction, research and credits. Toggle with the
-SOUND button (bottom-right) or the **M** key. Combat is only audible when it's on screen.
+**Skirmish:** Play as Helion Dynamics, the Kessler Collective, the Ashen Clans, the Vey Brood, the Keepers or the Hollow. Choose one or more human opponents, difficulty, starting flux, crystal density and one of four landscapes. Optional settings add the Brood, Keepers or Hollow as threats and start a supernova countdown. The last skirmish setup is remembered locally.
 
-## Tech tree
+In skirmish, destroy every hostile structure to win. A human faction can also hold a majority of flux vents for three minutes to open the launch corridor; rivals can do the same. Ground combat units capture uncontested vents by standing nearby. Harvesters and aircraft do not capture them.
 
-Solar → Barracks (infantry, Pulse Turret, Laboratory) · Solar → Extractor → Fabricator (vehicles) → Research Spire (Dominator, Thumper artillery, Rail Cannon)
+## Controls
 
-## Skirmish setup
+- **Left-click / drag:** Select a unit or building / box-select units. Double-click selects units of the same type.
+- **Right-click:** Move, attack an enemy, or send a harvester to crystal. **A** then left-click orders an attack move.
+- **WASD / arrows / screen edge:** Move the camera. Click the minimap to jump. Use **+ / −** or the mouse wheel to zoom.
+- **Build bar:** Pick a category and queue units or buildings. A finished building shows **PLACE**; click it, then click the map. Right-click a queued item to remove one.
+- **Q:** Use selected units' ability. **S:** Stop. **P:** Pack a selected Clan building. **M:** Toggle sound.
+- **Ctrl/Cmd + 1–9:** Save a control group; **1–9** recalls it. **Space:** Jump to the latest under-attack alert.
+- **Menu button:** Pause, resume, restart or return to the briefing.
 
-The briefing screen has a dropdown for 1–3 AI opponents; 2 AIs get a 76×76 map, 3 AIs get 90×90.
+On touch screens, tap to select, tap the ground to order selected units, drag to pan, and pinch to zoom. The box-select button switches a drag from panning to selection.
+
+## Game systems
+
+Flux funds construction and production. Extractors send harvesters to crystal, while controlled vents provide income. Most human buildings need power; a deficit slows production and disables turrets. Laboratories or faction equivalents unlock research. Units gain veterancy, and many have faction-specific abilities. Campaign missions add scripted objectives, the Vey's response to harvesting, choices and allied factions.
+
+Matches autosave in the browser and can be resumed from the briefing. Progress and saves use local storage in that browser.
+
+All music and effects are synthesized with WebAudio; the game has no audio files.
 
 ## Code map
 
-| File | What it does |
+| File | Purpose |
 |---|---|
-| `src/config.ts` | All balance numbers — units, buildings, defences, upgrades, team colors |
-| `src/map.ts` | Dynamic map generation, crystal fields, base positions |
-| `src/path.ts` | A* pathfinding |
-| `src/game.ts` | Simulation: movement, combat, harvesting, queues, research, power, fog, win/lose |
-| `src/ai.ts` | AI opponents: build order, economy, research, attack waves |
-| `src/input.ts` | Selection, orders, camera, placement |
-| `src/render.ts` | Terrain texture, Kenney sprite baking + team tinting, effects, minimap |
-| `src/ui.ts` | Bottom command bar: category dropdown, queue badges, upgrade button |
-| `src/main.ts` | Briefing flow, world setup, game loop |
+| `src/config.ts` | Factions, units, buildings, research and balance |
+| `src/map.ts`, `src/path.ts` | Map generation and pathfinding |
+| `src/game.ts`, `src/ai.ts` | Simulation, win conditions and opponents |
+| `src/campaign/missions.ts`, `src/campaign/runner.ts` | Campaign content and mission state |
+| `src/input.ts`, `src/ui.ts`, `src/main.ts` | Controls, interface and game startup |
+| `src/render.ts`, `src/*-art.ts`, `src/rig.ts` | Canvas rendering and faction art |
+| `src/audio.ts`, `src/epilogue.ts`, `src/save.ts` | Sound, endings and save/resume |
 
-Console helpers: `novaStep(30)` fast-forwards 30s; `novaDebug` exposes live game state.
+Console helpers: `novaStep(30)` advances the simulation by 30 seconds; `novaDebug` exposes live game state.
+
+## Art credits
+
+The project includes [“Sci-Fi Strategy Mech Buildings Isometric Asset Pack” by acdrnx](https://opengameart.org/content/sci-fi-strategy-mech-buildings-isometric-asset-pack) and [“Sci-Fi RTS” by Kenney](https://kenney.nl/assets/sci-fi-rts), both CC0. Newer factions also use code-drawn art.

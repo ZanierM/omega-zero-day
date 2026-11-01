@@ -192,7 +192,7 @@
     /* ---- mission briefing: clear frame over a dying system ---- */
     /* scrollable so the deploy button is always reachable on small windows */
     #briefing { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-start; justify-content: center;
-      background: var(--ink) url('briefing-orbit.webp') center / cover no-repeat; overflow-y: auto; }
+      background: var(--ink) url('/briefing-orbit.webp') center / cover no-repeat; overflow-y: auto; }
     #briefwrap { margin: auto; max-width: 100%;
       padding: calc(16px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left)); }
     #briefbox { position: relative; max-width: min(620px, calc(100vw - 20px)); margin: 12px 0; padding: 30px 34px 28px; color: var(--cream);
@@ -552,6 +552,7 @@
     #comms.seren #commstext { font-style: italic; letter-spacing: .04em; color: #d8f6f8; text-shadow: 0 0 6px rgba(191,238,242,.6); }
     #objtracker { position: absolute; z-index: 5; left: calc(8px + env(safe-area-inset-left)); top: calc(56px + env(safe-area-inset-top)); max-width: min(340px, calc(100vw - 80px));
       padding: 8px 12px 9px; background: var(--brief-glass); border: 1px solid var(--edge); border-radius: 6px; pointer-events: none; }
+    #objtracker.skirmish { top: calc(84px + env(safe-area-inset-top)); }
     #objtracker[hidden] { display: none; }
     #objtitle { font-family: var(--head); font-size: 10.5px; font-weight: 800; letter-spacing: .1em; color: var(--gold); text-transform: uppercase; margin-bottom: 4px; }
     #objlist { list-style: none; }
@@ -607,7 +608,7 @@
       <h2 id="pausetitle">Paused</h2>
       <button id="resumebtn">▶ Resume</button>
       <button id="restartbtn">⟲ Restart mission</button>
-      <button id="menubtn">⌂ Quit to menu</button>
+      <button id="quitbtn">⌂ Quit to menu</button>
       <button id="pausemute">Sound: on</button>
       <dl id="hotkeys"><dt>A</dt><dd>Attack-move</dd><dt>S</dt><dd>Stop</dd><dt>Q</dt><dd>Unit ability</dd><dt>P</dt><dd>Pack up (Clans)</dd>
         <dt>Ctrl+1–9</dt><dd>Save a group</dd><dt>1–9</dt><dd>Select a group</dd><dt>Space</dt><dd>Jump to last alert</dd><dt>M</dt><dd>Mute</dd><dt>Esc</dt><dd>Cancel / pause</dd></dl>
@@ -660,7 +661,8 @@
         <ul class="objectives">
           <li>Build an economy on the crystal: the fleet's drives depend on it</li>
           <li>Win by destroying every hostile building</li>
-          <li>Or hold most of the flux vents for 3 minutes to light the launch corridor (rivals can too)</li>
+          <li>Human factions can also hold a majority of flux vents for 3 minutes to launch (rivals can too)</li>
+          <li>Ground combat units capture an uncontested vent by standing nearby; harvesters and aircraft cannot</li>
         </ul>
         <div class="optlabel">Starting flux</div>
         <div class="paramrow" id="creditopts">

@@ -1,12 +1,12 @@
 import {
   BUILDINGS, UNITS, UPGRADES, NON_BUILDABLE, PLAYER, Tab, TAB_NAMES, UNIT_ARMOR, UNIT_DMGTYPE, VET_NAME,
-  FACTION_NAMES, SLOTS, rolesOf,
+  FACTION_NAMES, SLOTS, rolesOf, kindOf,
 } from './config';
 import * as campaign from './campaign/runner';
 import { showEpilogue } from './epilogue';
 import {
   players, powerOf, hasBuilding, startProduction, cancelProduction, queuedCount, prereqMet,
-  gameOver, endReason, corridor, techAllowed, costFor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
+  gameOver, endReason, corridor, CORRIDOR_HOLD, ventsHeld, ventsNeeded, techAllowed, costFor, toastMsg, toast, byId, issueOrder, upgradeBuilding, buildingUpgradeCost, Building, requirementText,
   Unit, deployPioneer, packBuilding, startRepair, repairCost, superReady, novaTotal, novaLeft,
   enemyStrikeETA, starvedHarvesters, stats, activateAbility, abilityOn,
 } from './game';
@@ -674,11 +674,34 @@ function updateCampaignUI() {
       }
     }
   }
+  if (!m) {
+    const need = ventsNeeded();
+    const held = ventsHeld(PLAYER);
+    const canLaunch = kindOf(PLAYER) === 'human';
+    const remaining = fmtTime(Math.max(0, Math.ceil(CORRIDOR_HOLD - corridor.held)));
+    const goals = [
+      'Destroy every hostile structure',
+      canLaunch
+        ? `Or hold a vent majority: ${held}/${need}${corridor.owner === PLAYER ? ` · launch in ${remaining}` : ' · hold for 3:00'}`
+        : `Rivals can launch by holding ${need} vents for 3:00`,
+      'Ground combat units capture uncontested vents; harvesters and aircraft cannot',
+    ];
+    const key = goals.join('|');
+    if (key !== shownObjs) {
+      shownObjs = key;
+      objTracker.hidden = false;
+      objTracker.classList.add('skirmish');
+      objTitle.textContent = 'Skirmish objectives';
+      objList.replaceChildren(...goals.map(text => { const li = document.createElement('li'); li.textContent = text; return li; }));
+    }
+    return;
+  }
   const objs = campaign.objectives();
   const key = objs.map(o => (o.done ? '1' : '0') + o.text).join('|');
   if (key !== shownObjs) {
     shownObjs = key;
     objTracker.hidden = !objs.length;
+    objTracker.classList.remove('skirmish');
     objTitle.textContent = campaign.missionTitle();
     objList.innerHTML = objs.map(o => `<li class="${o.done ? 'done' : ''}">${o.text}${o.optional ? ' (optional)' : ''}</li>`).join('');
   }

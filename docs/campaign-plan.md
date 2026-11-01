@@ -1,6 +1,6 @@
-# Omega Zero Day — campaign plan (draft 3; Acts I and II built)
+# Omega Zero Day — campaign plan and implementation notes
 
-Status: **story and plan only, nothing implemented.**
+Status: **Boot Camp and all three acts are implemented.** Sections 1–5 preserve the original story and implementation plan; section 6 records what was built and changed.
 Direction agreed so far: **dark and grim** tone · **two non-human peoples** (native alien life *and* a lost proto-human colony) · the central twist is that **Helion, the player's own side, caused the collapse** · a **silent commander** the story speaks to.
 Names are locked; the ending, Hollow and release decisions are in section 6.
 
