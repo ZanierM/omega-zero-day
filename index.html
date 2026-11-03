@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@200;300;600;700;800;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
   <style>
     /* ---- theme: riveted gunmetal plates, bronze trim, gold lettering ---- */
     :root {
@@ -644,6 +644,15 @@
     @media (orientation: landscape) and (min-width: 761px) and (min-height: 501px) { body:has(#comms:not([hidden])) #toast { top: calc(112px + env(safe-area-inset-top)); } }
     /* short landscape screens (phones): the top edge is full of pills, so notices sit just above the deck */
     @media (orientation: landscape) and (max-height: 500px) { #toast { top: auto; bottom: calc(120px + env(safe-area-inset-bottom)); max-width: min(420px, 58vw); padding: 6px 12px 7px; } }
+    /* the title: "Horizon" — thin, wide OMEGA over a burning lens flare, ZERO DAY in ember */
+    #briefbox h1.horizon { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 6px 0 14px; color: #fff1d6; line-height: 1; letter-spacing: 0; }
+    #briefbox h1.horizon .t-omega { font-size: clamp(38px, 7vw, 64px); font-weight: 200; letter-spacing: .34em; margin-right: -.34em; color: #fff1d6; text-shadow: 0 0 22px rgba(255,140,58,.45); }
+    #briefbox h1.horizon .t-flare { position: relative; display: block; width: 100%; height: 26px; }
+    #briefbox h1.horizon .t-flare::before { content: ""; position: absolute; left: 4%; right: 4%; top: 50%; height: 6px; margin-top: -3px; filter: blur(5px);
+      background: linear-gradient(90deg, rgba(255,140,58,0), #ff8c3a 25%, #fff1d6 50%, #ff8c3a 75%, rgba(255,140,58,0)); }
+    #briefbox h1.horizon .t-flare::after { content: ""; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+      background: radial-gradient(circle, #fff8ec 0 4px, rgba(255,176,102,.85) 6px, rgba(255,140,58,.35) 14px, rgba(255,140,58,0) 23px); }
+    #briefbox h1.horizon .t-zero { font-size: clamp(15px, 2.6vw, 22px); font-weight: 600; letter-spacing: .9em; margin-right: -.9em; color: #ff9a4a; text-shadow: 0 0 12px rgba(255,90,30,.6); }
   </style>
 </head>
 <body>
@@ -715,7 +724,7 @@
     <div id="briefwrap">
     <div id="briefbox">
       <div class="brieftag">Operation Last Light · Helios system · collapse in <b>214 days</b></div>
-      <h1 id="brieftitle" tabindex="-1">Omega <span>Zero Day</span></h1>
+      <h1 id="brieftitle" class="horizon" tabindex="-1"><span class="t-omega">Omega</span> <span class="t-flare" aria-hidden="true"></span><span class="t-zero">Zero Day</span></h1>
       <h2>Ark Fleet Command — <b>final transmission</b></h2>
       <p>Commander — the sun is dying. The ark-fleet can carry what's left of humanity out, but its drives burn
         <b>flux crystal</b>, and the last of it is down here. Take it.</p>
