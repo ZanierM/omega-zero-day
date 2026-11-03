@@ -4,7 +4,7 @@
 //     up when online; falls back to the cached shell when offline.
 //   * everything else (hashed JS/CSS, sprites, icons, fonts): cache-first,
 //     populated on demand — immutable assets, safe to serve from cache forever.
-const CACHE = 'ozd-v1';
+const CACHE = 'ozd-v2';   // bumped for the new logo icons, so installed copies drop the old ones
 
 self.addEventListener('install', e => {
   self.skipWaiting();

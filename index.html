@@ -15,7 +15,7 @@
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700;800;900&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     /* ---- theme: riveted gunmetal plates, bronze trim, gold lettering ---- */
     :root {
@@ -49,8 +49,8 @@
       --type-md: 15px;
       --type-lg: 20px;
       --type-xl: 32px;
-      --head: 'Exo 2', 'Nunito', system-ui, sans-serif;
-      --body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --head: 'Exo 2', system-ui, sans-serif;
+      --body: 'Exo 2', system-ui, -apple-system, 'Segoe UI', sans-serif;
       /* deep navy panels, matching the solid command deck: a faint top sheen, no grey brushing */
       --plates:
         linear-gradient(180deg, rgba(150,180,255,0.07), transparent 32%, transparent 70%, rgba(0,0,0,0.26)),
@@ -644,6 +644,77 @@
     @media (orientation: landscape) and (min-width: 761px) and (min-height: 501px) { body:has(#comms:not([hidden])) #toast { top: calc(112px + env(safe-area-inset-top)); } }
     /* short landscape screens (phones): the top edge is full of pills, so notices sit just above the deck */
     @media (orientation: landscape) and (max-height: 500px) { #toast { top: auto; bottom: calc(120px + env(safe-area-inset-bottom)); max-width: min(420px, 58vw); padding: 6px 12px 7px; } }
+    /* the title: "Horizon" — thin, wide OMEGA over a burning lens flare, ZERO DAY in ember */
+    #briefbox h1.horizon { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 6px 0 14px; color: #fff1d6; line-height: 1; letter-spacing: 0; }
+    #briefbox h1.horizon .t-omega { font-size: clamp(38px, 7vw, 64px); font-weight: 200; letter-spacing: .34em; margin-right: -.34em; color: #fff1d6; text-shadow: 0 0 22px rgba(255,140,58,.45); }
+    #briefbox h1.horizon .t-flare { position: relative; display: block; width: 100%; height: 26px; }
+    #briefbox h1.horizon .t-flare::before { content: ""; position: absolute; left: 4%; right: 4%; top: 50%; height: 6px; margin-top: -3px; filter: blur(5px);
+      background: linear-gradient(90deg, rgba(255,140,58,0), #ff8c3a 25%, #fff1d6 50%, #ff8c3a 75%, rgba(255,140,58,0)); }
+    #briefbox h1.horizon .t-flare::after { content: ""; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%;
+      background: radial-gradient(circle, #fff8ec 0 4px, rgba(255,176,102,.85) 6px, rgba(255,140,58,.35) 14px, rgba(255,140,58,0) 23px); }
+    #briefbox h1.horizon .t-zero { font-size: clamp(15px, 2.6vw, 22px); font-weight: 600; letter-spacing: .9em; margin-right: -.9em; color: #ff9a4a; text-shadow: 0 0 12px rgba(255,90,30,.6); }
+
+    /* ===== Horizon type & buttons: the logo's typeset everywhere =====
+       Exo 2 throughout, light and widely tracked; buttons are dark glass with a warm
+       hairline, and what's selected or primary carries the logo's ember flare. */
+    :root { --head: 'Exo 2', system-ui, sans-serif; --body: 'Exo 2', system-ui, sans-serif;
+      --hz-line: rgba(232,198,106,.24); --hz-line-hi: rgba(255,176,102,.6); --hz-ember: #ff8c3a; --hz-ember-soft: #ffb066; --hz-cream: #fff1d6;
+      --hz-glass: linear-gradient(180deg, rgba(22,18,16,.82), rgba(10,8,7,.82));
+      --hz-flare: radial-gradient(ellipse 70% 140% at 50% 100%, rgba(255,140,58,.28), rgba(255,140,58,0) 70%), linear-gradient(180deg, rgba(22,18,16,.85), rgba(12,9,8,.85)); }
+    body { font-family: var(--body); font-weight: 400; }
+
+    /* every ordinary button */
+    .opt, .actbtn, .actbtn:disabled, #pausebox button, #pausebox #pausemute, #scenefoot button, .commschoice button, .mapbtn, .groupbtn, #mutebtn {
+      background: var(--hz-glass); border: 1px solid var(--hz-line); border-radius: 2px; box-shadow: none; filter: none; text-shadow: none;
+      color: #e6d9bd; font-family: var(--head); font-weight: 500; letter-spacing: .16em; text-transform: uppercase; }
+    .opt:hover, .actbtn:not(:disabled):hover, #pausebox button:hover, #scenefoot button:not(:disabled):hover, .commschoice button:hover, .mapbtn:hover, .groupbtn:hover {
+      border-color: var(--hz-line-hi); color: var(--hz-cream); filter: none; }
+    .opt span { font-family: var(--body); font-style: normal; font-weight: 400; letter-spacing: .05em; text-transform: none; color: #a99b80; }
+    .opt i { font-family: var(--head); font-style: normal; }
+
+    /* selected: an ember line along the bottom with a soft glow rising from it */
+    .opt.sel, .htab.active, .groupbtn.current, #abilbtn.on {
+      background: var(--hz-flare); border-color: rgba(255,140,58,.55); color: var(--hz-ember-soft);
+      box-shadow: inset 0 -2px 0 var(--hz-ember), 0 8px 18px -12px rgba(255,140,58,.9); text-shadow: 0 0 10px rgba(255,120,40,.45); }
+    .opt.sel span { color: #e2cfa8; }
+
+    /* primary actions: the full flare */
+    #deploy, #overlay button, #pausebox #resumebtn, #actbtn:not(:disabled), #scenefoot #scenenext, .commschoice button:first-child {
+      background: radial-gradient(ellipse 60% 160% at 50% 100%, rgba(255,140,58,.45), rgba(255,140,58,0) 72%), linear-gradient(90deg, rgba(255,140,58,0), rgba(255,140,58,.14) 50%, rgba(255,140,58,0)), #0e0a08;
+      border: 1px solid var(--hz-ember); border-radius: 2px; color: var(--hz-cream); filter: none;
+      box-shadow: inset 0 -2px 0 var(--hz-ember), 0 0 22px -6px rgba(255,140,58,.55); text-shadow: 0 0 12px rgba(255,140,58,.65);
+      font-family: var(--head); font-weight: 500; letter-spacing: .28em; text-transform: uppercase; }
+    #deploy:hover, #overlay button:hover, #pausebox #resumebtn:hover, #actbtn:not(:disabled):hover, #scenefoot #scenenext:hover, .commschoice button:first-child:hover {
+      color: #ffffff; filter: brightness(1.15); }
+    #deploy { font-size: 18px; font-weight: 400; letter-spacing: .42em; padding: 16px 0; }
+    #deploy:active { transform: none; box-shadow: inset 0 -2px 0 var(--hz-ember), 0 0 12px -4px rgba(255,140,58,.5); }
+
+    /* type: light, wide headings; small spaced capitals for labels */
+    .optlabel { font-size: 12px; font-weight: 600; letter-spacing: .3em; color: var(--hz-ember); }
+    .brieftag { font-weight: 500; letter-spacing: .2em; }
+    #briefbox h2 { font-weight: 400; letter-spacing: .06em; }
+    #briefbox p { font-weight: 400; }
+    #pausebox h2, #overlay h1, #scenetitle { font-weight: 200; letter-spacing: .32em; color: var(--hz-cream); text-shadow: 0 0 18px rgba(255,140,58,.4); }
+    #overlay.win h1 { color: var(--hz-cream); } #overlay.lose h1 { color: #ff7a5a; }
+    .htab { font-weight: 500; letter-spacing: .22em; background: transparent; border-color: transparent; }
+    .bbtn .nm { font-weight: 500; letter-spacing: .05em; }
+    .bbtn .cost { font-weight: 500; }
+    #objtitle, #commswho, #scenewho, #buildtip strong, #toast::before { font-weight: 600; letter-spacing: .2em; }
+    #selinfo b { font-weight: 600; letter-spacing: .04em; }
+    #credits { font-weight: 600; letter-spacing: .04em; }
+    /* the old steel-blue secondary buttons join the glass set; upgrade keeps a gold label */
+    #pausebox #restartbtn, #upgbtn:not(:disabled), #abilbtn:not(:disabled) { background: var(--hz-glass); border: 1px solid var(--hz-line); border-radius: 2px; box-shadow: none; color: #e6d9bd; text-shadow: none; }
+    #pausebox #restartbtn:hover, #upgbtn:not(:disabled):hover, #abilbtn:not(:disabled):hover { border-color: var(--hz-line-hi); color: var(--hz-cream); }
+    #upgbtn:not(:disabled) { color: #e8c66a; }
+    #abilbtn.on { background: var(--hz-flare); border-color: rgba(255,140,58,.55); color: var(--hz-ember-soft); box-shadow: inset 0 -2px 0 var(--hz-ember); }
+    /* top bar pills: glass with a hairline, like the buttons */
+    .pill { background: var(--hz-glass); border: 1px solid var(--hz-line); border-top-color: var(--hz-line) !important; border-radius: 2px; box-shadow: none; }
+    .htab, .htab.active { border-radius: 2px 2px 0 0; }
+    #missionlist .opt b { font-weight: 600; letter-spacing: .14em; }
+    #missionlist .opt span { font-style: normal; font-weight: 400; letter-spacing: .03em; }
+    #missionlist .opt i { border-radius: 2px; font-weight: 500; }
+    /* on narrow screens the wide tracking eases off so labels still fit */
+    @media (max-width: 520px) { .opt, .actbtn, #pausebox button { letter-spacing: .08em; } #deploy { letter-spacing: .26em; font-size: 16px; } .htab { letter-spacing: .12em; } }
   </style>
   <script type="module" crossorigin src="./assets/index-BtVCqI9h.js"></script>
 </head>
@@ -716,7 +787,7 @@
     <div id="briefwrap">
     <div id="briefbox">
       <div class="brieftag">Operation Last Light · Helios system · collapse in <b>214 days</b></div>
-      <h1 id="brieftitle" tabindex="-1">Omega <span>Zero Day</span></h1>
+      <h1 id="brieftitle" class="horizon" tabindex="-1"><span class="t-omega">Omega</span> <span class="t-flare" aria-hidden="true"></span><span class="t-zero">Zero Day</span></h1>
       <h2>Ark Fleet Command — <b>final transmission</b></h2>
       <p>Commander — the sun is dying. The ark-fleet can carry what's left of humanity out, but its drives burn
         <b>flux crystal</b>, and the last of it is down here. Take it.</p>
