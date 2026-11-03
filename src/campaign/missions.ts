@@ -156,7 +156,7 @@ const coldDrop: MissionDef = {
   },
   intro(c) {
     c.say('varga', 'Lantern, Varga. You\'re down. Forty thousand sleepers are waiting on what you dig out of that ground. No pressure.');
-    c.say('okoye', 'Sergeant Okoye, your ground lead. Power first: a Solar Array. Nothing else in this yard wakes up without it.');
+    c.say('okoye', 'Okoye here, on the ground with you. Power first: a Solar Array next to the HQ. Nothing else in this yard wakes up without it.');
   },
   objectives: [
     { id: 'solar', text: 'Build a Solar Array', check: c => c.buildingsOf(PLAYER, 'solar').length > 0 },
@@ -173,13 +173,13 @@ const coldDrop: MissionDef = {
     { id: 'patrol1', when: c => c.t >= 120, run: c => {
       const k = c.base(KESSLER), p = hqPos(c);
       c.attackMove(c.spawn(['trooper', 'trooper', 'trooper'], KESSLER, k.tx + 2, k.ty + 5, 'p1'), p.x, p.y);
-      c.say('okoye', 'Movement on the ridge. Kessler colours. Three weeks ago they were guarding this depot.');
+      c.say('okoye', 'Movement on the ridge, in Kessler colours. Three weeks ago those people were guarding this depot. Now they\'re shooting at it.');
     } },
     { id: 'patrol1done', when: c => c.run.fired.includes('patrol1') && c.alive('p1').length === 0, run: c => c.say('okoye', 'Patrol\'s down. Nobody\'s calling them back, which means more are coming.') },
     { id: 'patrol2', when: c => c.t >= 270, run: c => {
       const k = c.base(KESSLER), p = hqPos(c);
       c.attackMove(c.spawn(['trooper', 'trooper', 'trooper', 'rocketeer'], KESSLER, k.tx + 2, k.ty + 5, 'p2'), p.x, p.y);
-      c.say('okoye', 'Second patrol. Bigger. They know exactly where we are.');
+      c.say('okoye', 'Second patrol, and it\'s bigger. They know exactly where we are, so someone up on that ridge is spotting for them.');
     } },
     { id: 'patrol3', when: c => c.t >= 430, run: c => {
       const k = c.base(KESSLER), p = hqPos(c);
@@ -232,7 +232,7 @@ const fluxLines: MissionDef = {
     }
   },
   intro(c) {
-    c.say('lind', 'Teodor Lind, flux engineering. Forget the crystal fields for a moment, Commander. The vents are where flux comes up from the deep crust. Hold one and you skim it at the source.');
+    c.say('lind', 'Lind here, on the survey channel. Once you hold both vents and a watchtower, I need ninety steady seconds of readings. I\'ll be listening.');
     c.say('okoye', 'The Hearth Clans have pickets on two of them. Stand your troops on a vent and keep enemies off it to take it. And watch the ground: the clans set snares.');
   },
   update(c, dt) {
@@ -362,7 +362,7 @@ const ironWeather: MissionDef = {
       const k = c.base(KESSLER), p = hqPos(c);
       c.attackMove(c.spawn(w.units, KESSLER, k.tx + 2, k.ty + 7, `w${i}`), p.x, p.y);
       c.say('kessler', w.line);
-      if (i === 0) c.say('okoye', 'That\'s Kessler himself on an open channel. Ignore him. Watch the ridge.');
+      if (i === 0) c.say('okoye', 'That\'s Kessler himself, on an open channel so the whole colony hears it. Don\'t answer him. Watch the ridge.');
     } })),
     ...WAVES.map((_, i): Trigger => ({ id: `cleared${i}`, when: c => c.run.fired.includes(`wave${i}`) && c.alive(`w${i}`).length === 0, run: c => {
       c.run.vars.cleared = (c.run.vars.cleared ?? 0) + 1;
@@ -526,7 +526,7 @@ const greenTide: MissionDef = {
     c.run.vars.labX = mx; c.run.vars.labY = my;
   },
   intro(c) {
-    c.say('reyes', 'Helion commander. This is Ama Reyes. You are standing on something that is alive. Please, turn around.');
+    c.say('reyes', 'Reyes to the Helion commander. My people are on the vents and they will not move. I am sorry it has come to this.');
     c.say('okoye', 'Clan swarms, firebombs and harpoons. Thumpers break them up. Keep the tanks in front, and sweep ahead for snares.');
   },
   update(c, dt) {

@@ -562,6 +562,52 @@
     #objlist li.done::before { content: "◆ "; color: var(--good); }
     @media (orientation: portrait), (max-width: 760px) { #comms { top: auto; right: auto; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--deck-h, 200px) + 12px); max-width: calc(100vw - 24px); } }
     @media (max-height: 500px) { #commsbadge { width: 44px; height: 44px; } #comms { bottom: auto; top: calc(56px + env(safe-area-inset-top)); left: auto; right: calc(60px + env(safe-area-inset-right)); max-width: min(420px, 55vw); } #objtracker { max-width: 40vw; } #objlist li { font-size: 11px; } }
+    /* pre-mission scene: one speaker at a time over the paused map, visual-novel style */
+    #scene { position: fixed; inset: 0; z-index: 18; display: flex; align-items: flex-end; justify-content: center; cursor: pointer;
+      padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+      background: linear-gradient(180deg, rgba(12,9,6,.25), rgba(12,9,6,.62) 45%, rgba(12,9,6,.9)); }
+    #scene[hidden] { display: none; }
+    #scenecard { position: relative; width: min(880px, 100%); padding: 16px 20px 14px; background: var(--rivets), var(--plates); border: 1px solid var(--edge-hi); border-radius: 6px;
+      box-shadow: 0 0 0 3px var(--plate-dk), 0 0 0 4px var(--edge), 0 18px 40px var(--frame-shadow); cursor: default; }
+    #scenehead { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(232,198,106,.25); }
+    #scenetitle { font-family: var(--head); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+    #sceneplace { font-size: 12.5px; color: var(--muted); font-style: italic; }
+    #sceneline { display: flex; gap: 18px; align-items: flex-start; min-height: 132px; }
+    #sceneportrait { flex: none; width: 132px; height: 132px; border: 2px solid; border-radius: 5px; overflow: hidden; display: grid; place-items: center;
+      background: var(--plate-dk); font-family: var(--head); font-size: 44px; font-weight: 900; color: var(--cream); box-shadow: 0 6px 16px rgba(0,0,0,.45); }
+    #sceneportrait[hidden] { display: none; }
+    #sceneportrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    #scenebody { flex: 1; min-width: 0; }
+    #scenewho { font-family: var(--head); font-size: 15px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+    #scenewho small { margin-left: 8px; color: var(--muted); font-weight: 600; letter-spacing: .03em; text-transform: none; font-size: 12.5px; }
+    #scenetext { margin-top: 6px; font-size: 17px; line-height: 1.6; color: var(--cream); min-height: 5em; }
+    #scene.narrator #sceneline { justify-content: center; min-height: 96px; }
+    #scene.narrator #scenebody { text-align: center; }
+    #scene.narrator #scenetext { font-style: italic; color: #e2d6bc; }
+    #scene.seren #scenetext, #scene.elder #scenetext { font-style: italic; letter-spacing: .03em; color: #d8f6f8; text-shadow: 0 0 6px rgba(191,238,242,.55); }
+    #scene.seren #sceneportrait { animation: signal 1.6s steps(2) infinite; }
+    #scenefoot { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    #sceneprog { margin-right: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    #scenefoot button { min-height: 38px; padding: 6px 16px; font-family: var(--head); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+      color: var(--cream); background: var(--plates-dk); border: 1px solid var(--edge-hi); border-radius: 4px; }
+    #scenefoot button:disabled { opacity: .4; cursor: default; }
+    #scenefoot #scenenext { color: var(--ink); background: linear-gradient(180deg, var(--gold-hi), var(--gold) 48%, var(--edge-hi)); }
+    #scenefoot button:not(:disabled):hover { filter: brightness(1.12); }
+    @media (pointer: coarse) { #scenefoot button { min-height: 44px; } }
+    @media (max-width: 640px) {
+      #sceneline { gap: 12px; min-height: 0; }
+      #sceneportrait { width: 76px; height: 76px; font-size: 28px; }
+      #scenetext { font-size: 15px; min-height: 7em; }
+      #scenewho small { display: block; margin: 2px 0 0; }
+    }
+    @media (max-height: 500px) {
+      #scenecard { padding: 10px 14px 10px; }
+      #scenehead { margin-bottom: 6px; padding-bottom: 5px; }
+      #sceneline { min-height: 0; gap: 12px; }
+      #sceneportrait { width: 72px; height: 72px; font-size: 26px; }
+      #scenetext { font-size: 14px; line-height: 1.45; min-height: 4.4em; }
+      #scenefoot { margin-top: 6px; }
+    }
   </style>
 </head>
 <body>
@@ -607,6 +653,7 @@
     <div id="pausebox">
       <h2 id="pausetitle">Paused</h2>
       <button id="resumebtn">▶ Resume</button>
+      <button id="replaybtn" hidden>▶ Replay briefing</button>
       <button id="restartbtn">⟲ Restart mission</button>
       <button id="quitbtn">⌂ Quit to menu</button>
       <button id="pausemute">Sound: on</button>
@@ -616,6 +663,16 @@
   </div>
   <div id="toast"></div>
   <div id="comms" aria-live="polite" hidden><div id="commsbadge"></div><div id="commsbody"><div id="commswho"></div><div id="commstext"></div></div></div>
+  <div id="scene" role="dialog" aria-modal="true" aria-labelledby="scenetitle" hidden>
+    <div id="scenecard">
+      <div id="scenehead"><span id="scenetitle"></span><span id="sceneplace"></span></div>
+      <div id="sceneline">
+        <div id="sceneportrait"></div>
+        <div id="scenebody"><div id="scenewho"></div><p id="scenetext" aria-live="polite"></p></div>
+      </div>
+      <div id="scenefoot"><span id="sceneprog"></span><button id="sceneskip" type="button">Skip</button><button id="sceneback" type="button">◂ Back</button><button id="scenenext" type="button">Next ▸</button></div>
+    </div>
+  </div>
   <div id="objtracker" hidden><div id="objtitle"></div><ul id="objlist"></ul></div>
   <div id="buildtip" role="tooltip"></div>
   <div id="briefing" role="dialog" aria-modal="true" aria-labelledby="brieftitle">

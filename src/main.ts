@@ -9,6 +9,7 @@ import { initUI, updateUI } from './ui';
 import { initAudio, toggleMute, isMuted, audioStats } from './audio';
 import { writeSave, readSave, clearSave, applySave, describeSave } from './save';
 import * as campaign from './campaign/runner';
+import { playScene } from './scene';
 import { initBrood, seedBrood } from './brood';
 import { initKeepers, seedKeepers, keeperLandingSite } from './keepers';
 import { initHollow, seedHollow } from './hollow';
@@ -112,8 +113,25 @@ async function startMission(id: string) {
   await initRenderer();
   clearSave();
   started = true;
-  game.setPaused(false);
+  game.setPaused(true);   // held until the pre-mission scene has been read (beginMission)
   last = performance.now();
+}
+
+// the characters' pre-mission conversation over the paused map, then the clock starts
+async function beginMission() {
+  const sc = campaign.missionScene();
+  // the fog hasn't run yet (the clock is held), so light the starting base for the backdrop
+  for (const e of [...game.buildings, ...game.units]) {
+    if (e.owner !== PLAYER) continue;
+    const c = e.kind === 'building' ? buildingCenter(e) : { x: e.x, y: e.y };
+    const cx = Math.floor(c.x / TILE), cy = Math.floor(c.y / TILE), r = e.def.vision;
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++)
+      if (inBounds(x, y) && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) { game.visible[idx(x, y)] = 1; game.explored[idx(x, y)] = 1; }
+  }
+  app.inert = true;
+  if (sc) await playScene(sc);
+  app.inert = false;
+  if (pauseMenu.style.display !== 'flex') { game.setPaused(false); last = performance.now(); }
   campaign.bootComms();
 }
 
@@ -242,7 +260,7 @@ refreshMuteBtn();
 // pause menu: ☰ opens it (pausing the sim), resume / restart
 const pauseMenu = document.getElementById('pausemenu')!;
 const menuBtn = document.getElementById('menubtn')!;
-function openPause() { if (started && !game.gameOver) { game.setPaused(true); app.inert = true; pauseMenu.style.display = 'flex'; document.getElementById('restartbtn')!.textContent = campaign.activeMission() ? '⟲ Restart mission' : '⟲ Restart skirmish'; document.getElementById('resumebtn')!.focus(); } }
+function openPause() { if (started && !game.gameOver) { game.setPaused(true); app.inert = true; pauseMenu.style.display = 'flex'; replayBtn.hidden = !campaign.missionScene(); document.getElementById('restartbtn')!.textContent = campaign.activeMission() ? '⟲ Restart mission' : '⟲ Restart skirmish'; document.getElementById('resumebtn')!.focus(); } }
 function closePause() { pauseMenu.style.display = 'none'; app.inert = false; game.setPaused(false); last = performance.now(); menuBtn.focus(); }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && pauseMenu.style.display !== 'flex') openPause();
@@ -251,6 +269,15 @@ menuBtn.addEventListener('click', () => {
   pauseMenu.style.display === 'flex' ? closePause() : openPause();
 });
 document.getElementById('resumebtn')!.addEventListener('click', closePause);
+const replayBtn = document.getElementById('replaybtn') as HTMLButtonElement;
+replayBtn.addEventListener('click', async () => {
+  const sc = campaign.missionScene();
+  if (!sc) return;
+  pauseMenu.style.display = 'none';
+  await playScene(sc);
+  pauseMenu.style.display = 'flex';   // back to the pause menu, still paused
+  replayBtn.focus();
+});
 // restart replays the same mission or skirmish setup; quitting goes back to the briefing
 document.getElementById('restartbtn')!.addEventListener('click', () => {
   clearSave();
@@ -305,6 +332,7 @@ deployBtn.addEventListener('click', async () => {
     else await startGame(n, opts);
     briefing.style.display = 'none';
     app.inert = false;
+    if (mode === 'campaign') await beginMission();
     document.getElementById('game')!.focus();
   } catch (err) {
     // never fail silently into a black screen

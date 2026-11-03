@@ -16,6 +16,7 @@ import { initKeepers } from '../keepers';
 import { initHollow } from '../hollow';
 import { centerCameraOn } from '../input';
 import { MISSIONS, MissionDef } from './missions';
+import { SCENES, Scene } from './scenes';
 
 // ---------- run state (saved with the match) ----------
 export interface RunState {
@@ -33,6 +34,8 @@ let def: MissionDef | null = null;
 
 // ---------- comms ----------
 export interface CommLine { who: Speaker; text: string }
+// a line in a pre-mission scene; the narrator sets the scene in italics, with no portrait
+export interface SceneLine { who: Speaker | 'narrator'; text: string }
 export type Speaker = 'varga' | 'okoye' | 'lind' | 'kessler' | 'seren' | 'elder' | 'reyes' | 'vessa' | 'keeper';
 // portrait: file in public/portraits (speakers without one get a lettered badge)
 export const SPEAKERS: Record<Speaker, { name: string; role: string; color: string; portrait?: string }> = {
@@ -258,6 +261,11 @@ export function setupMission(id: string) {
   run!.flux0 = stats.flux;
 }
 export function bootComms() { if (def && run) def.intro(makeCtx()); }
+/** The mission's pre-mission conversation, if it has one (lines can depend on campaign flags). */
+export function missionScene(): (Scene & { title: string }) | null {
+  const f = def && SCENES[def.id];
+  return f ? { title: missionTitle(), ...f(makeCtx()) } : null;
+}
 
 // ---------- save / resume ----------
 /** Dev: the live run state (for testing mission flows from the console). */
