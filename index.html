@@ -608,6 +608,35 @@
       #scenetext { font-size: 14px; line-height: 1.45; min-height: 4.4em; }
       #scenefoot { margin-top: 6px; }
     }
+
+    /* Desktop dock: the build cards grow to fill the row and sit in recessed slots, so the
+       deck reads as a tray of options rather than a few small icons in an empty band.
+       Phones and compact layouts keep their own fixed sizes (the media rules above). */
+    @media (min-width: 1100px) and (min-height: 600px) {
+      #buildgrid { gap: 6px; align-items: stretch; }
+      .bbtn { flex: 1 1 0; width: auto; min-width: 98px; max-width: 156px; justify-content: center; gap: 4px; padding: 8px 4px 9px;
+        background: rgba(0,0,0,.16); border: 1px solid rgba(90,72,48,.55); border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255,236,200,.05), inset 0 -2px 0 rgba(0,0,0,.25); }
+      .bbtn:hover, .bbtn:focus-visible { background: rgba(0,0,0,.26); border-color: var(--edge-hi); }
+      .bbtn img, .bbtn svg { flex: 0 1 auto; max-width: min(118px, 90%); max-height: 78px; }
+      .bbtn .nm { font-size: 13px; }
+      .bbtn .cost { font-size: 12.5px; }
+    }
+
+    /* Notices (toast): the same framed glass panel as the comms box and the build tooltip,
+       a small gold header and plain left-aligned text, up top where nothing else lives */
+    #toast { top: calc(14px + env(safe-area-inset-top)); bottom: auto; left: 50%; transform: translateX(-50%);
+      max-width: min(440px, calc(100vw - 140px)); padding: 9px 15px 10px; text-align: left;
+      font-family: var(--body); font-size: var(--type-sm); font-weight: 700; letter-spacing: 0; line-height: 1.4; color: var(--cream);
+      background: var(--brief-glass); border: 1px solid var(--edge-hi); border-radius: 6px;
+      box-shadow: 0 0 0 3px var(--plate-dk), 0 0 0 4px var(--edge), 0 10px 24px var(--frame-shadow); }
+    #toast::before { content: "Field report"; position: static; inset: auto; display: block; margin-bottom: 2px; border: 0; clip-path: none;
+      font-family: var(--head); font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+    #toast::after { content: none; }
+    @media (orientation: portrait), (max-width: 760px) { #toast { top: calc(64px + env(safe-area-inset-top)); max-width: calc(100vw - 24px); } }
+    /* while a comms line is up (top right), notices drop below it so the two never overlap */
+    @media (orientation: landscape) and (min-width: 761px) and (min-height: 501px) { body:has(#comms:not([hidden])) #toast { top: calc(112px + env(safe-area-inset-top)); } }
+    /* short landscape screens (phones): the top edge is full of pills, so notices sit just above the deck */
+    @media (orientation: landscape) and (max-height: 500px) { #toast { top: auto; bottom: calc(120px + env(safe-area-inset-bottom)); max-width: min(420px, 58vw); padding: 6px 12px 7px; } }
   </style>
 </head>
 <body>
