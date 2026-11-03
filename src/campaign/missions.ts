@@ -1,8 +1,11 @@
 // Act I — Landfall. Each mission is data (map, tech, objectives) plus small
 // script hooks the runner calls. Story: docs/campaign-plan.md.
 
-import type { Ctx } from './runner';
-import type { GameEvent } from '../game';
+import type { Ctx, Speaker } from './runner';
+import type { GameEvent, Unit, Building } from '../game';
+import { mission, damage, surface } from '../game';
+import { nearestTile, inBounds, terrain, idx, occupied } from '../map';
+import { sfx } from '../audio';
 import { PLAYER, KEEPERS } from '../config';
 import { seedKeepers, initKeepers, clearSpot } from '../keepers';
 import { seedBrood, initBrood } from '../brood';
@@ -312,7 +315,7 @@ const WAVES = [
     line: 'Last warning, Lantern. Walk away from the vents.' },
 ];
 const ironWeather: MissionDef = {
-  id: 'act1-3', act: 1, code: 'I-3', title: 'Iron Weather', tagline: 'Break the Kessler assault',
+  id: 'act1-3', act: 1, code: 'I-4', title: 'Iron Weather', tagline: 'Break the Kessler assault',
   briefing: [
     'Lantern, Varga. Kessler has stopped probing. Orbit shows an armoured column forming at his forward base, and it\'s pointed at you.',
     'Your Fabricator clearance just came through. Build armour, dig in behind the turrets and let his column break on them. Then take the fight to him.',
@@ -402,7 +405,7 @@ function act2Base(c: Ctx, extra: string[] = []) {
 // ---------------------------------------------------------------------------
 // II-4 · Sparks
 const sparks: MissionDef = {
-  id: 'act2-4', act: 2, code: 'II-4', title: 'Sparks', tagline: 'Keep the harvesters alive under Ashen raids',
+  id: 'act2-4', act: 2, code: 'II-5', title: 'Sparks', tagline: 'Keep the harvesters alive under Ashen raids',
   briefing: [
     'Lantern, Varga. A supply convoy lands at Depot Six in eight minutes, and it needs flux on the pad when it does.',
     'The Ashen Clans have started hitting harvesters across the valley: technicals in fast, cutters out, gone before the guns turn. Every harvester they wreck pays them. Keep yours running. Get a Fabricator up so you have something that can catch them.',
@@ -497,7 +500,7 @@ const sparks: MissionDef = {
 // ---------------------------------------------------------------------------
 // II-5 · The Green Tide
 const greenTide: MissionDef = {
-  id: 'act2-5', act: 2, code: 'II-5', title: 'The Green Tide', tagline: 'Break the Hearth\'s hold on the central vents',
+  id: 'act2-5', act: 2, code: 'II-6', title: 'The Green Tide', tagline: 'Break the Hearth\'s hold on the central vents',
   briefing: [
     'Lantern, Varga. The Hearth Clans hold three of the four central vents, and Lind needs them for the corridor survey. Take them.',
     'Their Speaker, Ama Reyes, keeps broadcasting that the vents are "wounds". Ignore it. The clans come in swarms and seed the ground with snares: bring splash, and the Thumper is cleared for you.',
@@ -546,7 +549,7 @@ const greenTide: MissionDef = {
   objectives: [
     { id: 'vents', text: () => `Take the central vents: ${Math.min(3, ventsHeld(PLAYER))} / 3`, check: () => ventsHeld(PLAYER) >= 3 },
     { id: 'hold', text: c => `Hold three vents: ${Math.floor(c.run.vars.hold ?? 0)} / 90 s`, hidden: true, check: c => (c.run.vars.hold ?? 0) >= 90 },
-    { id: 'labs', text: 'Optional: leave Reyes\'s labs standing', optional: true, hidden: true,
+    { id: 'labs', text: 'Leave Reyes\'s labs standing', optional: true, hidden: true,
       check: c => c.done('hold') && c.buildingsOf(HEARTH, 'lab').length > 0 },
   ],
   triggers: [
@@ -591,7 +594,7 @@ const greenTide: MissionDef = {
 // II-6 · Resonance
 const UPLINK_DEADLINE = 660;
 const resonanceM: MissionDef = {
-  id: 'act2-6', act: 2, code: 'II-6', title: 'Resonance', tagline: 'Destroy Kessler\'s Orbital Uplink before it charges',
+  id: 'act2-6', act: 2, code: 'II-8', title: 'Resonance', tagline: 'Destroy Kessler\'s Orbital Uplink before it charges',
   briefing: [
     'Lantern, Varga. Kessler is charging an Orbital Uplink. When it fires, he can hold the ark-fleet hostage, every sleeper aboard.',
     'Fleet Command has cleared you for the Orbital Protocol and your own Uplink. You have eleven minutes. Destroy his. And Lantern: deep-space arrays picked up something on approach to Cinder last night. Not ours. Not Kessler\'s.',
@@ -725,7 +728,7 @@ const hollowAllied = (c: Ctx) => c.flag('meridian') === 'protected';
 // ---------------------------------------------------------------------------
 // III-7 · Meridian
 const meridian: MissionDef = {
-  id: 'act3-7', act: 3, code: 'III-7', title: 'Meridian', tagline: 'The Hollow\'s ship, and a choice',
+  id: 'act3-7', act: 3, code: 'III-9', title: 'Meridian', tagline: 'The Hollow\'s ship, and a choice',
   briefing: [
     'Lantern, Varga. Survey drones found the wreck the Hollow live in: the Meridian. Colony ship, two hundred years down, listed as lost with all hands.',
     'The Ashen Clans found her too. Vessa Kol has sent you a message. So has something under the crust. You will have to decide which of them you answer.',
@@ -820,7 +823,7 @@ const meridian: MissionDef = {
 // ---------------------------------------------------------------------------
 // III-8 · Kessler's Wall
 const kesslersWall: MissionDef = {
-  id: 'act3-8', act: 3, code: 'III-8', title: 'Kessler\'s Wall', tagline: 'Break the Collective; hold the Lantern shaft',
+  id: 'act3-8', act: 3, code: 'III-12', title: 'Kessler\'s Wall', tagline: 'Break the Collective; hold the Lantern shaft',
   briefing: [
     'Lantern, Varga. Kessler has walled himself in around the last launch-capable vents in the north. His fleet bid goes out the moment the corridor opens. It cannot.',
     'Lind says Project Lantern is still drawing from the Vey\'s heart. He wants to go down the shaft and shut it off himself. I can\'t order you to let him. I can\'t order you to stop him either.',
@@ -916,7 +919,7 @@ const NOVA = 900, HOLD = 300;
 // vents held by you or anyone standing with you (the Hearth, the Hollow) light the beacon together
 const friendlyVents = () => neutrals.filter(n => n.kind === 'vent' && n.owner >= 0 && !hostile(n.owner, PLAYER)).length;
 const zeroDay: MissionDef = {
-  id: 'act3-9', act: 3, code: 'III-9', title: 'Zero Day', tagline: 'Hold the corridor while the sun dies',
+  id: 'act3-9', act: 3, code: 'III-13', title: 'Zero Day', tagline: 'Hold the corridor while the sun dies',
   briefing: [
     'Lantern. This is Varga, on every channel I have. Helios is coming apart. The corridor opens in minutes and closes for good fifteen after that.',
     'Hold the vents long enough to light the beacon. After that, I\'m told, there will be a choice. I am sorry it falls to you.',
@@ -1018,4 +1021,599 @@ const zeroDay: MissionDef = {
   endLose: { title: 'Zero Day', text: 'Helios goes before the beacon is lit. There is no corridor, no fleet, no dawn. Only light.' },
 };
 
-export const MISSIONS: MissionDef[] = [bootCamp, coldDrop, fluxLines, ironWeather, sparks, greenTide, resonanceM, meridian, kesslersWall, zeroDay];
+// ===========================================================================
+// Missions added in the second campaign pass. Each borrows a classic RTS idea:
+// a day/night cycle (I-3), a commando infiltration (II-7), a convoy hunt
+// (III-10) and an environmental hazard escort (III-11).
+
+const tileDist = (u: { x: number; y: number }, tx: number, ty: number) => Math.hypot(u.x / 32 - (tx + 0.5), u.y / 32 - (ty + 0.5));
+// the runner calls update() about every 0.3 s but passes 0.25; these missions time themselves off the real clock
+function realDt(c: Ctx): number { const v = c.run.vars, d = v.lastT === undefined ? 0 : c.t - v.lastT; v.lastT = c.t; return Math.max(0, d); }
+const NEUTRAL = ASHEN;   // an empty slot, allied to everyone, for things nobody owns yet
+// a clear tile near a point on the line from a to b (t along it, `side` tiles off to one side)
+function along(a: { tx: number; ty: number }, b: { tx: number; ty: number }, t: number, side = 0) {
+  const dx = b.tx - a.tx, dy = b.ty - a.ty, len = Math.hypot(dx, dy) || 1;
+  const x = Math.round(a.tx + dx * t - dy / len * side), y = Math.round(a.ty + dy * t + dx / len * side);
+  return nearestTile(x, y, 8, (tx, ty) => inBounds(tx, ty) && terrain[idx(tx, ty)] === 0 && occupied[idx(tx, ty)] === -1) ?? { x, y };
+}
+
+// ---------------------------------------------------------------------------
+// I-3 · Night Shift — day and night (after StarCraft II's *Outbreak*). By day the
+// Hollow keep to their tunnels and you can push out and collapse them; at night
+// they come up and hunt anything outside your lights. Harvester Two is out there.
+const DAY = 110, DUSK = 10, NIGHT = 80, DAWN = 10, CYCLE = DAY + DUSK + NIGHT + DAWN;
+function nightLevel(t: number) {
+  const p = t % CYCLE;
+  if (p < DAY) return 0;
+  if (p < DAY + DUSK) return (p - DAY) / DUSK;
+  if (p < DAY + DUSK + NIGHT) return 1;
+  return 1 - (p - DAY - DUSK - NIGHT) / DAWN;
+}
+const mouthsAlive = (c: Ctx) => [0, 1, 2, 3].map(i => byId.get(c.run.vars[`m${i}`])).filter((b): b is Building => !!b && b.kind === 'building');
+
+const nightShift: MissionDef = {
+  id: 'act1-night', act: 1, code: 'I-3', title: 'Night Shift', tagline: 'Find Harvester Two; the tunnels wake at dark',
+  briefing: [
+    'Lantern, Varga. Harvester Two\'s transponder has started pinging again, from somewhere past the northern scrub, under the ground. It went down with a full load and a drive core the fleet needs.',
+    'Okoye has found the tunnels the pale ones came out of. By day they stay below. At night they come up. Collapse the tunnels by daylight and bring the harvester home.',
+  ],
+  goals: ['Collapse the four tunnel mouths', 'Find Harvester Two and bring it home', 'Keep your people inside the lights after dark'],
+  seed: 51207, enemies: 1, credits: 3500,
+  allowed: [...BASE_TECH, 'sensor', 'pyro', 'vanguard'],
+  // Harvester Two sits in an empty slot that is friends with everyone, so nobody shoots it until it's found
+  onInstall() { setAllied(PLAYER, NEUTRAL, true); setAllied(HOLLOW, NEUTRAL, true); setAllied(KESSLER, NEUTRAL, true); },
+  setup(c) {
+    ensureFaction(NEUTRAL);
+    nexusAtBase(c);
+    const b = c.base(PLAYER), far = c.base(KESSLER);
+    c.place('solar', PLAYER, b.tx + 4, b.ty); c.place('solar', PLAYER, b.tx + 4, b.ty - 3);
+    c.place('extractor', PLAYER, b.tx, b.ty - 4); c.place('barracks', PLAYER, b.tx + 4, b.ty + 3);
+    c.place('turret', PLAYER, b.tx + 6, b.ty - 1); c.place('turret', PLAYER, b.tx + 2, b.ty + 7);
+    c.spawn(['trooper', 'trooper', 'trooper', 'trooper', 'rocketeer', 'rocketeer', 'pyro', 'pyro', 'vanguard', 'vanguard'], PLAYER, b.tx + 1, b.ty + 5);
+    // four tunnel mouths fanned out between the depot and the far scrub, a few sleepers by each
+    const fan: [number, number][] = [[0.36, -9], [0.5, 8], [0.68, -6], [0.86, 5]];
+    fan.forEach(([t, side], i) => {
+      const p = along(b, far, t, side);
+      const m = c.place('tunnelmouth', HOLLOW, p.x, p.y);
+      if (m) { c.run.vars[`m${i}`] = m.id; c.spawn(['shardkin', 'shardkin', ...(i >= 2 ? ['burrower'] : [])], HOLLOW, m.tx + 1, m.ty + 3); }
+    });
+    // Harvester Two, crusted with crystal, out past the last mouth
+    const h = c.spawn(['harvester'], NEUTRAL, far.tx + 1, far.ty + 1)[0];
+    if (h) { h.harvestState = 'none'; h.hp = Math.round(h.maxHp * 0.45); c.run.vars.h2 = h.id; }
+  },
+  intro(c) {
+    c.say('okoye', 'Daylight. That\'s our window. The tunnel mouths are marked on your map: get troops on them and bring them down while the pale ones sleep.');
+    c.say('okoye', 'When the sun goes, pull everyone back inside the lights. They hunt in the dark, and our scopes don\'t see much past the floodlights.');
+    for (const m of mouthsAlive(c)) { c.reveal(m.tx + 1, m.ty + 1, 3); c.ping(m.tx + 1, m.ty + 1, '#bfeef2'); }
+  },
+  update(c) {
+    const dt = realDt(c);
+    const v = c.run.vars, n = nightLevel(c.t), phase = c.t % CYCLE, nightNo = Math.floor(c.t / CYCLE) + 1;
+    mission.night = n * 0.88;
+    mission.visionMul = 1 - 0.45 * n;
+    mission.lights = () => mouthsAlive(c).map(m => ({ x: (m.tx + 1) * 32, y: (m.ty + 1) * 32, r: 64 }));
+    // dusk and dawn, once a cycle
+    if (phase >= DAY - 15 && phase < DAY && v.warned !== nightNo) {
+      v.warned = nightNo;
+      c.say('okoye', nightNo === 1 ? 'Sun\'s going down, Lantern. Fifteen seconds. Get everyone back inside the lights and let the turrets do the work.' : 'Dusk again. Pull them in.');
+    }
+    const night = phase >= DAY + DUSK * 0.5 && phase < DAY + DUSK + NIGHT;
+    if (night) {
+      v.wave = (v.wave ?? 3) - dt;
+      if (v.wave <= 0) {
+        v.wave = 28;
+        const mine = c.unitsOf(PLAYER), homes = c.buildingsOf(PLAYER), open = mouthsAlive(c);
+        // one tunnel at a time, in turn; bigger each night and the more tunnels you've left open
+        for (const m of open.length ? [open[(v.waveNo ?? 0) % open.length]] : []) {
+          const size = Math.min(6, nightNo + Math.floor(open.length / 3));
+          const pack = Array.from({ length: size }, (_, k) => (k === 2 ? 'burrower' : 'shardkin'));
+          const us = c.spawn(pack, HOLLOW, m.tx + 1, m.ty + 3, 'night');
+          for (const u of us) surface(u);
+          // they go for whatever is out in the dark first, else the nearest building
+          const lit = (u: Unit) => homes.some(b => Math.hypot(u.x - buildingCenter(b).x, u.y - buildingCenter(b).y) < Math.max(3, b.def.vision * 0.7) * 32);
+          const prey = mine.filter(u => !lit(u)).sort((a, z) => tileDist(a, m.tx, m.ty) - tileDist(z, m.tx, m.ty))[0];
+          const home = homes.sort((a, z) => Math.hypot(a.tx - m.tx, a.ty - m.ty) - Math.hypot(z.tx - m.tx, z.ty - m.ty))[0];
+          const to = prey ? { x: prey.x, y: prey.y } : home ? buildingCenter(home) : null;
+          if (to) c.attackMove(us, to.x, to.y);
+        }
+        v.waveNo = (v.waveNo ?? 0) + 1;
+      }
+    } else if (phase >= DAY + DUSK + NIGHT && v.dawn !== nightNo) {
+      v.dawn = nightNo; v.wave = 3;
+      for (const u of c.alive('night')) burrowUnit(u);
+      c.say('okoye', nightNo === 1 ? 'Dawn. They\'re going back down, all of them, at once. Like someone called them home. Move out while it\'s light.' : 'Sun\'s up. Go.');
+    }
+    // finding Harvester Two: any of yours within reach wakes its transponder and it follows you home
+    const h = byId.get(v.h2) as Unit | undefined;
+    if (h && h.owner === NEUTRAL && c.unitsOf(PLAYER).some(u => Math.hypot(u.x - h.x, u.y - h.y) < 3 * 32)) {
+      h.owner = PLAYER; h.harvestState = 'none';
+      const p = hqPos(c); issueOrder(h, { type: 'move', x: p.x + 40, y: p.y + 90 });
+      v.found = 1; c.show('home');
+      c.say('okoye', 'Found it. Lantern, it isn\'t wrecked. They didn\'t strip it. There\'s crystal grown right over the hull, like a dressing on a wound.');
+      c.say('seren', 'It sang to us, under the ground. Take it, root-taker. Take it home and leave the deep ones be.');
+      c.say('okoye', 'It\'s driving. Escort it home, and keep it out of the dark.');
+    }
+    if (h && h.owner === PLAYER && !v.home && Math.hypot(h.x - hqPos(c).x, h.y - hqPos(c).y) < 6 * 32) {
+      v.home = 1; issueOrder(h, { type: 'idle' });   // back to work
+    }
+    if (v.found && !v.home && !h) v.lost = 1;   // once it's home it's just another harvester
+  },
+  objectives: [
+    { id: 'mouths', text: c => `Collapse the tunnel mouths: ${4 - mouthsAlive(c).length} / 4`, check: c => mouthsAlive(c).length === 0 },
+    { id: 'find', text: 'Find Harvester Two (its signal comes from the far scrub)', check: c => !!c.run.vars.found },
+    { id: 'home', text: 'Bring Harvester Two back to the depot', hidden: true, check: c => !!c.run.vars.home },
+    { id: 'clock', text: c => { const p = c.t % CYCLE, night = p >= DAY && p < DAY + DUSK + NIGHT; return night ? `Night: dawn in ${fmt(DAY + DUSK + NIGHT + DAWN - p)}` : `Day: dusk in ${fmt(DAY - p)}`; }, check: () => false },
+  ],
+  triggers: [
+    { id: 'firstMouth', when: c => mouthsAlive(c).length < 4, run: c => {
+      c.say('lind', 'Lantern, Lind. The shaft walls are lined with crystal, grown smooth. This wasn\'t dug. It was grown, the way a root grows. I don\'t like what that means.');
+    } },
+    { id: 'beacon', when: c => c.t >= 40 && !c.run.vars.found, run: c => {
+      const f = c.base(KESSLER); c.ping(f.tx + 1, f.ty + 1, '#e8c66a');
+      c.say('okoye', 'Harvester Two\'s transponder: faint, out past the last tunnel. Marked. Daylight only, Lantern.');
+    } },
+    { id: 'lastMouth', when: c => mouthsAlive(c).length === 0, run: c => {
+      c.say('okoye', 'That\'s the last of them caved in. Whatever lives down there will have to find another way up.');
+    } },
+  ],
+  onEvent: harvesterWarning,
+  win: c => c.done('mouths') && c.done('home'),
+  lose: c => !!c.run.vars.lost,
+  endWin: { title: 'The night shift ends', text: 'Lind, over the harvester\'s crusted hull: "It isn\'t damaged, Lantern. It\'s been... mended. Whatever they are, they fixed our machine." Okoye, quietly: "Then why do they keep trying to kill us?"' },
+  endLose: { title: 'Lost in the dark', text: 'Harvester Two goes back under the crust, and this time its transponder stays silent.' },
+  endEliminated: { title: 'The lights go out', text: 'One by one the floodlights at Depot Six go dark. By dawn there is nothing left above ground to light.' },
+};
+
+// ---------------------------------------------------------------------------
+// II-7 · Dead Drop — a commando mission (after the hero missions of StarCraft,
+// Red Alert and Warcraft III). No base: Okoye and a small squad slip past
+// searchlights and sentries into the Survey Annex and take the archive core.
+interface Searchlight { x: number; y: number; base: number; amp: number; speed: number; phase: number }
+const LIGHT_R = 6.5, LIGHT_HW = 0.3, GUARD_SIGHT = 4.5;
+const lightAngle = (l: Searchlight, t: number) => l.base + Math.sin(t * l.speed + l.phase) * l.amp;
+function inBeam(l: Searchlight, t: number, x: number, y: number) {
+  const dx = x / 32 - l.x, dy = y / 32 - l.y, d = Math.hypot(dx, dy);
+  if (d > LIGHT_R || d < 0.3) return d < 0.3;
+  let da = Math.atan2(dy, dx) - lightAngle(l, t);
+  da = Math.atan2(Math.sin(da), Math.cos(da));
+  return Math.abs(da) < LIGHT_HW;
+}
+function lightsOf(c: Ctx): Searchlight[] {
+  const v = c.run.vars, out: Searchlight[] = [];
+  for (let i = 0; v[`l${i}x`] !== undefined; i++) out.push({ x: v[`l${i}x`], y: v[`l${i}y`], base: v[`l${i}b`], amp: 1.1, speed: v[`l${i}s`], phase: v[`l${i}p`] });
+  return out;
+}
+
+const deadDrop: MissionDef = {
+  id: 'act2-dead', act: 2, code: 'II-7', title: 'Dead Drop', tagline: 'Okoye\'s squad, no base: steal the archive core',
+  briefing: [
+    'Lantern, Okoye. The Survey Annex: Helion\'s old field office in the badlands. Lind swears the board kept a backup of the survey archive there, the one that burned at Depot Six. Kessler\'s people took the Annex last month. They\'re looking for the same thing.',
+    'No base, no reinforcements. Me, two Ghost Snipers and three Troopers. Stay out of the searchlights and away from the sentries. If they see us, they purge the archive.',
+  ],
+  goals: ['Reach the archive vault unseen', 'Copy the archive core (stay by the vault)', 'Get Okoye back to the landing zone'],
+  seed: 64613, enemies: 1, size: 56, credits: 0,
+  allowed: [],
+  onInstall(c) {
+    mission.unitsOnly = true;
+    mission.night = 0.62; mission.visionMul = 0.8;
+    // the beams are lit pools at night, and drawn over the fog so you can always see where they sweep
+    mission.lights = () => lightsOf(c).map(l => { const a = lightAngle(l, c.run.t); return { x: (l.x + Math.cos(a) * LIGHT_R * 0.6) * 32, y: (l.y + Math.sin(a) * LIGHT_R * 0.6) * 32, r: 80 }; });
+    mission.drawOver = g => drawSearchlights(g, lightsOf(c), c.run.t, !!c.run.vars.alarm);
+  },
+  setup(c) {
+    const b = c.base(PLAYER), k = c.base(KESSLER);
+    c.run.vars.lzx = b.tx + 1; c.run.vars.lzy = b.ty + 1;
+    const squad = c.spawn(['okoye', 'sniper', 'sniper', 'trooper', 'trooper', 'trooper'], PLAYER, b.tx + 1, b.ty + 2);
+    c.run.vars.okoye = squad[0]?.id ?? -1;
+    // the Annex: a command post, the archive vault and its guns
+    const hq = c.place('outpost', KESSLER, k.tx, k.ty);
+    const vault = c.place('lab', KESSLER, k.tx + (k.tx < b.tx ? 3 : -3), k.ty + (k.ty < b.ty ? 3 : -3));
+    if (vault) { vault.inert = true; c.run.vars.vault = vault.id; c.run.vars.vx = vault.tx + 1; c.run.vars.vy = vault.ty + 1; }
+    c.place('barracks', KESSLER, k.tx + (k.tx < b.tx ? -1 : 2), k.ty + (k.ty < b.ty ? 4 : -4));
+    c.place('solar', KESSLER, k.tx + (k.tx < b.tx ? 4 : -4), k.ty);
+    if (hq) c.run.vars.annex = hq.id;
+    const away = (n: number, axis: 'x' | 'y') => -n * Math.sign(axis === 'x' ? b.tx - k.tx || 1 : b.ty - k.ty || 1);
+    for (const [dx, dy] of [[3, 1], [1, 3]]) c.place('turret', KESSLER, k.tx + away(dx, 'x'), k.ty + away(dy, 'y'));
+    // searchlights along the approach, each sweeping across the likely paths
+    const towardsBase = Math.atan2(b.ty - k.ty, b.tx - k.tx);
+    ([[0.3, -6, 0.6], [0.42, 7, 0.75], [0.55, -3, 0.9], [0.66, 6, 0.7], [0.78, -5, 1.0]] as [number, number, number][]).forEach(([t, side, sp], i) => {
+      const p = along(b, k, t, side), v = c.run.vars;
+      v[`l${i}x`] = p.x + 0.5; v[`l${i}y`] = p.y + 0.5; v[`l${i}b`] = towardsBase + (side > 0 ? -0.6 : 0.6); v[`l${i}s`] = sp; v[`l${i}p`] = t * 9;
+    });
+    // sentries that stand still, and pairs that walk a beat
+    for (const [t, side] of [[0.5, -1], [0.66, 4], [0.8, 0], [0.92, -3]] as [number, number][]) { const p = along(b, k, t, side); c.spawn(['trooper'], KESSLER, p.x, p.y, 'sentry'); }
+    const beats: [number, number, number, number][] = [[0.4, 4, 0.55, -6], [0.6, -7, 0.75, 2], [0.78, 6, 0.9, -4]];
+    beats.forEach(([t1, s1, t2, s2], i) => {
+      const p = along(b, k, t1, s1), q = along(b, k, t2, s2);
+      c.run.vars[`b${i}ax`] = p.x; c.run.vars[`b${i}ay`] = p.y; c.run.vars[`b${i}bx`] = q.x; c.run.vars[`b${i}by`] = q.y;
+      c.spawn(['trooper', 'rocketeer'], KESSLER, p.x, p.y, `beat${i}`);
+    });
+    c.spawn(['trooper', 'trooper', 'rocketeer', 'vanguard'], KESSLER, k.tx + away(2, 'x'), k.ty + away(2, 'y'), 'garrison');
+  },
+  intro(c) {
+    c.say('okoye', 'Lights out, comms low. The Annex is north-east. Watch the searchlight beams: if one touches us, or a sentry gets within a few paces, the whole place wakes up.');
+    c.say('okoye', 'The snipers outrange the sentries. Drop one from the dark and nobody hears a thing. Let the patrols walk past.');
+    const v = c.run.vars; c.ping(v.vx, v.vy, '#e8c66a');
+  },
+  update(c) {
+    const dt = realDt(c);
+    const v = c.run.vars, t = c.t;
+    const okoye = byId.get(v.okoye) as Unit | undefined;
+    if (!okoye) { v.okoyeDown = 1; return; }
+    const mine = c.unitsOf(PLAYER);
+    // patrols walk their beat until the alarm goes
+    if (!v.alarm) for (let i = 0; i < 3; i++) for (const u of c.alive(`beat${i}`)) {
+      if (u.order.type !== 'idle' || u.autoTargetId >= 0) continue;
+      const leg = (v[`leg${u.id}`] = 1 - (v[`leg${u.id}`] ?? 0));
+      const tx = leg ? v[`b${i}bx`] : v[`b${i}ax`], ty = leg ? v[`b${i}by`] : v[`b${i}ay`];
+      issueOrder(u, { type: 'move', x: (tx + 0.5) * 32, y: (ty + 0.5) * 32 }, true);
+    }
+    // being seen: a beam, a sentry close by, or a gun in range
+    if (!v.alarm) {
+      const enemies = c.unitsOf(KESSLER), ls = lightsOf(c);
+      const seen = mine.find(u => ls.some(l => inBeam(l, t, u.x, u.y)) || enemies.some(e => Math.hypot(e.x - u.x, e.y - u.y) < GUARD_SIGHT * 32));
+      if (seen) raiseAlarm(c, seen, true);
+    }
+    if (v.alarm) {
+      // the Annex sends squads after the intruders, and purges the archive if it can
+      v.react = (v.react ?? 20) - dt;
+      if (v.react <= 0) {
+        v.react = 32;
+        const k = c.base(KESSLER);
+        c.attackMove(c.spawn(['trooper', 'trooper', 'rocketeer', ...(v.copied ? ['vanguard'] : [])], KESSLER, k.tx + 1, k.ty + 3), okoye.x, okoye.y);
+      }
+      if (!v.copied) { v.purge = (v.purge ?? 150) - dt; if (v.purge <= 0) v.purged = 1; }
+    }
+    // copying the core: someone stands by the vault
+    if (!v.copied && byId.has(v.vault) && mine.some(u => tileDist(u, v.vx, v.vy) < 3)) {
+      v.dl = (v.dl ?? 0) + dt;
+      if (v.dl >= 15) {
+        v.copied = 1; c.show('extract');
+        c.ping(v.lzx, v.lzy, '#e8c66a'); c.reveal(v.lzx, v.lzy, 5);
+        c.say('okoye', 'Got it. The core\'s copied and it\'s on me. And that tripped every alarm in the building. Back to the landing zone, fast!');
+        c.say('varga', 'Lantern, Varga. I have a dropship holding over your LZ with a fire team aboard. Get her there.');
+        c.spawn(['trooper', 'trooper', 'rocketeer', 'rocketeer'], PLAYER, v.lzx, v.lzy + 2);
+        if (!v.alarm) raiseAlarm(c, okoye, false);
+      }
+    }
+    if (v.copied && tileDist(okoye, v.lzx, v.lzy) < 3.5) v.out = 1;
+  },
+  objectives: [
+    { id: 'vault', text: c => c.run.vars.copied ? 'Copy the archive core' : `Copy the archive core at the vault: ${Math.floor(c.run.vars.dl ?? 0)} / 15 s${c.run.vars.alarm ? ` · ALARM: purge in ${fmt(c.run.vars.purge ?? 0)}` : ''}`, check: c => !!c.run.vars.copied },
+    { id: 'unseen', text: 'Reach the vault unseen', optional: true, check: c => !!c.run.vars.copied && !c.run.vars.seenFirst },
+    { id: 'extract', text: 'Get Okoye back to the landing zone', hidden: true, check: c => !!c.run.vars.out },
+    { id: 'alive', text: 'Okoye must survive', check: () => false },
+  ],
+  triggers: [
+    { id: 'firstKill', when: c => c.alive('sentry').length < 4 || [0, 1, 2].some(i => c.alive(`beat${i}`).length < 2), run: c => {
+      c.say('okoye', 'Quiet. I knew some of these people, Lantern. Not well. Well enough.');
+    } },
+    { id: 'nearVault', when: c => c.unitsOf(PLAYER).some(u => tileDist(u, c.run.vars.vx, c.run.vars.vy) < 8), run: c => {
+      c.say('okoye', 'That\'s the vault. Get someone up against it and hold for fifteen seconds while I copy the core.');
+    } },
+  ],
+  win: c => !!c.run.vars.out,
+  lose: c => !!c.run.vars.okoyeDown || !!c.run.vars.purged,
+  endWin: { title: 'Dead drop', text: 'Lind turns the core over in his hands. "It\'s locked with board keys, Lantern. Nineteen years of survey data, locked." A long pause. "I think I know one of the keys. I\'m afraid I know it."' },
+  endLose: { title: 'The archive is gone', text: 'Either Okoye is down or the Annex has purged its archive. Whatever the board buried out here stays buried.' },
+};
+function raiseAlarm(c: Ctx, u: Unit, spotted: boolean) {
+  const v = c.run.vars;
+  v.alarm = 1; if (spotted && !v.copied) v.seenFirst = 1;
+  sfx('siren');
+  const tx = Math.floor(u.x / 32), ty = Math.floor(u.y / 32);
+  c.ping(tx, ty, '#ff4030');
+  if (spotted) c.say('okoye', 'We\'re spotted! They\'ll start purging the archive. Forget quiet: get to that vault NOW.');
+  for (const e of c.unitsOf(KESSLER)) issueOrder(e, { type: 'attackMove', x: u.x + Math.random() * 60 - 30, y: u.y + Math.random() * 60 - 30 });
+}
+function drawSearchlights(g: CanvasRenderingContext2D, ls: Searchlight[], t: number, alarm: boolean) {
+  for (const l of ls) {
+    const x = l.x * 32, y = l.y * 32, a = lightAngle(l, t), r = LIGHT_R * 32;
+    const grd = g.createRadialGradient(x, y, 4, x, y, r);
+    const col = alarm ? '255,90,70' : '255,236,170';
+    grd.addColorStop(0, `rgba(${col},0.42)`); grd.addColorStop(0.75, `rgba(${col},0.2)`); grd.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = grd;
+    g.beginPath(); g.moveTo(x, y); g.arc(x, y, r, a - LIGHT_HW, a + LIGHT_HW); g.closePath(); g.fill();
+    g.fillStyle = '#1a1612'; g.fillRect(x - 5, y - 5, 10, 10);
+    g.fillStyle = alarm ? '#ff6a4a' : '#ffe9a8'; g.beginPath(); g.arc(x + Math.cos(a) * 3, y + Math.sin(a) * 3, 2.5, 0, Math.PI * 2); g.fill();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// III-10 · The Haul Road — a convoy hunt (after StarCraft II's *The Great Train
+// Robbery*). Kessler's ore haulers drive a fixed road from his mine to his depot
+// on a timetable; stop eight of twelve. A hauler shot to a third of its plating
+// stalls, and anyone of yours who reaches it can drive it home.
+const HAULS = 12, HAUL_GAP = 38, HAUL_START = 45;
+function roadPoints(c: Ctx): { x: number; y: number }[] {
+  const v = c.run.vars, out: { x: number; y: number }[] = [];
+  for (let i = 0; v[`rx${i}`] !== undefined; i++) out.push({ x: v[`rx${i}`], y: v[`ry${i}`] });
+  return out;
+}
+const haulRoad: MissionDef = {
+  id: 'act3-haul', act: 3, code: 'III-10', title: 'The Haul Road', tagline: 'Stop Kessler\'s flux convoys',
+  briefing: [
+    'Lantern, Varga. Kessler is stockpiling flux behind his wall in the north. He means to light a beacon of his own and take the corridor with his people. Every load reaches him down one road, from his mine to his depot, on a timetable.',
+    'Stop eight of the twelve haulers. Put enough rounds into one and it stalls: get someone onto it and it\'s ours, load and all.',
+  ],
+  goals: ['Stop 8 of 12 Kessler haulers', 'Don\'t let 5 reach the depot', 'Optional: capture a stalled hauler'],
+  seed: 61421, enemies: 1, size: 72, credits: 7000,
+  allowed: ACT3_TECH,
+  onInstall(c) {
+    mission.drawGround = (g, t) => {
+      const pts = roadPoints(c);
+      if (pts.length < 2) return;
+      g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+      const path = () => { g.beginPath(); g.moveTo((pts[0].x + 0.5) * 32, (pts[0].y + 0.5) * 32); for (const p of pts.slice(1)) g.lineTo((p.x + 0.5) * 32, (p.y + 0.5) * 32); };
+      path(); g.strokeStyle = 'rgba(58,38,24,0.38)'; g.lineWidth = 64; g.stroke();
+      path(); g.strokeStyle = 'rgba(150,120,86,0.22)'; g.lineWidth = 44; g.stroke();
+      g.setLineDash([10, 14]); g.lineDashOffset = -t * 6;
+      for (const off of [-9, 9]) { g.save(); g.translate(off * 0.7, off * 0.7); path(); g.strokeStyle = 'rgba(40,24,14,0.45)'; g.lineWidth = 3; g.stroke(); g.restore(); }
+      g.restore();
+    };
+  },
+  setup(c) {
+    act2Base(c, ['fab', 'lab']);
+    const b = c.base(PLAYER), k = c.base(KESSLER);
+    c.spawn(['hovertank', 'hovertank', 'hovertank', 'raider', 'raider', 'rocketeer', 'rocketeer', 'rocketeer', 'trooper', 'trooper'], PLAYER, b.tx + 1, b.ty + 5);
+    // the mine and the depot sit on the other two corners; the road crosses the middle
+    const mine = { tx: b.tx, ty: k.ty }, depot = { tx: k.tx, ty: b.ty };
+    const mid = { tx: Math.round((b.tx + k.tx) / 2), ty: Math.round((b.ty + k.ty) / 2) };
+    const pts = [mine, { tx: Math.round((mine.tx + mid.tx) / 2) + 4, ty: Math.round((mine.ty + mid.ty) / 2) + 4 }, mid,
+      { tx: Math.round((depot.tx + mid.tx) / 2) - 4, ty: Math.round((depot.ty + mid.ty) / 2) - 4 }, depot].map(p => along(p, p, 0));
+    pts.forEach((p, i) => { c.run.vars[`rx${i}`] = p.x; c.run.vars[`ry${i}`] = p.y; });
+    c.place('extractor', KESSLER, mine.tx + 1, mine.ty - 1);
+    for (const [dx, dy] of [[3, 2], [-2, 3]]) c.place('turret', KESSLER, mine.tx + dx, mine.ty + dy);
+    const d = c.place('outpost', KESSLER, depot.tx - 1, depot.ty + 1); if (d) d.maxHp = d.hp = d.maxHp * 3;
+    for (const [id, dx, dy] of [['bastion', 3, -3], ['railgun', -4, 3], ['turret', 2, 4], ['turret', -3, -3]] as [string, number, number][]) c.place(id, KESSLER, depot.tx + dx, depot.ty + dy);
+    c.place('barracks', KESSLER, k.tx, k.ty); c.place('fab', KESSLER, k.tx + 3, k.ty);
+  },
+  intro(c) {
+    c.say('okoye', 'The road\'s marked on your map. First hauler leaves the mine in under a minute, and one every forty seconds after that.');
+    c.say('okoye', 'Early ones run alone. Later ones bring escorts. Hit them on the open stretch, away from the guns at either end.');
+    const p = roadPoints(c); if (p[0]) c.ping(p[0].x, p[0].y, '#e58a3a');
+    // scouts have walked the whole road: it's on the map from the start
+    for (let i = 1; i < p.length; i++) {
+      const a = p[i - 1], z = p[i], n = Math.ceil(Math.hypot(z.x - a.x, z.y - a.y) / 2);
+      for (let k = 0; k <= n; k++) c.reveal(Math.round(a.x + (z.x - a.x) * k / n), Math.round(a.y + (z.y - a.y) * k / n), 2);
+    }
+  },
+  update(c) {
+    const dt = realDt(c);
+    const v = c.run.vars, pts = roadPoints(c);
+    // the timetable
+    const due = Math.min(HAULS, Math.floor((c.t - HAUL_START) / HAUL_GAP) + 1);
+    while ((v.sent ?? 0) < due) {
+      const i = v.sent = (v.sent ?? 0) + 1;
+      const p = pts[0];
+      const h = c.spawn(['harvester'], KESSLER, p.x, p.y)[0];
+      if (h) { h.harvestState = 'none'; (c.run.groups.haul ??= []).push(h.id); v[`wp${h.id}`] = 1; }
+      const esc = i <= 3 ? [] : i <= 7 ? ['hovertank', 'hovertank'] : i <= 10 ? ['hovertank', 'hovertank', 'dominator'] : ['dominator', 'dominator', 'hovertank', 'artillery'];
+      for (const e of c.spawn(esc, KESSLER, p.x + 1, p.y + 1, 'escort')) v[`wp${e.id}`] = 1;
+      if (i === 4) c.say('okoye', 'Escorts from here on, Lantern. Two tanks per hauler.');
+      if (i === 8) c.say('kessler', 'You\'re robbing colonists of their fuel, Lantern. Every load you burn is a family that doesn\'t leave.');
+      if (i === HAULS) c.say('okoye', 'Last one\'s rolling. Make it count.');
+    }
+    // followers: haulers drive, escorts sweep; both step down the road point by point
+    v.step = (v.step ?? 0) - dt;
+    const reissue = v.step <= 0; if (reissue) v.step = 2;
+    for (const u of [...c.alive('haul'), ...c.alive('escort')]) {
+      if (u.owner !== KESSLER) continue;
+      const hauler = u.def.harvester;
+      if (hauler && v[`dis${u.id}`]) continue;
+      if (hauler && u.hp < u.maxHp * 0.34) { v[`dis${u.id}`] = 1; issueOrder(u, { type: 'move', x: u.x, y: u.y }, true); c.ping(Math.floor(u.x / 32), Math.floor(u.y / 32), '#e8c66a'); continue; }
+      let wi = v[`wp${u.id}`] ?? 1;
+      const wp = pts[wi];
+      if (!wp) continue;
+      if (tileDist(u, wp.x, wp.y) < 2) {
+        wi = v[`wp${u.id}`] = wi + 1;
+        if (wi >= pts.length) {
+          if (hauler) { v.delivered = (v.delivered ?? 0) + 1; burrowUnit(u); if (v.delivered === 3) c.say('varga', 'Three loads have reached his depot, Lantern. Two more and he has enough.'); }
+          // an escort that reaches the depot stays there and guards it
+          continue;
+        }
+      }
+      if (reissue && (u.order.type === 'idle' || hauler)) {
+        const to = pts[Math.min(wi, pts.length - 1)];
+        issueOrder(u, hauler ? { type: 'move', x: (to.x + 0.5) * 32, y: (to.y + 0.5) * 32 } : { type: 'attackMove', x: (to.x + 0.5) * 32, y: (to.y + 0.5) * 32 }, true);
+      }
+    }
+    // a stalled hauler changes hands when someone of yours climbs aboard
+    for (const h of c.alive('haul')) {
+      if (h.owner !== KESSLER || !v[`dis${h.id}`]) continue;
+      if (c.unitsOf(PLAYER).some(u => !u.def.harvester && Math.hypot(u.x - h.x, u.y - h.y) < 1.8 * 32)) {
+        h.owner = PLAYER; h.harvestState = 'none'; issueOrder(h, { type: 'idle' });
+        v.captured = (v.captured ?? 0) + 1;
+        players[PLAYER].credits += 2000;
+        c.say('okoye', v.captured === 1 ? 'Hauler\'s ours, load and all. Two thousand flux for the fleet, and a harvester for us.' : 'Another one. Kessler\'s going to start counting.');
+      }
+    }
+    // Kessler answers in kind now and then
+    if (c.t >= 150) {
+      v.raid = (v.raid ?? 0) - dt;
+      if (v.raid <= 0) { v.raid = 110; const k = c.base(KESSLER); c.attackMove(c.spawn(['hovertank', 'vanguard', 'vanguard', 'rocketeer', 'rocketeer'], KESSLER, k.tx + 1, k.ty + 3), hqPos(c).x, hqPos(c).y); }
+    }
+  },
+  onEvent(c, ev) {
+    if (ev.type === 'destroyed' && ev.e.kind === 'unit' && ev.e.owner === KESSLER && ev.e.def.harvester) c.run.vars.killed = (c.run.vars.killed ?? 0) + 1;
+    harvesterWarning(c, ev);
+  },
+  objectives: [
+    { id: 'stop', text: c => `Haulers stopped: ${(c.run.vars.killed ?? 0) + (c.run.vars.captured ?? 0)} / 8 · delivered ${c.run.vars.delivered ?? 0} / 5 · sent ${c.run.vars.sent ?? 0} / ${HAULS}`,
+      check: c => (c.run.vars.killed ?? 0) + (c.run.vars.captured ?? 0) >= 8 },
+    { id: 'capture', text: 'Capture a stalled hauler', optional: true, check: c => (c.run.vars.captured ?? 0) >= 1 },
+  ],
+  triggers: [
+    { id: 'firstStall', when: c => Object.keys(c.run.vars).some(k => k.startsWith('dis')), run: c => c.say('okoye', 'That one\'s stalled. Get anyone onto it, a Trooper will do, and it\'s ours.') },
+  ],
+  win: c => c.done('stop'),
+  lose: c => (c.run.vars.delivered ?? 0) >= 5,
+  endWin: c => ({ title: 'The road goes quiet', text: `Varga: "Kessler's depot is short, Lantern. Not empty, but short. He'll have to come out from behind the wall to finish his beacon, or not finish it at all."${(c.run.vars.captured ?? 0) ? ' Okoye has the captured haulers repainted by nightfall.' : ''}` }),
+  endLose: { title: 'Kessler\'s depot is full', text: 'Five loads reach the north. Behind his wall, Kessler\'s beacon has all the flux it needs.' },
+  endEliminated: { title: 'The base falls', text: 'Kessler\'s raiders burn the base while his haulers roll on north, untroubled.' },
+};
+
+// ---------------------------------------------------------------------------
+// III-11 · Flare Season — an environmental hazard (after StarCraft II's *The
+// Devil's Playground*). Helios flares every minute or so and burns anything in
+// the open; shelter under the shield domes, in the lee of rock or close to your
+// buildings. Lind's rig drives shelter to shelter to the Lantern shaft.
+const FLARE_FIRST = 50, FLARE_EVERY = 72, FLARE_WARN = 12, FLARE_LEN = 6, DOME_R = 2.8;
+function flarePhase(t: number): { warn: number; burn: number; next: number } {
+  if (t < FLARE_FIRST - FLARE_WARN) return { warn: 0, burn: 0, next: FLARE_FIRST - t };
+  const p = (t - (FLARE_FIRST - FLARE_WARN)) % FLARE_EVERY;
+  if (p < FLARE_WARN) return { warn: p / FLARE_WARN, burn: 0, next: FLARE_WARN - p };
+  if (p < FLARE_WARN + FLARE_LEN) return { warn: 1, burn: 1, next: 0 };
+  return { warn: 0, burn: 0, next: FLARE_EVERY - p };   // until the next warning
+}
+// how many flares have burned out by time t
+const flaresDone = (t: number) => t < FLARE_FIRST + FLARE_LEN ? 0 : Math.floor((t - FLARE_FIRST - FLARE_LEN) / FLARE_EVERY) + 1;
+function domes(c: Ctx): { x: number; y: number }[] {
+  const v = c.run.vars, out: { x: number; y: number }[] = [];
+  for (let i = 0; v[`dx${i}`] !== undefined; i++) out.push({ x: v[`dx${i}`], y: v[`dy${i}`] });
+  return out;
+}
+function sheltered(c: Ctx, u: Unit): boolean {
+  if (domes(c).some(d => tileDist(u, d.x, d.y) < DOME_R)) return true;
+  if (c.buildingsOf(PLAYER).some(b => { const p = buildingCenter(b); return Math.hypot(p.x - u.x, p.y - u.y) < (Math.max(b.def.w, b.def.h) / 2 + 1.6) * 32; })) return true;
+  const tx = Math.floor(u.x / 32), ty = Math.floor(u.y / 32);   // the lee of rock, with the sun in the north-west
+  return [[-1, 0], [0, -1], [-1, -1]].some(([dx, dy]) => inBounds(tx + dx, ty + dy) && terrain[idx(tx + dx, ty + dy)] === 1);
+}
+const flareSeason: MissionDef = {
+  id: 'act3-flare', act: 3, code: 'III-11', title: 'Flare Season', tagline: 'Get Lind\'s rig to the Lantern shaft between flares',
+  briefing: [
+    'Lantern, Varga. Helios has started throwing flares. Every minute or so the open ground burns. Anything caught outside cover cooks.',
+    'Lind has to reach the Lantern shaft with his rig. It drives itself from shield dome to shield dome; your job is to clear the road ahead and keep it alive. Shelter under the domes, in the lee of rock, or right by your buildings.',
+  ],
+  goals: ['Escort Lind\'s drill rig to the Lantern shaft', 'Take cover when the flare warning sounds', 'Keep the rig alive'],
+  seed: 71933, enemies: 1, size: 64, credits: 6000,
+  allowed: ACT3_TECH,
+  onInstall(c) {
+    mission.drawGround = (g, t) => {
+      for (const d of domes(c)) {
+        const x = (d.x + 0.5) * 32, y = (d.y + 0.5) * 32, r = DOME_R * 32;
+        const grd = g.createRadialGradient(x, y, r * 0.2, x, y, r);
+        grd.addColorStop(0, 'rgba(95,224,240,0.16)'); grd.addColorStop(1, 'rgba(95,224,240,0.04)');
+        g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#2a2e38'; g.fillRect(x - 6, y - 6, 12, 12);
+        g.fillStyle = `rgba(95,224,240,${0.6 + Math.sin(t * 3) * 0.3})`; g.beginPath(); g.arc(x, y - 2, 3, 0, Math.PI * 2); g.fill();
+      }
+    };
+    mission.drawOver = (g, t) => {
+      const ph = flarePhase(c.run.t);
+      for (const d of domes(c)) {
+        const x = (d.x + 0.5) * 32, y = (d.y + 0.5) * 32, r = DOME_R * 32;
+        g.strokeStyle = `rgba(150,240,250,${0.35 + ph.warn * 0.45})`; g.lineWidth = 2;
+        g.beginPath(); g.ellipse(x, y, r, r * 0.92, 0, 0, Math.PI * 2); g.stroke();
+        g.strokeStyle = `rgba(150,240,250,${0.12 + ph.warn * 0.2})`; g.lineWidth = 1;
+        for (const k of [0.45, 0.75]) { g.beginPath(); g.ellipse(x, y - r * (1 - k) * 0.2, r * k, r * k * 0.5, 0, Math.PI, 0); g.stroke(); }
+      }
+      const rig = byId.get(c.run.vars.rig) as Unit | undefined, next = domes(c)[c.run.vars.next ?? 0];
+      if (rig && next) {
+        g.setLineDash([6, 8]); g.lineDashOffset = -t * 12; g.strokeStyle = 'rgba(232,198,106,0.55)'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(rig.x, rig.y); g.lineTo((next.x + 0.5) * 32, (next.y + 0.5) * 32); g.stroke(); g.setLineDash([]);
+      }
+    };
+  },
+  setup(c) {
+    act2Base(c, ['fab', 'lab']);
+    const b = c.base(PLAYER), k = c.base(KESSLER);
+    c.spawn(['hovertank', 'hovertank', 'hovertank', 'rocketeer', 'rocketeer', 'rocketeer', 'trooper', 'trooper', 'trooper', 'warden'], PLAYER, b.tx + 1, b.ty + 5);
+    const shaft = c.place('lanternshaft', PLAYER, k.tx, k.ty);
+    if (shaft) { c.run.vars.shaft = shaft.id; c.run.vars.sx = shaft.tx + 1; c.run.vars.sy = shaft.ty + 1; }
+    const route: [number, number][] = [[0.18, 3], [0.34, -4], [0.5, 3], [0.66, -3], [0.82, 2]];
+    route.forEach(([t, side], i) => { const p = along(b, k, t, side); c.run.vars[`dx${i}`] = p.x; c.run.vars[`dy${i}`] = p.y; });
+    const n = domes(c).length;
+    c.run.vars[`dx${n}`] = c.run.vars.sx; c.run.vars[`dy${n}`] = c.run.vars.sy + 2;   // the last "dome" is the shaft head
+    const rig = c.spawn(['drillrig'], PLAYER, b.tx + 2, b.ty + 4)[0];
+    if (rig) c.run.vars.rig = rig.id;
+  },
+  intro(c) {
+    c.say('lind', 'Rig\'s fuelled. I\'ll drive it dome to dome. Each dome throws a shield up when the warning sounds. Clear the road ahead of me, please. I\'m not built for shooting.');
+    c.say('okoye', 'When the siren goes you have twelve seconds. Domes, rock on the sunward side, or hug a building. Anything standing in the open after that burns, theirs and ours.');
+    for (const d of domes(c)) c.reveal(d.x, d.y, 3);
+  },
+  update(c) {
+    const dt = realDt(c);
+    const v = c.run.vars, ph = flarePhase(c.t), ds = domes(c);
+    mission.glare = ph.burn ? 0.85 + Math.sin(c.t * 9) * 0.1 : ph.warn * 0.3;
+    // the siren, once per flare
+    const flareNo = Math.floor((c.t - (FLARE_FIRST - FLARE_WARN)) / FLARE_EVERY);
+    if (ph.warn > 0 && !ph.burn && v.siren !== flareNo) {
+      v.siren = flareNo; sfx('siren');
+      if (flareNo === 0) c.say('okoye', 'Flare warning! Twelve seconds. Everyone into cover!');
+    }
+    // the burn: everything in the open cooks, a little every quarter second
+    if (ph.burn && dt > 0) {
+      for (const u of [...units]) {
+        if (u.def.air || sheltered(c, u)) continue;
+        damage(u, (u.def.id === 'drillrig' ? 70 : 28) * dt);   // per second in the open: a trooper lasts about four
+      }
+    }
+    // the rig: dome to dome between flares; under a warning it makes for the nearest cover
+    const rig = byId.get(v.rig) as Unit | undefined;
+    if (!rig) { v.rigLost = 1; return; }
+    let next = v.next ?? 0;
+    const target = ph.warn > 0
+      ? [...ds.slice(Math.max(0, next - 1), next + 1)].sort((a, z) => tileDist(rig, a.x, a.y) - tileDist(rig, z.x, z.y))[0]
+      : ds[next];
+    if (!target) return;
+    if (next === ds.length - 1 && tileDist(rig, ds[next].x, ds[next].y) < 1.6) { v.arrived = 1; return; }
+    // under a dome it waits out the next flare, then makes its dash: that's the window to clear the road ahead
+    if (v.waiting) {
+      if (flaresDone(c.t) <= v.waitFrom || ph.warn) return;
+      v.waiting = 0;
+      if (next < ds.length - 1) c.say('lind', next === 1 ? 'All clear. Moving out!' : 'Clear. Next dome.');
+    }
+    if (!ph.warn && tileDist(rig, target.x, target.y) < 1.4) {
+      next = v.next = next + 1;
+      if (next >= ds.length) { v.arrived = 1; return; }
+      v.waiting = 1; v.waitFrom = flaresDone(c.t);
+      issueOrder(rig, { type: 'move', x: rig.x, y: rig.y }, true);
+      const said = DOME_TALK[next];
+      if (said) for (const [who, text] of said(c)) c.say(who, text);
+      if (next === 2 || next === 4) {   // Kessler has a roadblock on the next leg: it waits there for the rig
+        const d = ds[Math.min(ds.length - 1, next)];
+        c.spawn(next === 2 ? ['hovertank', 'vanguard', 'vanguard', 'rocketeer', 'rocketeer'] : ['dominator', 'hovertank', 'hovertank', 'rocketeer', 'rocketeer', 'artillery'], KESSLER, d.x + 3, d.y - 2, 'ambush');
+        c.ping(d.x + 3, d.y - 2, '#e58a3a'); c.reveal(d.x + 3, d.y - 2, 4);
+        c.say('okoye', 'Kessler roadblock at the next dome, marked. Clear it while Lind waits out the flare.');
+      }
+      if (next === 3 && c.flag('meridian') === 'sold') {
+        const d = ds[3];
+        c.ambush(d.x - 2, d.y + 2, ['shardkin', 'shardkin', 'shardkin', 'burrower', 'choir'], 'hollow', rig.id);
+        c.say('seren', 'Root-taker. You sold her walls. We remember.');
+      }
+    }
+    // re-route only when it has stopped or the destination changed: re-issuing a live route
+    // every second resets it, and the rig ends up rocking in place behind anyone in its way
+    const tx = (target.x + 0.5) * 32, ty = (target.y + 0.5) * 32, o = rig.order;
+    v.drive = (v.drive ?? 0) - dt;
+    if (o.type === 'idle' || (o.type === 'move' && Math.hypot((o.x ?? 0) - tx, (o.y ?? 0) - ty) > 4) || (v.drive <= 0 && !rig.path)) {
+      v.drive = 1.5; issueOrder(rig, { type: 'move', x: tx, y: ty }, true);
+    }
+  },
+  objectives: [
+    { id: 'rig', text: c => `Escort the rig to the Lantern shaft: shelter ${Math.min(c.run.vars.next ?? 0, domes(c).length - 1)} / ${domes(c).length - 1}`, check: c => !!c.run.vars.arrived },
+    { id: 'flare', text: c => { const ph = flarePhase(c.t); return ph.burn ? 'FLARE: stay in cover' : ph.warn ? `Flare in ${Math.ceil(ph.next)} s: take cover!` : `Next flare in ${fmt(ph.next)}`; }, check: () => false },
+  ],
+  triggers: [],
+  onEvent: harvesterWarning,
+  win: c => !!c.run.vars.arrived,
+  lose: c => !!c.run.vars.rigLost,
+  endWin: { title: 'The shaft head', text: 'Lind climbs down from the rig and looks into the Lantern shaft for a long time. "Six years," he says to nobody. "Right. Let\'s finish it." Behind the ridge, Kessler\'s wall is lit up like a city.' },
+  endLose: { title: 'The rig burns', text: 'Lind\'s rig dies in the open between two flares. Project Lantern keeps drawing on the Vey\'s heart, and the sun keeps dying.' },
+  endEliminated: { title: 'The base falls', text: 'With nothing left to come home to, Lind\'s rig stops on the open flats and waits for the next flare.' },
+};
+// what Lind and Okoye say on the road, as the rig reaches each shelter
+const DOME_TALK: Record<number, (c: Ctx) => [Speaker, string][]> = {
+  1: () => [['lind', 'First dome. Mara, do you remember the night Depot Six burned? I watched it from the tether station. I knew what was in the archive. I didn\'t say anything.'],
+            ['okoye', 'I remember. I was the one they sent to put it out.']],
+  2: () => [['lind', 'I named it Lantern because it was supposed to light the way home. That was the pitch. Flux enough for every ship we\'d ever build.'],
+            ['okoye', 'And the commander\'s callsign?'], ['lind', 'Someone on the board thought it was funny. I didn\'t. I still don\'t.']],
+  3: () => [['okoye', 'Teo. When we get there, you don\'t have to be the one who goes down.'],
+            ['lind', 'I do, though. Nobody else knows where the off switch is. I made sure of that, six years ago, because I was proud of it.']],
+  4: () => [['lind', 'Last stretch. Lantern, if I don\'t get a chance later: thank you for getting me this far. It\'s more than I earned.'],
+            ['okoye', 'Shut up and drive, Doc.']],
+};
+
+export const MISSIONS: MissionDef[] = [bootCamp, coldDrop, fluxLines, nightShift, ironWeather, sparks, greenTide, deadDrop, resonanceM, meridian, haulRoad, flareSeason, kesslersWall, zeroDay];

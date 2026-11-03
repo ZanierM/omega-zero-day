@@ -2355,6 +2355,35 @@ function groundRing(x: number, y: number, rx: number, ry: number) {
 }
 
 
+// night (a campaign mission): a blue-black wash over the screen with soft holes
+// cut out round the player's buildings, units and any lights the mission adds.
+// Drawn at half resolution; the gradients hide it.
+let nightCanvas: HTMLCanvasElement | null = null;
+function drawNight(vw: number, vh: number, z: number) {
+  const w = Math.ceil(vw / 2), h = Math.ceil(vh / 2);
+  if (!nightCanvas) nightCanvas = document.createElement('canvas');
+  if (nightCanvas.width !== w || nightCanvas.height !== h) { nightCanvas.width = w; nightCanvas.height = h; }
+  const g = nightCanvas.getContext('2d')!;
+  const n = game.mission.night, k = z / 2;
+  g.globalCompositeOperation = 'source-over';
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = `rgba(6,10,26,${0.8 * n})`;
+  g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'destination-out';
+  const lamp = (wx: number, wy: number, r: number) => {
+    const sx = (wx - camera.x) * k, sy = (wy - camera.y) * k, sr = r * k;
+    if (sx < -sr || sy < -sr || sx > w + sr || sy > h + sr) return;
+    const grd = g.createRadialGradient(sx, sy, sr * 0.15, sx, sy, sr);
+    grd.addColorStop(0, 'rgba(0,0,0,0.95)'); grd.addColorStop(0.6, 'rgba(0,0,0,0.55)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.beginPath(); g.arc(sx, sy, sr, 0, Math.PI * 2); g.fill();
+  };
+  for (const b of buildings) if (b.owner === PLAYER) { const c = game.buildingCenter(b); lamp(c.x, c.y, Math.max(3, b.def.vision * 0.7) * TILE); }
+  for (const u of units) if (u.owner === PLAYER) lamp(u.x, u.y, (u.def.tab === 'veh' ? 3.4 : 2.6) * TILE);
+  for (const l of game.mission.lights?.() ?? []) lamp(l.x, l.y, l.r);
+  ctx.drawImage(nightCanvas, 0, 0, vw, vh);
+}
+
 export function render() {
   if (!terrainTex) return; // not initialized yet (briefing screen)
   T = performance.now() / 1000;
@@ -2397,6 +2426,7 @@ export function render() {
   drawVeyGround();
   trackStructures();
   drawRubble();
+  game.mission.drawGround?.(ctx, T);   // a mission's own ground marks (a haul road, shelter rings)
 
   const tx0 = Math.max(0, Math.floor(camera.x / TILE));
   const ty0 = Math.max(0, Math.floor(camera.y / TILE));
@@ -2880,6 +2910,7 @@ export function render() {
   updateFogTexture();
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(fogCanvas, 0, 0, MAP_W, MAP_H, 0, 0, MAP_W * TILE, MAP_H * TILE);
+  game.mission.drawOver?.(ctx, T);     // marks the player should always see (searchlight cones)
 
   // building placement ghost
   if (placement) {
@@ -2905,6 +2936,8 @@ export function render() {
 
   ctx.restore();
 
+  if (game.mission.night > 0.01) drawNight(vw, vh, z);
+
   // vignette
   const vg = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.3, vw / 2, vh / 2, Math.max(vw, vh) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
@@ -2916,6 +2949,13 @@ export function render() {
   if (game.flash > 0) {
     const f = game.flash;
     ctx.fillStyle = `rgba(255,${170 + f * 60},${120 + f * 80},${f * 0.55})`;
+    ctx.fillRect(0, 0, vw, vh);
+  }
+
+  // a solar flare: the whole sky goes white-orange
+  if (game.mission.glare > 0.01) {
+    const gl = game.mission.glare;
+    ctx.fillStyle = `rgba(255,${190 + gl * 50},${120 + gl * 90},${gl * 0.62})`;
     ctx.fillRect(0, 0, vw, vh);
   }
 

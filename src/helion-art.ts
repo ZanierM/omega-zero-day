@@ -83,6 +83,16 @@ const SNIPER: Kit = {
   },
   back: (P, z) => P.push({ k: 'cloth', c: [-0.6, 0, z + 5.6], r0: 2.4, z1: z - 1.6, r1: 3.8, t: { dk: '#2a3028', mid: '#46503e', lt: '#64705a', hi: '#8a967c' }, trim: 'rgba(0,0,0,0)' }),   // a camouflage cape
 };
+// Sergeant Okoye: a veteran's long rifle, a gold visor and a red field cape, so she reads at a glance in a squad
+const OKOYE: Kit = {
+  bulk: 1.08, visor: 'rgba(255,214,110,0.95)',
+  gun: (P, z) => {
+    P.push({ k: 'limb', a: [0.4, 1.1, z + 3.2], b: [3.6, 1.1, z + 3.6], w: 1.5, w2: 1.3, t: GUNM });
+    P.push({ k: 'limb', a: [3.6, 1.1, z + 3.6], b: [10.4, 1.1, z + 4.2], w: 0.8, w2: 0.6, t: GUNM });
+    P.push({ k: 'glow', c: [10.6, 1.1, z + 4.2], r: 0.7, col: 'rgba(95,224,240,0.9)' });
+  },
+  back: (P, z) => P.push({ k: 'cloth', c: [-0.6, 0, z + 5.6], r0: 2.5, z1: z - 1.2, r1: 3.6, t: { dk: '#5a1410', mid: '#9a2a1e', lt: '#c8483a', hi: '#ee8070' }, trim: 'rgba(232,198,106,0.9)' }),
+};
 const PYRO: Kit = {
   visor: 'rgba(255,170,80,0.95)',
   back: (P, z) => { for (const sd of [-1, 1]) P.push({ k: 'limb', a: [-2.4, sd * 1.1, z + 1.4], b: [-2.4, sd * 1.1, z + 6.6], w: 1.9, w2: 1.9, t: { dk: '#6a1e10', mid: '#b8402a', lt: '#e06a4a', hi: '#ffb090' } }); },   // fuel tanks
@@ -105,6 +115,7 @@ Object.assign(VEHICLE_ART, {
   rocketeer:  { hull: (g: Ctx, a: number, t: string, p = 0) => soldier(g, a, t, p, ROCKETEER),  reach: 11, height: 20, frames: 4, turn: 10 },
   vanguard:   { hull: (g: Ctx, a: number, t: string, p = 0) => soldier(g, a, t, p, VANGUARD),   reach: 11, height: 22, frames: 4, turn: 10 },
   sniper:     { hull: (g: Ctx, a: number, t: string, p = 0) => soldier(g, a, t, p, SNIPER),     reach: 14, height: 20, frames: 4, turn: 10 },
+  okoye:      { hull: (g: Ctx, a: number, t: string, p = 0) => soldier(g, a, t, p, OKOYE),      reach: 13, height: 22, frames: 4, turn: 10 },
   pyro:       { hull: (g: Ctx, a: number, t: string, p = 0) => soldier(g, a, t, p, PYRO),       reach: 10, height: 20, frames: 4, turn: 10 },
   juggernaut: { hull: (g: Ctx, a: number, t: string, p = 0) => soldier(g, a, t, p, JUGGERNAUT), reach: 13, height: 26, frames: 4, turn: 10 },
 });

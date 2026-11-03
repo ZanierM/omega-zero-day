@@ -42,12 +42,23 @@ export const SCENES: Record<string, (c: Ctx) => Scene> = {
     ],
   }),
 
+  'act1-night': () => ({
+    place: 'Depot Six, two days after the vents · 205 days',
+    lines: [
+      { who: 'okoye', text: "Harvester Two's transponder came back on last night. Faint, from out past the northern scrub, and from underground. It went down with a full load, and the drive core the fleet has been waiting on." },
+      { who: 'lind', text: "And I've been looking at the bodies from the vents. There's crystal in their bones, Lantern. Not on them: in them, grown right through, like steel in concrete. Whatever they are, they have lived with the flux for a very long time." },
+      { who: 'okoye', text: "We found where they come up: four tunnel mouths between us and the harvester. My scouts watched them all day and nothing came out. Then the sun went down." },
+      { who: 'okoye', text: "So here's the plan. By day they stay below, and that's when we go out, cave the tunnels in and bring the harvester home. At night we pull back inside the floodlights and let the turrets work. Our scopes don't see much past the lights after dark." },
+      { who: 'varga', text: "That drive core is worth a week of mining to the fleet. Bring it home, Lantern. And close those tunnels before something opens one under the depot." },
+    ],
+  }),
+
   'act1-3': () => ({
     place: 'Depot Six, eight days later · 201 days',
     lines: [
-      { who: 'okoye', text: "We need to talk about the vents. Those things that came up out of the ground at the harvester. I looked at the bodies, Lantern. They were human. Pale, with crystal growing through the skin like quartz, but human." },
-      { who: 'lind', text: "Which isn't possible. Nobody lives out there. The company surveys say so, the colony records say so. I'm writing it up anyway, because somebody has to." },
-      { who: 'okoye', text: "And the voice on the comms shouting about 'root-takers'. That signal came from under the crust. I don't have a theory. I just don't like it." },
+      { who: 'okoye', text: "Harvester Two is back on the line, crystal crust and all. Lind spent the whole night crawling over it." },
+      { who: 'lind', text: "It's been mended, Lantern. Whatever lives under the crust grew crystal over the damage and sealed it. They fixed our machine, and then they tried to kill the people who came to fetch it. I don't understand them at all." },
+      { who: 'okoye', text: "And the voice on the comms, the one that calls us 'root-takers'. It comes from under the crust, and last night it told us to leave 'the deep ones' be. I don't have a theory. I just don't like it." },
       { who: 'varga', text: "It will have to wait. Kessler has stopped probing. Orbital scans show an armoured column forming at his forward base, and it is pointed straight at Depot Six." },
       { who: 'okoye', text: "Some background on Kessler, since you'll hear from him today. Marshal Dieter Kessler ran colony security for twenty years. When Helion's supply ships didn't come, he kept this colony fed through two famines. People down here trust him more than they trust the company." },
       { who: 'okoye', text: "I served under him for twelve of those years. He's hard, but he doesn't lie for fun. When he walked out three weeks ago, he said Helion had done something unforgivable. He never said what." },
@@ -88,13 +99,27 @@ export const SCENES: Record<string, (c: Ctx) => Scene> = {
     ],
   }),
 
+  'act2-dead': () => ({
+    place: 'Depot Six, the night after the valley · 164 days',
+    lines: [
+      { who: 'lind', text: "Lantern, can I have a minute? Off the fleet channel." },
+      { who: 'lind', text: "Reyes's signal maps. I've been reading them every night, and they match something I've seen before: a Helion survey from nineteen years ago. I only ever saw the summary. The full data was in the archive at Depot Six." },
+      { who: 'okoye', text: "The archive that burned." },
+      { who: 'lind', text: "The board always kept a second copy, at the Survey Annex out in the badlands. Kessler's people took the Annex last month. If they're looking for the same thing, sooner or later they'll find it." },
+      { who: 'okoye', text: "So we get there first. No base, no armour: this is a quiet job. Me, two Ghost Snipers and three Troopers. In, copy the archive core, out." },
+      { who: 'okoye', text: "Searchlights sweep the approach, and there are sentries and patrols. If a beam touches us, or a sentry gets within a few paces, they start wiping the archive. The snipers can drop a sentry from beyond its sight and nobody will hear a thing." },
+      { who: 'varga', text: "Lantern. I didn't authorise this, and I'm not going to ask what's on that core. Bring the sergeant back." },
+      { who: 'okoye', text: "That's as close to a blessing as we'll get. And Lantern: if I go down, it's over. Keep me alive." },
+    ],
+  }),
+
   'act2-6': () => ({
     place: 'The northern flats · 160 days',
     lines: [
       { who: 'varga', text: "Lantern. Kessler is charging an Orbital Uplink: a fire-control link that can reach the fleet in orbit. Once it charges he can threaten every ship up here, and forty thousand sleepers become his hostages." },
       { who: 'varga', text: "He has shielded it behind three relay pylons out in the valley. Destroy the relays and the shield drops. You have eleven minutes. Fleet Command has cleared you to research the Orbital Protocol and put up an Uplink of your own." },
       { who: 'okoye', text: "And there's the other thing. Since the valley, every time we push a field hard, the ground answers: tremors, crystal storms, vents going dark. And the pale ones come up wherever we cut deepest." },
-      { who: 'lind', text: "The resonance. Yes. I've been reading the signal maps from Reyes's labs all week, and..." },
+      { who: 'lind', text: "The resonance. Yes. And the core from the Annex is open. Nearly. I've had one of the board's keys in my head for six years, and I've been too afraid to use it." },
       { who: 'lind', text: "Lantern, when this is over I need to talk to you. Privately. Please don't let me put it off again." },
       { who: 'varga', text: "One more thing. Deep-space arrays picked up something on approach to Cinder last night. It isn't ours and it isn't Kessler's. I don't know what it is. Watch the sky." },
       { who: 'okoye', text: "Relays first, then the uplink. Eleven minutes. Let's go." },
@@ -121,13 +146,38 @@ export const SCENES: Record<string, (c: Ctx) => Scene> = {
     ],
   }),
 
+  'act3-haul': c => ({
+    place: 'The northern plains · 14 days',
+    lines: [
+      { who: 'varga', text: "Lantern. Kessler has stopped hiding what he's doing. He's walled himself in around the last launch-capable vents in the north, and he's building a beacon of his own. If he lights it first, the corridor is his, and our forty thousand stay behind." },
+      { who: 'okoye', text: "A beacon needs flux, and his mines are in the west. Every load comes up one road, from his mine to his depot, on a timetable. Twelve haulers today. The early ones run alone; the later ones bring tanks." },
+      { who: 'kessler', text: "Lantern. I know you're listening. I've read your company's report now, the same one your engineer read. I'm taking every colonist I can carry, and Helion's board will answer for it when we land. Stay off my road." },
+      { who: 'okoye', text: "Stop eight of the twelve and he's short. Put enough rounds into a hauler and it stalls, and anyone who climbs aboard can drive it home: flux for the fleet, and a harvester for us." },
+      c.flag('meridian') === 'sold'
+        ? { who: 'okoye', text: "And for the record, Lantern: after the Meridian, I'm not sure Kessler's the only one in this who should answer for things." }
+        : { who: 'varga', text: "Five loads reaching his depot is enough for his beacon. Don't let it come to that." },
+    ],
+  }),
+
+  'act3-flare': () => ({
+    place: 'The southern flats · 9 days',
+    lines: [
+      { who: 'lind', text: "Lantern, Lind. Project Lantern is still drawing from the Vey's heart, even now. The controls to shut it off are at the bottom of the shaft, and I'm the only one left who knows them. So I'm going, with my rig." },
+      { who: 'varga', text: "And Helios has started throwing flares. Every minute or so the open ground burns. A soldier caught in the open lasts about six seconds." },
+      { who: 'okoye', text: "Lind's people set out shield domes along the road to the shaft. When the flare siren goes you have twelve seconds to get under a dome, into the lee of a rock on the sunward side, or right up against one of our buildings." },
+      { who: 'lind', text: "The rig drives itself, dome to dome, and runs for the nearest one when the siren goes. Please clear the road ahead of me. I am not built for shooting." },
+      { who: 'okoye', text: "Kessler will have people on that road. He knows what Lind is trying to do, and he wants the shaft for himself, as evidence." },
+      { who: 'lind', text: "Then let's be quick. Mara, you're running the escort. I'll talk. I always talk when I'm frightened." },
+    ],
+  }),
+
   'act3-8': c => {
     const sold = c.flag('meridian') === 'sold';
     return {
       place: "Kessler's Wall, the northern vents · 6 days",
       lines: [
-        { who: 'varga', text: "Kessler has walled himself in around the last launch-capable vents in the north. He means to light a beacon of his own and take the corridor with his people aboard. If he does, our forty thousand stay behind." },
-        { who: 'lind', text: "And Project Lantern is still running. The tap at the bottom of the shaft is still drawing from the Vey's heart, even now, with the star coming apart. If I shut it off, the Vey might steady Helios just long enough for the corridor to open on time." },
+        { who: 'varga', text: "Kessler's wall. The haul road left his beacon short, but he's dug in around the last launch-capable vents in the north, and he won't wait forever. If he lights it, our forty thousand stay behind." },
+        { who: 'lind', text: "And my rig made it to the shaft head through the flares. Project Lantern is still drawing from the Vey's heart. If I shut it off, the Vey might steady Helios just long enough for the corridor to open on time." },
         { who: 'lind', text: "The controls are at the bottom of the shaft, and I'm the only one left who knows them. I'm going down. Keep the shaft head clear for ninety seconds and I'll do the rest." },
         { who: 'okoye', text: "Teo, that shaft is full of whatever comes up out of the Vey. Nobody walks back out of that." },
         { who: 'lind', text: "Mara. I built the thing that is killing the sun. Let me do one useful thing with what I know." },

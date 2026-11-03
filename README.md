@@ -13,7 +13,7 @@ Open the local URL printed by Vite. Run `npm test` for the TypeScript check and 
 
 ## Modes
 
-**Campaign:** Play as Helion through an optional Boot Camp and nine missions in three acts. Briefings, comms and an objective tracker guide each mission. Choices about the Hearth Clans and the Hollow affect later allies and the ending. Easy, Normal and Hard difficulty are available. Completed missions and choices are saved locally.
+**Campaign:** Play as Helion through an optional Boot Camp and thirteen missions in three acts, including a night-and-day tunnel hunt, a no-base commando raid, a convoy hunt and an escort through solar flares. A pre-mission conversation, comms and an objective tracker guide each mission. Choices about the Hearth Clans and the Hollow affect later allies and the ending. Easy, Normal and Hard difficulty are available. Completed missions and choices are saved locally.
 
 **Skirmish:** Play as Helion Dynamics, the Kessler Collective, the Ashen Clans, the Vey Brood, the Keepers or the Hollow. Choose one or more human opponents, difficulty, starting flux, crystal density and one of four landscapes. Optional settings add the Brood, Keepers or Hollow as threats and start a supernova countdown. The last skirmish setup is remembered locally.
 
@@ -46,7 +46,7 @@ All music and effects are synthesized with WebAudio; the game has no audio files
 | `src/config.ts` | Factions, units, buildings, research and balance |
 | `src/map.ts`, `src/path.ts` | Map generation and pathfinding |
 | `src/game.ts`, `src/ai.ts` | Simulation, win conditions and opponents |
-| `src/campaign/missions.ts`, `src/campaign/runner.ts` | Campaign content and mission state |
+| `src/campaign/missions.ts`, `src/campaign/runner.ts`, `src/campaign/scenes.ts` | Campaign content, mission state and pre-mission conversations |
 | `src/input.ts`, `src/ui.ts`, `src/main.ts` | Controls, interface and game startup |
 | `src/render.ts`, `src/*-art.ts`, `src/rig.ts` | Canvas rendering and faction art |
 | `src/audio.ts`, `src/epilogue.ts`, `src/save.ts` | Sound, endings and save/resume |

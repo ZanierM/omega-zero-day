@@ -67,6 +67,7 @@ export interface Building {
   repairing: boolean;
   charge: number;                // superweapon: seconds until the strike is ready (0 = ready)
   shielded?: boolean;            // campaign: takes no damage while its relays stand
+  inert?: boolean;               // campaign: an objective (a vault to break into) that takes no damage and nobody targets
   sh?: number; shT?: number;     // Keeper energy shield: current points, seconds since last hit
   cooldown: number;              // turret reload
   rallyX: number; rallyY: number;
@@ -215,9 +216,17 @@ export const mission = {
   corridor: true,                       // launch-corridor victory in play
   allowed: null as Set<string> | null,  // player tech allowed (null = everything)
   resonance: false,                     // the Vey reacts to harvesting
+  unitsOnly: false,                     // no base (a commando mission): you're beaten when your last unit falls
+  visionMul: 1,                         // night shortens what your units can see
+  night: 0,                             // 0 day … 1 full dark (render darkens all but your lights)
+  glare: 0,                             // 0 … 1 white-orange solar glare over the screen
+  lights: null as null | (() => { x: number; y: number; r: number }[]),   // extra light pools at night (world px)
+  drawGround: null as null | ((g: CanvasRenderingContext2D, t: number) => void),   // world space, under everything
+  drawOver: null as null | ((g: CanvasRenderingContext2D, t: number) => void),     // world space, over the fog
 };
 export function resetMission() {
   mission.active = false; mission.tick = null; mission.checkEnd = null; mission.corridor = true; mission.allowed = null; mission.resonance = false;
+  mission.unitsOnly = false; mission.visionMul = 1; mission.night = 0; mission.glare = 0; mission.lights = null; mission.drawGround = null; mission.drawOver = null;
 }
 export const techAllowed = (owner: number, id: string) => canMake(owner, id) && (owner !== PLAYER || !mission.allowed || mission.allowed.has(id));
 
@@ -623,7 +632,7 @@ export function burrowUnit(u: Unit) {
 }
 
 export function damage(target: Entity, amount: number, attacker?: Unit) {
-  if (target.kind === 'building' && target.shielded) return;   // the shield takes it
+  if (target.kind === 'building' && (target.shielded || target.inert)) return;   // the shield takes it
   // a Keeper's energy shield soaks the hit first; any hit resets its recharge
   if (target.def.shield) {
     target.shT = 0;
@@ -1060,6 +1069,7 @@ function findEnemyInRange(e: Entity, rangeTiles: number): Entity | null {
     // don't auto-acquire walls; they're only attacked on explicit orders or when blocking
     if (t.kind === 'building' && t.def.isWall && e.kind === 'unit' && e.order.type !== 'attack') return;
     if (t.kind === 'building' && t.def.trap) return;   // nobody sees a trap until it springs
+    if (t.kind === 'building' && t.inert) return;      // an objective, not a target
     if (!canHit(e, t)) return;
     const d = distBetween(e, t);
     if (d <= rangePx && d < bestD) { best = t; bestD = d; }
@@ -1285,8 +1295,8 @@ function step(dt: number) {
         const push = (min - d) * 0.5 * dt * 8;
         const nx = dx / d, ny = dy / d;
         // deployed/immobilised units hold their ground and don't get shoved
-        const aFix = a.def.ability?.immobile && a.toggled;
-        const bFix = b.def.ability?.immobile && b.toggled;
+        const aFix = (a.def.ability?.immobile && a.toggled) || (a.def.shoves && !b.def.shoves);
+        const bFix = (b.def.ability?.immobile && b.toggled) || (b.def.shoves && !a.def.shoves);
         if (!aFix) { a.x -= nx * push; a.y -= ny * push; }
         if (!bFix) { b.x += nx * push; b.y += ny * push; }
       }
@@ -1526,7 +1536,9 @@ function step(dt: number) {
     };
     for (const u of units) if (u.owner === PLAYER) {
       const tx = tileOf(u.x), ty = tileOf(u.y);
-      reveal(tx, ty, inStorm(tx, ty) ? Math.ceil(u.def.vision / 2) : u.def.vision);   // a crystal storm blinds
+      // night shortens sight, but never below a unit's own weapon reach (else defenders stand blind and let the base burn)
+      const v = Math.min(u.def.vision, Math.max(2, Math.round(u.def.vision * mission.visionMul), Math.ceil(u.def.range) + 1));
+      reveal(tx, ty, inStorm(tx, ty) ? Math.ceil(v / 2) : v);   // a crystal storm blinds
     }
     for (const b of buildings) if (b.owner === PLAYER) reveal(b.tx + Math.floor(b.def.w / 2), b.ty + Math.floor(b.def.h / 2), b.def.vision);
     // captured watchtowers are long-range eyes; owned vents show their surroundings
@@ -1554,7 +1566,8 @@ function step(dt: number) {
   }
 
   // win / lose: walls don't keep a faction "alive"
-  const alive = (owner: number) => buildings.some(b => b.owner === owner && !b.def.isWall && !b.def.trap) || units.some(u => u.owner === owner && u.packed);
+  const alive = (owner: number) => owner === PLAYER && mission.unitsOnly ? units.some(u => u.owner === PLAYER)
+    : buildings.some(b => b.owner === owner && !b.def.isWall && !b.def.trap) || units.some(u => u.owner === owner && u.packed);
   if (!alive(PLAYER)) { gameOver = 'lose'; endReason = 'eliminated'; }
   else if (mission.checkEnd) {
     const r = mission.checkEnd();

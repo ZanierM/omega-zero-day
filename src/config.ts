@@ -42,6 +42,7 @@ export interface UnitDef {
   air?: boolean;       // aircraft: fly over terrain, only anti-air weapons can hit them
   antiAir?: boolean;   // this unit's weapon can hit aircraft
   nonBuildable?: boolean;   // campaign-only (the Hollow): never on a build bar
+  shoves?: boolean;         // a heavy escort vehicle (campaign): pushes others aside, never gets pushed
   crystalRegen?: number;    // hp/s healed while standing within 2 tiles of crystal
   healAura?: { radius: number; rate: number };   // heals friendly units around it (hp/s; doubled near crystal)
   shield?: number;          // the Keepers: an energy shield that soaks damage first and recharges
@@ -132,6 +133,11 @@ export const UNITS: Record<string, UnitDef> = {
                desc: 'Long-range seismic artillery walker. Shells an area — devastates groups.' },
   dominator: { id: 'dominator', name: 'Dominator',      tab: 'veh', cost: 1750, buildTime: 16, hp: 800, speed: 2.0, damage: 70, range: 5.5, reload: 2.4, vision: 6, radius: 17, model: 'mech', mstep: 1, spriteH: 52, weapon: 'shell', splash: 0.9,
                desc: 'Twin-cannon siege mech. Slow. Unstoppable. Requires Research Spire.' },
+  // ---- campaign-only units ----
+  okoye:     { id: 'okoye',     name: 'Sgt. Okoye',     tab: 'inf', cost: 0,    buildTime: 1,  hp: 420, speed: 2.4, damage: 24, range: 6,   reload: 1.0, vision: 7, radius: 9,  model: 'soldier', mstep: 1, spriteH: 28, antiAir: true, nonBuildable: true,
+               desc: 'Sergeant Mara Okoye: twenty years of colony security and a long rifle. If she falls, the mission is over.' },
+  drillrig:  { id: 'drillrig',  name: 'Drill Rig',      tab: 'veh', cost: 0,    buildTime: 1,  hp: 2600, speed: 1.3, damage: 0, range: 0,   reload: 0,   vision: 6, radius: 16, model: 'drone', mstep: 3, spriteH: 44, nonBuildable: true, shoves: true,
+               desc: 'Dr. Lind\'s rig, carrying everything he needs to shut Project Lantern off. It drives itself; keep it alive.' },
   pioneer:   { id: 'pioneer',   name: 'Pioneer',        tab: 'veh', cost: 2000, buildTime: 16, hp: 500, speed: 1.8, damage: 0,  range: 0,   reload: 0,   vision: 6, radius: 15, model: 'drone', mstep: 3, spriteH: 42, prereq: 'fab', deploysTo: 'outpost',
                desc: 'Mobile expansion base. Drive it to a fresh crystal field and DEPLOY.' },
   harvester: { id: 'harvester', name: 'Harvester',      tab: 'veh', cost: 1400, buildTime: 12, hp: 600, speed: 2.5, damage: 0,  range: 0,   reload: 0,   vision: 5, radius: 15, model: 'drone', mstep: 1, spriteH: 40, harvester: true,
@@ -399,6 +405,7 @@ export type ArmorClass = 'infantry' | 'light' | 'heavy' | 'structure';
 export type DmgType = 'gun' | 'flame' | 'rocket' | 'cannon' | 'sniper';
 
 export const UNIT_ARMOR: Record<string, ArmorClass> = {
+  okoye: 'infantry', drillrig: 'heavy',
   trooper: 'infantry', rocketeer: 'infantry', vanguard: 'infantry', pyro: 'infantry', sniper: 'infantry',
   ranger: 'light', raider: 'light', warden: 'light', harvester: 'light', pioneer: 'light', gunship: 'light', bomber: 'heavy',
   hovertank: 'heavy', artillery: 'heavy', dominator: 'heavy', colossus: 'heavy', juggernaut: 'heavy',
@@ -409,6 +416,7 @@ export const UNIT_ARMOR: Record<string, ArmorClass> = {
   acolyte: 'infantry', lancer: 'light', luminar: 'light', monolith: 'heavy',
 };
 export const UNIT_DMGTYPE: Record<string, DmgType> = {
+  okoye: 'gun',
   trooper: 'gun', vanguard: 'gun', ranger: 'gun', raider: 'gun', warden: 'gun', juggernaut: 'gun', gunship: 'gun', bomber: 'cannon',
   pyro: 'flame', rocketeer: 'rocket', sniper: 'sniper',
   scav: 'gun', harpooner: 'rocket', firebrand: 'flame', longshot: 'sniper', technical: 'gun', rustbucket: 'cannon', mortar: 'cannon',

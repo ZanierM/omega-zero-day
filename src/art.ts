@@ -1643,6 +1643,7 @@ export const VEHICLE_ART: Partial<Record<string, VehicleArt>> = {
   colossus:  { hull: drawColossusHull,  turret: drawColossusTurret,  reach: 30, height: 30, frames: 4 },
   harvester: { hull: drawHarvesterHull, reach: 20, height: 16 },
   pioneer:   { hull: drawPioneerHull,   reach: 20, height: 18 },
+  drillrig:  { hull: drawPioneerHull,   reach: 22, height: 20 },   // Lind's rig (campaign): a Pioneer chassis
   trooper:    soldierArt(TROOPER, 11, 20),
   rocketeer:  soldierArt(ROCKETEER, 10, 20),
   vanguard:   soldierArt(VANGUARD, 11, 22),
