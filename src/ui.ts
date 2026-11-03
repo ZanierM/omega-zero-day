@@ -243,7 +243,7 @@ export function initUI() {
   };
   detailsBtn.addEventListener('click', () => {
     if (!selectionDetails.hidden) { closeDetails(true); return; }
-    detailsCopy.innerHTML = selCopy.innerHTML;
+    setHTML(detailsCopy, lastHTML.get(selCopy) ?? selCopy.innerHTML);
     selectionDetails.hidden = false;
     detailsBtn.setAttribute('aria-expanded', 'true');
     detailsClose.focus();
@@ -253,6 +253,7 @@ export function initUI() {
   document.getElementById('game')!.addEventListener('pointerdown', () => closeDetails());
   compactDeck.addEventListener('change', () => { if (!compactDeck.matches) closeDetails(); });
   rebuildGrid();
+  prewarmTabs();
 }
 
 function defsFor(tab: Tab) {
@@ -279,18 +280,31 @@ function showTip(el: HTMLElement, name: string, desc: string, cost: number) {
 }
 function hideTip() { buildTip.style.display = 'none'; }
 
+// each tab's buttons are built once and kept: switching tabs swaps the cached
+// set back in instead of re-creating every button and re-decoding its icon
+const tabCache = new Map<Tab, { key: string; btns: Btn[] }>();
 function rebuildGrid() {
   hideTip();
-  grid.innerHTML = '';
+  const set = tabButtons(activeTab);
+  grid.replaceChildren(...set.map(b => b.el));
   btns.length = 0;
-  for (const def of defsFor(activeTab)) {
+  btns.push(...set);
+}
+// the cached buttons for a tab, built now if the tab's contents changed
+function tabButtons(tab: Tab): Btn[] {
+  const defs = defsFor(tab);
+  const key = defs.map(d => `${d.id}:${costFor(PLAYER, d.id, tab)}`).join(',');
+  const hit = tabCache.get(tab);
+  if (hit && hit.key === key) return hit.btns;
+  const out: Btn[] = [];
+  for (const def of defs) {
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'bbtn';
     const desc = (def as any).desc ?? '';
-    const cost = costFor(PLAYER, def.id, activeTab);   // faction bonuses change prices
+    const cost = costFor(PLAYER, def.id, tab);   // faction bonuses change prices
     el.setAttribute('aria-label', `${def.name}, ${cost} flux. ${desc}`);
-    el.innerHTML = `${iconHtml(activeTab, def.id)}<span class="nm">${def.name}</span><span class="cost"><span class="resource-gem" aria-hidden="true">◈</span>${cost}</span><span class="prog"></span><span class="count"></span>`;
+    el.innerHTML = `${iconHtml(tab, def.id)}<span class="nm">${def.name}</span><span class="cost"><span class="resource-gem" aria-hidden="true">◈</span>${cost}</span><span class="prog"></span><span class="count"></span>`;
     let held = false;
     let timer = 0;
     el.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') showTip(el, def.name, desc, cost); });
@@ -302,13 +316,23 @@ function rebuildGrid() {
     el.addEventListener('pointercancel', () => { clearTimeout(timer); hideTip(); });
     el.addEventListener('click', () => { if (held) { held = false; return; } hideTip(); onBtnClick(def.id); });
     el.addEventListener('contextmenu', e => { e.preventDefault(); cancelOne(def.id); });
-    grid.appendChild(el);
-    btns.push({
-      el, defId: def.id, tab: activeTab,
+    out.push({
+      el, defId: def.id, tab,
       prog: el.querySelector('.prog') as HTMLElement,
       count: el.querySelector('.count') as HTMLElement,
     });
   }
+  tabCache.set(tab, { key, btns: out });
+  return out;
+}
+// build the other tabs in idle moments, so a first visit doesn't stall on drawing icons
+function prewarmTabs() {
+  const todo = CATEGORIES.filter(t => t !== activeTab && tabBtns.has(t));
+  // a deadline, so a page that's never idle (a busy phone) still gets them built
+  const ric = (window as any).requestIdleCallback as ((f: () => void, o: { timeout: number }) => number) | undefined;
+  const idle = (f: () => void) => ric ? ric(f, { timeout: 1500 }) : setTimeout(f, 50);
+  const step = () => { const t = todo.shift(); if (!t) return; tabButtons(t); idle(step); };
+  idle(step);
 }
 
 function onBtnClick(defId: string) {
@@ -374,6 +398,16 @@ function abilityUnits(): Unit[] {
   return out;
 }
 
+// ---- per-frame DOM writes: only touch an element when its value really changes.
+// Writing the same text or style still invalidates layout, and doing that for
+// every build button every frame made the bar (and the game) stutter.
+const lastHTML = new WeakMap<Element, string>();
+function setText(el: HTMLElement, s: string) { if (el.textContent !== s) el.textContent = s; }
+function setHTML(el: HTMLElement, s: string) { if (lastHTML.get(el) !== s) { el.innerHTML = s; lastHTML.set(el, s); } }
+function setStyle(el: HTMLElement, prop: 'width' | 'display' | 'visibility' | 'opacity', v: string) { if (el.style[prop] !== v) el.style[prop] = v; }
+function setClass(el: HTMLElement, c: string) { if (el.className !== c) el.className = c; }
+function setDisabled(el: HTMLButtonElement, d: boolean) { if (el.disabled !== d) el.disabled = d; }
+
 export function updateUI() {
   updateCampaignUI();
   const showDetailsBtn = selection.size > 0;
@@ -393,46 +427,46 @@ export function updateUI() {
     b.el.classList.toggle('current', current);
     b.el.setAttribute('aria-pressed', String(current));
     b.el.setAttribute('aria-label', ids.length ? `Recall group ${b.key}, ${ids.length} selected. Hold to replace.` : `Save selection as group ${b.key}`);
-    b.count.textContent = ids.length ? String(ids.length) : 'Save';
+    setText(b.count, ids.length ? String(ids.length) : 'Save');
     b.state = state;
   }
   const p = players[PLAYER];
   // smooth credit ticker, RA2-style
   shownCredits += (p.credits - shownCredits) * 0.2;
   if (Math.abs(shownCredits - p.credits) < 1) shownCredits = p.credits;
-  creditsEl.textContent = '◈ ' + Math.round(shownCredits).toLocaleString();
+  setText(creditsEl, '◈ ' + Math.round(shownCredits).toLocaleString());
 
   const pw = powerOf(PLAYER);
   const frac = pw.supply > 0 ? Math.min(1, pw.drain / pw.supply) : (pw.drain > 0 ? 1 : 0);
-  powerFill.style.width = pw.low ? '100%' : `${Math.max(4, 100 - frac * 100)}%`;
-  powerFill.className = pw.low ? 'low' : '';
+  setStyle(powerFill, 'width', pw.low ? '100%' : `${Math.max(4, 100 - frac * 100)}%`);
+  setClass(powerFill, pw.low ? 'low' : '');
   // the Clans (and the aliens) run on no grid at all
-  powerText.textContent = !pw.supply && !pw.drain ? 'No grid' : pw.low ? `${pw.drain - pw.supply} over — slowed` : `${pw.supply - pw.drain} spare`;
+  setText(powerText, !pw.supply && !pw.drain ? 'No grid' : pw.low ? `${pw.drain - pw.supply} over — slowed` : `${pw.supply - pw.drain} spare`);
 
   // supernova countdown
   if (novaTotal > 0) {
-    countdown.style.display = 'flex';
+    setStyle(countdown, 'display', 'flex');
     const s = Math.max(0, Math.ceil(novaLeft));
-    cdTime.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    setText(cdTime, `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
     countdown.classList.toggle('warn', novaLeft < novaTotal / 3);
   } else {
-    countdown.style.display = 'none';
+    setStyle(countdown, 'display', 'none');
   }
 
   // enemy orbital-strike dread banner (RA2-style visible countdown)
   const eta = enemyStrikeETA();
   if (eta !== Infinity && !gameOver) {
-    enemySw.classList.add('show');
+    enemySw.classList.toggle('show', true);
     enemySw.classList.toggle('imminent', eta <= 0);
-    enemySw.textContent = eta <= 0 ? '⚠ Hostile orbital strike ready' : `⚠ Hostile orbital strike — ${fmtTime(eta)}`;
+    setText(enemySw, eta <= 0 ? '⚠ Hostile orbital strike ready' : `⚠ Hostile orbital strike — ${fmtTime(eta)}`);
   } else {
-    enemySw.classList.remove('show', 'imminent');
+    enemySw.classList.toggle('show', false); enemySw.classList.toggle('imminent', false);
   }
 
   // idle-harvester warning button
   const idle = starvedHarvesters().length;
   idleBtn.classList.toggle('show', idle > 0 && !gameOver);
-  if (idle > 0) idleCount.textContent = String(idle);
+  if (idle > 0) setText(idleCount, String(idle));
 
   // research tab dims until a Laboratory exists
   const upsTab = tabBtns.get('ups');
@@ -446,52 +480,52 @@ export function updateUI() {
     b.el.classList.toggle('done', researched);
 
     const n = queuedCount(PLAYER, b.tab, b.defId);
-    b.count.style.display = n > 1 || (n === 1 && q[0]?.defId !== b.defId) ? 'block' : 'none';
-    b.count.textContent = 'x' + n;
+    setStyle(b.count, 'display', n > 1 || (n === 1 && q[0]?.defId !== b.defId) ? 'block' : 'none');
+    setText(b.count, 'x' + n);
 
     const head = q[0];
     const mine = head?.defId === b.defId;
     b.el.classList.toggle('ready', !!(mine && head!.ready));
-    b.prog.style.width = mine && !head!.ready ? `${(1 - head!.remaining / head!.total) * 100}%` : '0%';
+    setStyle(b.prog, 'width', mine && !head!.ready ? `${(1 - head!.remaining / head!.total) * 100}%` : '0%');
   }
 
   // unit ability button (Q) — reflects toggle / cooldown / ready
   const au = abilityUnits();
   if (au.length) {
     const u = au[0], ab = u.def.ability!;
-    abilBtn.style.visibility = 'visible';
+    setStyle(abilBtn, 'visibility', 'visible');
     if (ab.kind === 'toggle') {
       const on = abilityOn(u);
       abilBtn.classList.toggle('on', on);
-      abilBtn.textContent = `${on ? '◆' : '◇'} ${ab.name}${keyHint('Q')}`;
-      abilBtn.disabled = false;
+      setText(abilBtn, `${on ? '◆' : '◇'} ${ab.name}${keyHint('Q')}`);
+      setDisabled(abilBtn, false);
     } else {
-      abilBtn.classList.remove('on');
-      if (u.abilityTimer > 0) { abilBtn.textContent = `${ab.name} active`; abilBtn.disabled = true; }
-      else if (u.abilityCd > 0) { abilBtn.textContent = `${ab.name} ${Math.ceil(u.abilityCd)}s`; abilBtn.disabled = true; }
-      else { abilBtn.textContent = `⚡ ${ab.name}${keyHint('Q')}`; abilBtn.disabled = false; }
+      abilBtn.classList.toggle('on', false);
+      if (u.abilityTimer > 0) { setText(abilBtn, `${ab.name} active`); setDisabled(abilBtn, true); }
+      else if (u.abilityCd > 0) { setText(abilBtn, `${ab.name} ${Math.ceil(u.abilityCd)}s`); setDisabled(abilBtn, true); }
+      else { setText(abilBtn, `⚡ ${ab.name}${keyHint('Q')}`); setDisabled(abilBtn, false); }
     }
   } else {
-    abilBtn.style.visibility = 'hidden';
-    abilBtn.classList.remove('on');
+    setStyle(abilBtn, 'visibility', 'hidden');
+    abilBtn.classList.toggle('on', false);
   }
 
   // selection info + building upgrade button
   const ob = selectedOwnBuilding();
   if (ob && ob.def.upgradable && (ob.level < 3 || ob.upgrading)) {
-    upgBtn.style.visibility = 'visible';
+    setStyle(upgBtn, 'visibility', 'visible');
     if (ob.upgrading) {
       const pct = Math.round((1 - ob.upgrading.remaining / ob.upgrading.total) * 100);
-      upgBtn.textContent = `Upgrading… ${pct}%`;
-      upgBtn.disabled = true;
+      setText(upgBtn, `Upgrading… ${pct}%`);
+      setDisabled(upgBtn, true);
     } else {
-      upgBtn.textContent = compactDeck.matches
+      setText(upgBtn, compactDeck.matches
         ? `⬆ Upgrade Lv ${ob.level + 1} · ◈${buildingUpgradeCost(ob)}`
-        : `⬆ Upgrade to Lv ${ob.level + 1} — ◈${buildingUpgradeCost(ob)}`;
-      upgBtn.disabled = false;
+        : `⬆ Upgrade to Lv ${ob.level + 1} — ◈${buildingUpgradeCost(ob)}`);
+      setDisabled(upgBtn, false);
     }
   } else {
-    upgBtn.style.visibility = 'hidden';
+    setStyle(upgBtn, 'visibility', 'hidden');
   }
 
   // contextual action button: deploy Pioneer · orbital strike · repair
@@ -499,29 +533,29 @@ export function updateUI() {
   const showHalt = !pio && !ob && selectedUnits().some(u => !u.def.harvester && u.order.type !== 'idle');
   if (showHalt !== shownHalt) { actBtn.classList.toggle('halt', showHalt); shownHalt = showHalt; }
   if (pio) {
-    actBtn.style.visibility = 'visible';
-    actBtn.textContent = pio.packed ? `▼ Set up ${BUILDINGS[pio.packed].name}` : `▼ ${pio.def.deploysTo === 'camp' ? 'Set up war camp' : 'Deploy command post'}`;
-    actBtn.disabled = false;
+    setStyle(actBtn, 'visibility', 'visible');
+    setText(actBtn, pio.packed ? `▼ Set up ${BUILDINGS[pio.packed].name}` : `▼ ${pio.def.deploysTo === 'camp' ? 'Set up war camp' : 'Deploy command post'}`);
+    setDisabled(actBtn, false);
   } else if (ob && ob.def.superweapon) {
-    actBtn.style.visibility = 'visible';
-    if (superReady(ob)) { actBtn.textContent = '⊕ Launch orbital strike'; actBtn.disabled = false; }
-    else { actBtn.textContent = `Charging… ${Math.round((1 - ob.charge / ob.def.superweapon.charge) * 100)}%`; actBtn.disabled = true; }
+    setStyle(actBtn, 'visibility', 'visible');
+    if (superReady(ob)) { setText(actBtn, '⊕ Launch orbital strike'); setDisabled(actBtn, false); }
+    else { setText(actBtn, `Charging… ${Math.round((1 - ob.charge / ob.def.superweapon.charge) * 100)}%`); setDisabled(actBtn, true); }
   } else if (ob && ob.def.packable && (ob.hp >= ob.maxHp || ob.repairing)) {
     // the Clans strike camp: [P] packs a damaged one too
-    actBtn.style.visibility = 'visible';
-    actBtn.textContent = `▲ Pack up${keyHint('P')}`;
-    actBtn.disabled = !!ob.upgrading;
+    setStyle(actBtn, 'visibility', 'visible');
+    setText(actBtn, `▲ Pack up${keyHint('P')}`);
+    setDisabled(actBtn, !!ob.upgrading);
   } else if (ob && ob.hp < ob.maxHp) {
-    actBtn.style.visibility = 'visible';
-    if (ob.repairing) { actBtn.textContent = 'Repairing…'; actBtn.disabled = true; }
-    else { actBtn.textContent = `🔧 Repair — ◈${repairCost(ob)}`; actBtn.disabled = false; }
+    setStyle(actBtn, 'visibility', 'visible');
+    if (ob.repairing) { setText(actBtn, 'Repairing…'); setDisabled(actBtn, true); }
+    else { setText(actBtn, `🔧 Repair — ◈${repairCost(ob)}`); setDisabled(actBtn, false); }
   } else if (showHalt) {
-    actBtn.style.visibility = 'visible';
+    setStyle(actBtn, 'visibility', 'visible');
     const halt = `■ Halt${keyHint('S')}`;
-    if (actBtn.textContent !== halt) actBtn.textContent = halt;
-    actBtn.disabled = false;
+    if (actBtn.textContent !== halt) setText(actBtn, halt);
+    setDisabled(actBtn, false);
   } else {
-    actBtn.style.visibility = 'hidden';
+    setStyle(actBtn, 'visibility', 'hidden');
   }
 
   if (selection.size > 0) {
@@ -532,13 +566,13 @@ export function updateUI() {
       const lvl0 = first.kind === 'building' ? first.level : 1;
       const portraitKey = single ? `${first.kind}:${first.def.id}:${first.owner}:${lvl0}` : '';
       if (portraitKey !== shownPortrait) {
-        selPortrait.innerHTML = single ? iconHtml(first.def.tab, first.def.id, first.owner, lvl0) : '';
+        setHTML(selPortrait, single ? iconHtml(first.def.tab, first.def.id, first.owner, lvl0) : '');
         shownPortrait = portraitKey;
       }
       if (single) {
         const health = Math.max(0, Math.min(100, Math.round(first.hp / first.maxHp * 100)));
         if (health !== shownHealth) {
-          selHealthFill.style.width = `${health}%`;
+          setStyle(selHealthFill, 'width', `${health}%`);
           selHealthFill.classList.toggle('warn', health > 25 && health <= 50);
           selHealthFill.classList.toggle('low', health <= 25);
           selHealth.setAttribute('aria-valuenow', String(health));
@@ -563,35 +597,35 @@ export function updateUI() {
         ? `<b>${name}</b>${lvl} — ${hp}${order}${combat}<br><i>${(first.def as any).desc ?? ''}</i>`
         : `<b>${selection.size} units selected</b><span class="selorder">${groupOrderText(selectedUnits())}</span>${name} +${selection.size - 1} more`;
       if (html !== shownSelection) {
-        selCopy.innerHTML = html;
-        if (!selectionDetails.hidden) detailsCopy.innerHTML = html;
+        setHTML(selCopy, html);
+        if (!selectionDetails.hidden) setHTML(detailsCopy, html);
         shownSelection = html;
       }
     }
   } else {
     if (shownSingle) { selInfo.classList.remove('has-selection'); shownSingle = false; }
-    if (shownPortrait) { selPortrait.innerHTML = ''; shownPortrait = ''; }
+    if (shownPortrait) { setHTML(selPortrait, ''); shownPortrait = ''; }
     const html = '<b>Awaiting orders</b><br>Select a unit or building.';
-    if (html !== shownSelection) { selCopy.innerHTML = html; shownSelection = html; }
+    if (html !== shownSelection) { setHTML(selCopy, html); shownSelection = html; }
   }
 
   // toast
-  toastEl.textContent = toastMsg.text;
-  toastEl.style.opacity = toastMsg.ttl > 0 ? '1' : '0';
+  setText(toastEl, toastMsg.text);
+  setStyle(toastEl, 'opacity', toastMsg.ttl > 0 ? '1' : '0');
 
   // game over
   if (gameOver) {
     if (overlay.style.display !== 'flex') {
       duckMusic();
       document.getElementById('app')!.inert = true;
-      overlay.style.display = 'flex';
+      setStyle(overlay, 'display', 'flex');
       (overlay.querySelector('button') as HTMLButtonElement).focus();
     }
-    overlay.className = gameOver;
+    setClass(overlay, gameOver);
     const novaExpired = novaTotal > 0 && novaLeft <= 0;
-    overlayTitle.textContent = gameOver === 'win' ? 'Victory' : novaExpired ? 'Supernova' : 'Defeat';
+    setText(overlayTitle, gameOver === 'win' ? 'Victory' : novaExpired ? 'Supernova' : 'Defeat');
     const viaCorridor = endReason === 'corridor';
-    overlaySub.textContent = gameOver === 'win' && viaCorridor
+    setText(overlaySub, gameOver === 'win' && viaCorridor
       ? 'The vents held long enough to light the beacon. The ark-fleet rides the corridor out — humanity survives.'
       : gameOver === 'win'
       ? 'The launch corridor is clear. The ark-fleet jumps at dawn — humanity survives.'
@@ -599,14 +633,14 @@ export function updateUI() {
       ? `${FACTION_NAMES[corridor.owner] ?? 'A rival faction'} held the vents and launched first. The corridor closes behind them.`
       : novaExpired
       ? 'Helios detonated with the enemy still standing. The fleet burns. There is no dawn.'
-      : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.';
+      : 'Your forces can no longer hold the surface. The fleet dies in orbit, and humanity with the sun.');
     const m = campaign.activeMission();
     if (m) {
       const end = campaign.endingFor(gameOver === 'win', endReason === 'eliminated')!;
-      overlayTitle.textContent = end.title;
-      overlaySub.textContent = end.text;
+      setText(overlayTitle, end.title);
+      setText(overlaySub, end.text);
       const last = gameOver === 'win' && campaign.isLastMission();
-      againBtn.textContent = last ? 'Epilogue ▸' : gameOver === 'win' ? 'Next mission ▸' : 'Retry mission';
+      setText(againBtn, last ? 'Epilogue ▸' : gameOver === 'win' ? 'Next mission ▸' : 'Retry mission');
       againBtn.onclick = last
         ? () => showEpilogue(campaign.endingChosen(), campaign.progress().flags ?? {}, () => location.reload())
         : () => { campaign.queueMission(gameOver === 'win'); location.reload(); };
@@ -621,7 +655,7 @@ export function updateUI() {
         ['Structures razed', String(stats.razed)],
         ['Orbital strikes', String(stats.strikes)],
       ];
-      overlayStats.innerHTML = rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join('');
+      setHTML(overlayStats, rows.map(([k, v]) => `<div class="k">${k}</div><div class="v">${v}</div>`).join(''));
     }
   }
 }
@@ -645,7 +679,7 @@ function refreshTabs() {
 function updateCampaignUI() {
   const m = campaign.activeMission();
   const tech = (m?.id ?? '') + SLOTS[PLAYER];
-  if (tech !== shownTech) { shownTech = tech; iconCache.clear(); refreshTabs(); rebuildGrid(); }   // a new faction means new icons too   // the build bar follows the mission's and faction's tech
+  if (tech !== shownTech) { shownTech = tech; iconCache.clear(); tabCache.clear(); refreshTabs(); rebuildGrid(); prewarmTabs(); }   // a new faction means new icons too   // the build bar follows the mission's and faction's tech
   const line = campaign.currentComm();
   if (line !== shownComm) {   // only touch the DOM when the line changes
     shownComm = line;
