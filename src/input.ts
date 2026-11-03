@@ -92,7 +92,10 @@ function zoomAt(factor: number, screenX: number, screenY: number) {
 // the units you just picked up answer (one voice for the group, and only for fighting units)
 function greet() {
   const u = selectedUnits().find(x => !x.def.harvester);
-  if (u) voice('select', SLOTS[PLAYER], u.def.tab === 'veh');
+  if (u) { voice('select', SLOTS[PLAYER], u.def.tab === 'veh'); return; }
+  // a building of yours gives a quiet hum instead
+  const only = selection.size === 1 ? byId.get([...selection][0]) : undefined;
+  if (only?.kind === 'building' && only.owner === PLAYER) sfx('select');
 }
 function selectedUnits(): Unit[] {
   const out: Unit[] = [];
