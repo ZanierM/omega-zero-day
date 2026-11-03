@@ -319,9 +319,7 @@ export function takeQueuedMission(): string | null {
 }
 export function isLastMission() { return !!def && MISSIONS[MISSIONS.length - 1].id === def.id; }
 
-export function unlocked(id: string) {
-  const i = MISSIONS.findIndex(m => m.id === id), done = progress().done;
-  // a mission stays open once you've reached it, or anything after it (missions added later slot in without locking you out)
-  return i === 0 || !!MISSIONS[i - 1]?.optional || done.includes(MISSIONS[i - 1]?.id) || MISSIONS.slice(i).some(m => done.includes(m.id));
-}
+// every mission is open from the start; the list still picks your next unfinished one,
+// and a later mission played early just runs with the default choices
+export function unlocked(id: string) { return MISSIONS.some(m => m.id === id); }
 export { MISSIONS, FACTION_NAMES };

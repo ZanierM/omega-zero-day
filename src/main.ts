@@ -361,12 +361,14 @@ function renderMissions() {
   if (!selectedMission || !campaign.unlocked(selectedMission)) selectedMission = firstOpen.id;
   const ACTS: Record<number, string> = { 0: 'Boot camp', 1: 'Act I — Landfall', 2: 'Act II — The Corridor', 3: 'Act III — Last Light' };
   const button = (m: typeof campaign.MISSIONS[number]) => {
-    const open = campaign.unlocked(m.id), fin = done.includes(m.id);
-    return `<button class="opt mission${m.id === selectedMission ? ' sel' : ''}" type="button" data-id="${m.id}"${open ? '' : ' disabled'}>`
-      + `<i>${fin ? '✓' : open ? m.code : '🔒'}</i>${m.title}<span>${open ? m.tagline : 'Complete the previous mission'}</span></button>`;
+    const fin = done.includes(m.id);
+    return `<button class="opt mission${m.id === selectedMission ? ' sel' : ''}${fin ? ' done' : ''}" type="button" data-id="${m.id}" title="${m.code} · ${m.title}">`
+      + `<i>${fin ? '✓' : m.code}</i><b>${m.title}</b><span>${m.tagline}</span></button>`;
   };
-  missionList.innerHTML = [...new Set(campaign.MISSIONS.map(m => m.act))].map(act =>
-    `<div class="optlabel">${ACTS[act]}</div><div class="actrow">${campaign.MISSIONS.filter(m => m.act === act).map(button).join('')}</div>`).join('');
+  missionList.innerHTML = [...new Set(campaign.MISSIONS.map(m => m.act))].map(act => {
+    const ms = campaign.MISSIONS.filter(m => m.act === act);
+    return `<div class="optlabel">${ACTS[act]}</div><div class="actrow${ms.length === 1 ? ' solo' : ''}">${ms.map(button).join('')}</div>`;
+  }).join('');
   const m = campaign.MISSIONS.find(x => x.id === selectedMission)!;
   missionBrief.innerHTML = `<div class="optlabel">Transmission · ${m.code} ${m.title}</div>`
     + `<div class="transmission"><img src="portraits/varga.webp" alt="Admiral Varga"><div>${m.briefing.map(p => `<p>${p}</p>`).join('')}</div></div>`
