@@ -51,13 +51,25 @@ export function duckMusic() {
 // ---------------- sound effects ----------------
 
 // interface and alert sounds (not positioned); battle sounds are sfxAt() below
-type SfxName = 'place' | 'ready' | 'click'
+type SfxName = 'place' | 'ready' | 'click' | 'select'
              | 'error' | 'cash' | 'research' | 'upgrade' | 'siren' | 'alert';
 
 const lastPlayed: Record<string, number> = {};
 const MIN_GAP: Partial<Record<SfxName, number>> = {
-  cash: 0.25, click: 0.03,
+  cash: 0.25, click: 0.04, select: 0.12,
 };
+
+// a sine through a lowpass with its own envelope: rounder than osc(), for the interface sounds
+function soft(f0: number, f1: number, t: number, attack: number, decay: number, peak: number, cutoff = 1800, type: OscillatorType = 'sine') {
+  const o = ac!.createOscillator(), f = ac!.createBiquadFilter(), g = ac!.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + attack + decay);
+  f.type = 'lowpass'; f.frequency.value = cutoff; f.Q.value = 0.5;
+  env(g, t, peak, attack, decay);
+  o.connect(f); f.connect(g); g.connect(sfxBus);
+  o.start(t); o.stop(t + attack + decay + 0.05);
+}
 
 function env(g: GainNode, t: number, peak: number, attack: number, decay: number) {
   g.gain.setValueAtTime(0, t);
@@ -127,18 +139,33 @@ export function sfx(name: SfxName) {
   const t = now;
   switch (name) {
     case 'place':
-      osc('sine', 150, 60, t, 0.16, 0.28, sfxBus);
-      noise(t, 0.08, 0.10, 3000, 500);
+      // a structure set down: a heavy foot landing, a puff of dust, then two bolts clanking home
+      soft(120, 52, t, 0.004, 0.32, 0.34, 600);
+      noise(t, 0.22, 0.07, 900, 180);
+      for (const [dt2, f] of [[0.07, 610], [0.15, 470]]) {
+        noise(t + dt2, 0.03, 0.06, 3200, 1800, sfxBus, 'bandpass', 3);
+        soft(f, f * 0.97, t + dt2, 0.002, 0.12, 0.05, 2400, 'triangle');
+      }
       break;
     case 'ready':
-      osc('sine', 660, 660, t, 0.09, 0.12, sfxBus);
-      osc('sine', 880, 880, t + 0.1, 0.16, 0.12, sfxBus);
+      // done: a warm rising fifth, soft-edged
+      soft(392, 392, t, 0.012, 0.32, 0.09, 2200, 'triangle');
+      soft(587, 587, t + 0.11, 0.012, 0.45, 0.09, 2200, 'triangle');
       break;
     case 'click':
-      osc('square', 1400, 1000, t, 0.03, 0.05, sfxBus);
+      // a chunky console switch: a short tick and a low wooden knock, no beep
+      noise(t, 0.018, 0.05, 2600, 1400, sfxBus, 'bandpass', 2);
+      soft(330, 240, t, 0.002, 0.06, 0.07, 900);
+      break;
+    case 'select':
+      // your own building answers: a low, soft power-up hum
+      soft(196, 196, t, 0.02, 0.22, 0.06, 700, 'triangle');
+      soft(294, 294, t + 0.04, 0.02, 0.2, 0.035, 700, 'triangle');
       break;
     case 'error':
-      osc('square', 170, 140, t, 0.16, 0.10, sfxBus);
+      // no: two dull low knocks, not a buzz
+      soft(150, 120, t, 0.004, 0.1, 0.12, 500, 'triangle');
+      soft(130, 100, t + 0.12, 0.004, 0.12, 0.12, 500, 'triangle');
       break;
     case 'cash':
       osc('sine', 1150, 1150, t, 0.05, 0.08, sfxBus);
